@@ -1,0 +1,40 @@
+name: Release VPS
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+jobs:
+  artifact:
+    uses: ./.github/workflows/ci.yml
+    with:
+      publish: true
+  deploy:
+    needs: artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Deploy tested digest through restricted SSH
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          IMAGE: ${{ needs.artifact.outputs.image }}
+        run: |
+          umask 077
+          export DEPLOY_KEY_FILE="$RUNNER_TEMP/deploy-key"
+          export DEPLOY_KNOWN_HOSTS_FILE="$RUNNER_TEMP/deploy-known-hosts"
+          trap 'rm -f "$DEPLOY_KEY_FILE" "$DEPLOY_KNOWN_HOSTS_FILE"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$DEPLOY_KEY_FILE"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$DEPLOY_KNOWN_HOSTS_FILE"
+          unset DEPLOY_KEY DEPLOY_KNOWN_HOSTS
+          bash deploy/ssh-deploy.sh "$IMAGE"

@@ -1,0 +1,105 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        default: false
+    outputs:
+      image:
+        description: Tested immutable application image
+        value: ${{ jobs.publish.outputs.image }}
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - name: Install exact toolchain and locked dependencies
+        run: |
+          npm install --global npm@11.19.0
+          npm ci
+      - name: Lint, domain/API tests, production build
+        run: npm run check
+      - name: Browser and accessibility journeys
+        run: |
+          npx --no-install playwright install --with-deps chromium firefox webkit
+          npm run test:browser
+      - name: Validate deployment scripts
+        run: |
+          for file in deploy/*.sh; do bash -n "$file"; done
+          python3 -m py_compile deploy/provision-do.py
+          bash deploy/test-validation.sh
+          python3 deploy/test-release.py
+      - name: Build and smoke the production image without upstream access
+        env:
+          NODE_IMAGE: ${{ vars.NODE_IMAGE || 'node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e' }}
+        run: |
+          source deploy/validate.sh
+          valid_node_image "$NODE_IMAGE" || fail 'NODE_IMAGE override must be node:24.20.0-bookworm-slim@sha256:<verified digest>.'
+          docker build --build-arg "NODE_IMAGE=$NODE_IMAGE" --label "org.opencontainers.image.revision=$GITHUB_SHA" --tag "hotel-revealer-ci:$GITHUB_SHA" .
+          bash deploy/smoke-image.sh "hotel-revealer-ci:$GITHUB_SHA"
+      - name: Save the exact tested image for release
+        if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+        run: docker save "hotel-revealer-ci:$GITHUB_SHA" --output "$RUNNER_TEMP/tested-image.tar"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+        with:
+          name: tested-image
+          path: ${{ runner.temp }}/tested-image.tar
+          compression-level: 1
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+  publish:
+    if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tested-image
+          path: ${{ runner.temp }}
+      - name: Publish the tested image for a manual release
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          [[ "$repository" =~ ^ghcr\.io/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$ ]] || exit 1
+          docker load --input "$RUNNER_TEMP/tested-image.tar"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          docker tag "hotel-revealer-ci:$GITHUB_SHA" "$repository:sha-$GITHUB_SHA"
+          docker push "$repository:sha-$GITHUB_SHA"
+          image=$(docker inspect --format '{{index .RepoDigests 0}}' "$repository:sha-$GITHUB_SHA")
+          [[ "$image" =~ @sha256:[a-f0-9]{64}$ ]] || exit 1
+          [[ ${image%@sha256:*} == "$repository" ]] || exit 1
+          printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"

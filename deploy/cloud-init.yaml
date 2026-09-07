@@ -1,0 +1,109 @@
+#cloud-config
+# Template rendered by provision-do.py; never put a private key or provider secret here.
+package_update: true
+package_upgrade: true
+ssh_pwauth: false
+disable_root: true
+users:
+  - name: operator
+    groups: [sudo]
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - __ADMIN_PUBLIC_KEY__
+  - name: deploy
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __RESTRICTED_DEPLOY_PUBLIC_KEY__
+packages:
+  - ca-certificates
+  - curl
+  - ufw
+  - unattended-upgrades
+  - apt-listchanges
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-hotel-revealer.conf
+    permissions: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      MaxAuthTries 3
+      MaxStartups 10:30:30
+      LoginGraceTime 30
+      LogLevel VERBOSE
+      AllowUsers operator deploy
+      Match User deploy
+        AllowTcpForwarding no
+        AllowAgentForwarding no
+        X11Forwarding no
+        PermitTTY no
+        PermitUserRC no
+      Match all
+  - path: /etc/sudoers.d/hotel-revealer-deploy
+    permissions: '0440'
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/local/sbin/hotel-revealer-release *
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  - path: /etc/apt/apt.conf.d/52hotel-revealer-security
+    permissions: '0644'
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "false";
+  - path: /etc/systemd/journald.conf.d/hotel-revealer.conf
+    permissions: '0644'
+    content: |
+      [Journal]
+      SystemMaxUse=100M
+      RuntimeMaxUse=50M
+  - path: /etc/docker/daemon.json
+    permissions: '0644'
+    content: |
+      {"log-driver":"local","log-opts":{"max-size":"10m","max-file":"3"}}
+  - path: /usr/local/sbin/hotel-revealer-bootstrap
+    permissions: '0700'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      . /etc/os-release
+      [[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]]
+      export DEBIAN_FRONTEND=noninteractive
+      install -m 0755 -d /etc/apt/keyrings
+      curl --proto '=https' --fail --silent --show-error https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      cat > /etc/apt/sources.list.d/docker.sources <<EOF
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: noble
+      Components: stable
+      Architectures: $(dpkg --print-architecture)
+      Signed-By: /etc/apt/keyrings/docker.asc
+      EOF
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      systemctl enable --now docker unattended-upgrades
+      systemctl restart systemd-journald
+      # The deployment account cannot replace its forced command or public key.
+      chown root:root /home/deploy /home/deploy/.ssh /home/deploy/.ssh/authorized_keys
+      chmod 755 /home/deploy
+      chmod 755 /home/deploy/.ssh
+      chmod 644 /home/deploy/.ssh/authorized_keys
+      visudo -cf /etc/sudoers.d/hotel-revealer-deploy
+      sshd -t
+      systemctl reload ssh
+      ufw default deny incoming
+      ufw default allow outgoing
+      __SSH_UFW_RULES__
+      ufw allow 80/tcp
+      ufw allow 443/tcp
+      ufw --force enable
+      docker compose version
+runcmd:
+  - [/usr/local/sbin/hotel-revealer-bootstrap]
+final_message: "Bootstrap finished. Check cloud-init status, SSH host key and firewall before installing release scripts."

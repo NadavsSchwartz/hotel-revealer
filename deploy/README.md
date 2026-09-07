@@ -1,0 +1,134 @@
+# VPS deployment preparation
+
+This is a single Linux VPS deployment: Node serves the built React application
+and API; Caddy terminates HTTPS. The current application has no live provider
+adapter. `/health` checks process health and never contacts a hotel provider.
+Hostinger managed Node hosting cannot run these Docker/VPS scripts; it requires
+its own platform setup. No host has been provisioned or released by this work.
+
+## Review and provision
+
+The initial sizing candidate is one `s-1vcpu-1gb` Ubuntu 24.04 Droplet. Container
+limits are 512 MiB for the app and 128 MiB for Caddy; this is an unmeasured starting
+point, not a capacity claim. Verify current region availability and pricing before
+creating the host. Application builds run in CI, never on the VPS.
+
+Use separate existing Ed25519 public keys for the administrator and CI deployer,
+and an existing DigitalOcean administrator SSH key ID:
+
+```sh
+python3 deploy/provision-do.py \
+  --admin-key ~/.ssh/hotel-admin.pub \
+  --deploy-key ~/.ssh/hotel-deploy.pub \
+  --ssh-key-id 123456 \
+  --render /tmp/hotel-cloud-init.yaml
+```
+
+The default is a local dry run: no cloud API calls and no purchases. The optional
+`--render` file must not already exist. An explicitly authorized `--apply` run
+creates a tag, cloud firewall and billable Droplet. Authenticate doctl locally;
+do not put a DigitalOcean token in deployment CI. Failed provisioning preserves
+created resources and reports the completed IDs; inspect the account before
+retrying or deleting anything.
+
+SSH defaults to public IPv4 for compatibility with standard GitHub hosted runners.
+Only key authentication is enabled. Root login, passwords, forwarding and PTYs
+for the deployment account are disabled. Its key has a forced release command;
+the account has no Docker-group membership and cannot rewrite its authorized key
+or installed scripts. Repeat `--ssh-cidr` to restrict SSH when stable administrator
+and runner source addresses are available. The cloud firewall permits public TCP
+80/443; only Caddy publishes those ports. Docker can bypass UFW for published
+ports, so keep the cloud firewall and loopback-only app port in place.
+
+## Install the reviewed configuration
+
+1. Verify `cloud-init status --wait` and inspect failures through the provider
+   console. Verify the SSH host public key/fingerprint through that independent
+   console before making a known_hosts entry. `ssh-keyscan` alone is not identity
+   verification.
+2. Copy the reviewed `deploy/` directory using the administrator account and run
+   `sudo bash deploy/install.sh`. Docker Engine and Compose **2.30+** must exist.
+3. Edit `/etc/hotel-revealer/compose.env` with the domain and ACME email. The example
+   pins an official Caddy manifest verified on 2026-09-07; an override must also
+   use a verified `caddy:2...@sha256:<64 lowercase hex>` reference. Set the domain's
+   DNS to this VPS. This file is parsed as data, not executed as shell.
+4. Create root-owned mode-600 `/etc/hotel-revealer/image-repository` containing
+   exactly `ghcr.io/OWNER/REPOSITORY` in lowercase, without a tag or digest.
+5. Keep root-only `/etc/hotel-revealer/runtime.env` empty for the current disabled
+   provider. Any future approved credentials stay here, outside Git and CI.
+   Compose reads literal `KEY=value` lines; do not add shell quotes or commands.
+6. For a private GHCR package, configure a dedicated read-only package credential
+   in root's Docker credential configuration on the host, without placing it in
+   source, cloud-init or workflow output. CI's temporary publishing token cannot
+   serve as persistent host registry authentication.
+
+State belongs in `/var/lib/hotel-revealer/provider`, owned by UID/GID 1000. This is
+only provider block/cooldown state, not hotel or search persistence. Caddy's named
+volumes hold TLS state. Preserve these directories/volumes on replacement or
+restore; losing cooldown state can allow an early retry. Keep the last healthy
+application image in the local Docker cache. There is no automatic image prune.
+
+## Configure CI and release
+
+- Optional repository variable `NODE_IMAGE`: override the default with a verified
+  `node:24.20.0-bookworm-slim@sha256:<64 lowercase hex>` reference. Docker and CI
+  default to the official manifest digest verified on 2026-09-07. The registry
+  manifests were checked; the image build and container runtime remain unverified
+  locally because Docker is unavailable.
+- Production environment variable `DEPLOY_HOST`: plain DNS name or IPv4 address.
+- Production environment secrets `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS`: the
+  restricted private key and independently verified exact-host known_hosts entry.
+- Set the production environment's allowed branch to `main` and require operator
+  review before a public release. Protect main and the workflow/deployment files.
+
+CI runs lint, domain/API tests, the build and Chromium/Firefox/WebKit journeys.
+It then builds the image and tests its UI, `/health`, nonroot process, read-only
+root and persistent state mount with external container networking disabled.
+Only a manual **Release VPS** workflow saves that tested image and passes it to a
+separate job with package-write permission; production receives its exact digest.
+The deployment job has no package-write or cloud API credential.
+
+The release script serializes changes, rejects unexpected repositories and
+mutable image references, pulls before downtime, then stops/drains the old app
+before starting the replacement. It checks `/health` within a bounded polling
+window. Failure stops the replacement and restores the previous application
+digest; a failed first release removes only the failed app container and preserves
+its state directory, allowing a later retry. Release failure remains a
+failed job even when rollback succeeds. This includes a short service outage.
+The rollback covers the application image, not independent Caddy/config changes.
+An administrator can release a previously tested digest using the same script:
+
+```sh
+sudo /usr/local/sbin/hotel-revealer-release ghcr.io/OWNER/REPOSITORY@sha256:DIGEST
+```
+
+The command above uses placeholders that validation rejects until replaced.
+After release, verify public HTTPS, static assets, the disabled-provider user
+journey, a planned failed-image rollback, and reboot recovery. Measure memory,
+CPU and disk before claiming this host is sufficient. Docker/cloud/SSH/TLS/reboot
+execution remains unverified locally; shell/YAML parsing and fake-command release
+tests do not substitute for those checks.
+
+## Health notifications and maintenance
+
+Set repository variables `HEALTH_HOST` and `HEALTHCHECK_ENABLED=true` after release.
+The scheduled workflow requests only HTTPS `/health` twice hourly; it never runs
+a search or provider refresh. Enable failed-workflow email notifications in your
+GitHub notification settings and manually run a failure/recovery drill to verify
+delivery. GitHub schedules can be delayed or disabled after inactivity, so this
+is lightweight monitoring, not an uptime guarantee. No message destination is
+configured automatically.
+
+Host security updates are automatic; automatic reboot is disabled. Schedule and
+verify reboots when updates require them. Logs are bounded (Docker local logs
+30 MiB per service, journald 100 MiB disk/50 MiB runtime). Watch disk use manually
+and remove only explicitly reviewed obsolete image digests after preserving
+current/rollback images and persistent volumes.
+
+Implementation references verified 2026-09-07:
+[Docker installation](https://docs.docker.com/engine/install/ubuntu/),
+[Compose service settings](https://docs.docker.com/reference/compose-file/services/),
+[Caddy proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy),
+[doctl Droplet creation](https://docs.digitalocean.com/reference/doctl/reference/compute/droplet/create/),
+[doctl firewall rules](https://docs.digitalocean.com/reference/doctl/reference/compute/firewall/create/).
+GitHub Actions are pinned to commit SHAs verified through their official tag refs.

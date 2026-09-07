@@ -1,0 +1,22 @@
+name: Public health
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: public-health
+  cancel-in-progress: true
+jobs:
+  health:
+    if: vars.HEALTHCHECK_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check HTTPS health only
+        env:
+          HEALTH_HOST: ${{ vars.HEALTH_HOST }}
+        run: |
+          [[ "$HEALTH_HOST" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$HEALTH_HOST" == *.* && "$HEALTH_HOST" != *..* ]] || exit 1
+          status=$(curl --proto '=https' --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 10 --max-time 20 "https://$HEALTH_HOST/health")
+          [[ "$status" == 200 ]] || { echo "Health endpoint returned HTTP $status" >&2; exit 1; }
