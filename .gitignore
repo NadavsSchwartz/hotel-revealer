@@ -45,3 +45,9 @@ dist
 out
 .yarn
 .yarnrc
+var/
+output/
+test-results/
+playwright-report/
+.env.*
+!.env.example

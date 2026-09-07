@@ -1,45 +1,36 @@
-import dotenv from 'dotenv';
-import express from 'express';
-import morgan from 'morgan';
-import { notFound, errorHandler } from './middleware/errorMiddleware.js';
-import connectDB from './config/mongodb.js';
-import hotelDealsRoutes from './routes/hotelDealsRoutes.js';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import path from 'path';
+import 'dotenv/config';
+import { createApp } from './app.js';
+import { createProviderService } from './provider/service.js';
 
-dotenv.config();
+const service = createProviderService();
+const app = createApp({ service });
+const port = Number(process.env.PORT || 5000);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
 
-connectDB();
+const server = app.listen(port, () => {
+  console.info({ event: 'server_started', port, providerConfigured: false });
+});
+server.requestTimeout = 30_000;
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+let stopping = false;
 
-const app = express();
-app.use(express.json());
-app.use(cors());
-app.use(cookieParser());
-if (process.env.NODE_ENV === 'development') {
-	app.use(morgan('dev'));
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  service.drain();
+  const forceClose = setTimeout(() => {
+    service.close();
+    server.closeAllConnections();
+  }, 25_000);
+  forceClose.unref();
+  server.close(() => {
+    clearTimeout(forceClose);
+    service.close();
+    console.info({ event: 'server_stopped' });
+  });
+  server.closeIdleConnections();
 }
-const __dirname = path.resolve();
-console.log('dirname', __dirname);
-app.use('/api/v1/', hotelDealsRoutes);
 
-if (process.env.NODE_ENV === 'production') {
-	app.use(express.static(path.join(__dirname, '/frontend/build')));
-
-	app.get('*', (req, res) =>
-		res.sendFile(path.resolve(__dirname, 'frontend', 'build', 'index.html'))
-	);
-} else {
-	app.get('/', (req, res) => {
-		res.send('API is running....');
-	});
-}
-app.use(notFound);
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(
-	PORT,
-	console.log(`Server running in ${process.env.NODE_ENV}, mode on port ${PORT}`)
-);
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

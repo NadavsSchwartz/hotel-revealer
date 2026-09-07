@@ -1,96 +1,139 @@
-![Heroku](https://pyheroku-badge.herokuapp.com/?app=hotel-revealer&style=flat)
+# Hotel Revealer
 
-# HotelRevealer
-> Find hidden Priceline Hotel deals with a click of a button.
+A small traveler application for comparing an unnamed Express offer with possible
+named hotels. It keeps the original offer, candidate evidence, and retail hotel
+information separate. A candidate is never presented as a verified identity.
 
-https://hotelrevealer.org
+**Current status:** local application and offline verification are implemented.
+There is no live provider adapter. Production search fails closed with a clear
+unavailable state. This is not a live release or a sample-data demo. Read
+[the live-access prerequisite](docs/LIVE_ACCESS.md) before connecting a provider.
 
-### Table of Contents
+## Run locally
 
-- [Description](#description)
-- [Key Features](#key-features)
-- [Stack](#Stack)
-- [Setup](#Setup)
-- [Resources](#Resources)
-    - [Home Page Component](#HomePage)
-    - [Search Results](#SearchResults)
-    - [Recent Deals](#RecentDeals)
-    - [Hotel Details](#HotelDetails)
-- [Contributing](#contributing)
-- [License](#license)
+Requires the exact Node version in `.nvmrc` (24.20.0) and its npm (11.19.0).
 
----
+```sh
+nvm install
+nvm use
+npm ci
+npm run dev
+```
 
-## Description
-HotelRevealer was created to help people conveniently attempt to find the hidden hotel behind Priceline's express deals,
-helping you save up to 70% of the regular hotel price.
+The frontend runs at `http://127.0.0.1:5173`; `/api` is proxied to Express on port
+5000. No database, map key, browser secret, or live-provider credential is needed.
 
+For the actual production build:
 
-## Key Features
-- Free forever.
-- Modern design.
-- Live data extraction from Priceline's servers.
-- Dedicated Hotel details page to view reviews, amenities and, important information on the hotel.
-- Google Maps integration to see the surrounding area of the hotel.
+```sh
+npm run build
+NODE_ENV=production npm start
+```
 
-## Stack:
-- Node (Web server)
-- Express (Web server framework)
-- React (UI library)
-- Redux (State management)
-- MongoDB (database)
-- styled-components (CSS styling solution library)
-- crypto-js (secure cryptographic algorithms)
+Open `http://127.0.0.1:5000`. `/health` checks the application without querying a
+hotel provider. HTTP 200 from this endpoint proves the app is responding, not that
+live search is configured. Copy `.env.example` if configuration is needed.
 
-## Setup
+## Verify
 
-1. Clone this repository
-2. Create an `.env` file and fill it properly ([see below](#configuration)).
-3. Install dependencies: `npm install` or `yarn` if you're using yarn.
-4. Run for development: `npm run dev` or `yarn dev` if you're using yarn.
+```sh
+npm run check
+npx playwright install chromium firefox webkit
+npm run test:browser
+```
 
-### Configuration
+`check` runs lint, native Node domain/API tests, and the production build. Browser
+tests start that build and intercept only their own API calls with synthetic
+fixtures. The production server has no fixture or demo switch. Chromium, mobile
+emulation, Firefox, and WebKit tests do not substitute for actual Chrome/Edge/
+Safari, physical mobile-device, or assistive-technology signoff.
 
-For the configuration, the following settings have to be added in your `.env`-file:
+Generated evidence lives in ignored `output/`, `test-results/`, and
+`playwright-report/`. See [acceptance evidence](docs/ACCEPTANCE.md) for the current
+claims and missing release gates.
 
-- **MONGO_URI**: The connection string
-- [**REACT_APP_GOOGLE_MAP_API_KEY**: Your google map api key](https://developers.google.com/maps/documentation/javascript/get-api-key)
-- **REACT_APP_SECRET**: secure secret used for crypto-js
+## Application boundaries
 
-## Resources
+- `shared/`: supported cities shared by browser and API.
+- `backend/domain/`: input validation, conservative normalization and pure matching.
+- `backend/provider/`: bounded scheduling, request sharing, fresh caches, control
+  state, and the injectable authorized-adapter boundary.
+- `backend/app.js`: JSON contracts, safe errors, security headers, static SPA and
+  app-only health route. `backend/server.js` owns startup and shutdown.
+- `frontend/src/traveler/`: React/Redux search, comparison, detail, and recovery UI.
+- `deploy/`: optional single-VPS deployment preparation. Hostinger managed hosting
+  is a separate deployment candidate; do not run VPS scripts against shared hosting.
 
-### HomePage
-| route | method | description | Docs |
-|---|---|---|---|
-|  '/' | GET | Show homepage|  [code](./frontend/src/screens/Home/Home.js) |
+The API paths remain POST `/api/v1/hotelDeals` and POST `/api/v1/deal`. The former
+encrypted `q` links are retired. Plain date-only URL context makes refresh and
+back navigation reproducible. Full JSON contracts are in
+[the implementation contract](docs/IMPLEMENTATION.md).
 
----
+## Matching decisions
 
-### SearchResults
-| route | methods | description | Docs |
-|---|---|---|---|
-|  '/results?q=hashed-form-data' | GET | Show search results for hotel deals | [code](./frontend/src/screens/HotelResults/HotelResults.js) |
+Neighborhood and stars establish the initial comparison. Rating, review-count,
+and amenity evidence determines supported/partial candidates; missing evidence
+remains unknown. The matcher does not invent rounding or masking semantics.
+Contradictions require comparable known facts. Price orders candidates only
+within a tier and cannot establish identity. Duplicate observations are merged
+conservatively, without reconstructing stronger evidence from conflicting rows.
 
----
-### RecentDeals
-| route | methods | description | Docs |
-|---|---|---|---|
-|  '/recent-deals' | GET | Show recent searches made by users |  [code](./frontend/src/screens/Home/Grid/RecentDealsGrid.js) |
+Raw legacy website fields do not establish masked numeric semantics. An authorized
+adapter must supply documented clue semantics and an original-offer handoff bound
+to the same trip. Normalization never synthesizes a booking URL.
 
----
-### HotelDetails
-|  route | Methods | description  |  Docs |
-|---|---|---|---|
-|  '/deal?q=hashed-deal-data' | GET | Show hotel details by deal| [code](./frontend/src/screens/HotelDetails/HotelDetails.js) |
+Retrieved pagination completeness is not exhaustive provider coverage. Offline
+fixtures test behavior; they do not measure live identification accuracy.
 
+## Operating limits
 
-## Contributing
+One process coordinates all provider work: one active call, a one-second start
+gap, at most four waiting requests, at most three search pages, and admission-to-
+response deadlines of 20 seconds for searches and 10 seconds for details.
+Search/detail cache limits are 25/100 entries with five-minute/one-minute freshness,
+subject to provider permissions. No automatic retry is used. A detail request must
+revalidate its offer/candidate relationship; a missing retail rate does not imply
+that an Express offer is unavailable.
 
-Pull requests are welcome. You'll probably find lots of improvements to be made.
+Only provider cooldown/block control state is persisted in `var/`. Search results
+remain process-local and are lost on restart. The block must survive restart.
+After reviewing and resolving its cause, the operator can reset control state:
 
-Open issues for feedback, requesting features, reporting bugs, or discuss ideas.
+```sh
+npm run provider:reset -- --after-review
+```
 
-## License
+Then restart the app. Resetting control state does not authorize or configure live
+access. Never reset state to bypass provider restrictions.
 
-The app is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+## Security and remaining dependency advisories
 
+The application renders upstream text as text, accepts only bounded structured
+input, validates handoff/image hosts, does not expose a generic URL proxy, and
+avoids credentials or trip payloads in routine logs. Search/detailed views must not
+be treated as authoritative booking information.
+
+Express stays on major 4; `qs` is overridden to its patched 6.16.0 release.
+The retained React Router 6 line has two advisory entries: the SSR deserialization
+path is not used by this client-only SPA; internal navigation uses fixed local
+paths with encoded query values, and provider navigation uses allowlisted native
+links. Targeted link tests and a source review are required before claiming these
+paths are unreachable. Do not run `npm audit fix --force` and silently change the
+React/router major versions. ESLint 9 is retained for the React plugin's declared
+peer compatibility; it emits an upstream support warning and should be reviewed
+when the plugin supports the next major.
+
+## Release prerequisites
+
+Written provider permission and current authorized integration documentation,
+known-outcome matching evidence, manual VoiceOver and real mobile checks,
+3–5 first-time-user sessions, host sizing, verified deployment/rollback/reboot,
+and the public live flow remain required. No provider messages, bookings, hosting
+purchases, domain registrations, or external deployments have been performed.
+
+## Development checkpoints
+
+Commit coherent, tested milestones and use a separate skeptical reviewer before
+substantial checkpoints. The first review fixed cross-page revival of conflicting
+offer clues and invalidated browser-held candidate evidence after server rejection.
+See `AGENTS.md` for the ongoing working agreement.
