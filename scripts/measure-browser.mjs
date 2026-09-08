@@ -166,7 +166,7 @@ try {
     await sort.focus();
     // Native select type-ahead chooses "Lowest nightly quote" on installed Chrome.
     const sorting = await sampleAction(page, 'sort 100 fixture offers by price', () => page.keyboard.press('l'), () => page.waitForFunction(() => document.querySelector('.offer-card')?.getAttribute('aria-labelledby') === 'offer-offer-lab-100-title'));
-    const compare = page.getByRole('button', { name: /Compare 2 candidates/ }).first();
+    const compare = page.getByRole('button', { name: 'Why these matches?', exact: true }).first();
     await compare.scrollIntoViewIfNeeded();
     const expansion = await sampleAction(page, 'expand first fixture comparison', () => compare.click(), () => page.locator('.offer-expanded').waitFor());
     if (run === 1) await page.screenshot({ path: `${output}/comparison-mobile-100-offers-test-only.png` });
@@ -187,7 +187,7 @@ try {
   await page.goto('/', { waitUntil: 'networkidle' });
   await page.screenshot({ path: `${output}/home-desktop-current.png`, fullPage: true });
   await page.goto(searchPath);
-  await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
+  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
   await page.screenshot({ path: `${output}/comparison-desktop-test-only.png`, fullPage: true });
   await context.close();
 

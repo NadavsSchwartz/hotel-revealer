@@ -11,18 +11,100 @@ permission or exception to the published terms has been established.
 | Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 140/140 local cases passed | 35 scenarios across Chromium, mobile Chromium, Firefox and WebKit; no retries or skips. Production-build intercepted journeys and real app live flow are separate evidence |
+| Browser journeys | 200 local cases covered and passing | 50 scenarios across Chromium, mobile Chromium, Firefox and WebKit; exact runs below. Production-build intercepted journeys and real app live flow are separate evidence |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Previous-design baseline plus isolated live timings; gate open | Repeat the browser performance measurement on the selected production design; field INP/p75, controlled live-search latency and hosted sizing remain unverified |
-| Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; retained Router 6 advisories documented in README |
+| Performance | Current local mobile LCP/CLS target passed in three runs | LCP 2.352/2.144/2.160s; CLS 0.001181. Field INP/p75, controlled live-search latency and hosted sizing remain unverified |
+| Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
-## Current live checkpoint
+## Comparison and family-pricing milestone (`6954d01`)
+
+Hotel names, photos, match strength and original-offer pricing lead the comparison.
+Detailed clue values remain available on demand. Results paginate 12 offers;
+expanded comparisons reveal eight hotels at a time and preserve the revealed
+count, focus and scroll when returning from a hotel. Refresh keeps prior results
+visible; a rejected selection invalidates only the affected original shortlist.
+
+The search animation uses a restrained wordmark reveal with a reduced-motion
+alternative. Travelers retain page position for pointer actions, preserve keyboard
+and validation focus, and recompute the panel's bounds when the viewport changes.
+Calendar navigation and selected dates now expose accessible names and states.
+Responsive results/details CSS no longer declares text below 12px.
+
+Final native suite: **169 passed** after the current provider correction. The
+shared lint/build check passed before that backend-only correction; its unchanged
+frontend artifact is `index-BmlF8wpI.js`. All **200 browser combinations** are
+covered: Chromium initially passed 49/50, its obsolete tooltip-copy assertion was
+updated and the targeted case passed, then mobile/Firefox/WebKit passed 150/150.
+No automatic retries, skipped tests or new Axe exceptions were added. Exact runs
+and explicitly synthetic screenshots are in
+`output/verification/current-ui-fixtures/browser-verification.md`.
+
+Live verification exposed two pricing defects that stubs alone did not establish:
+legacy plain-age API inputs did not carry the intended child occupancy, and the
+legacy total could omit a second room's property fees. Both are corrected. API
+children use ordinal-age strings (`1-7` for the first child aged seven); provider
+URLs retain plain ages. The original quote now uses current `sopqHotelDetails`
+pricing, independently of the named hotel's retail price. An ambiguous, malformed
+or inconsistent price falls back to the listing quote without claiming fee
+inclusion. Totals are never multiplied or estimated. See LIVE_ACCESS.md for the
+observed inputs, amounts and stricter quote-selection contract.
+
+The final normal API check requested Las Vegas, September 21–24, two rooms, four
+adults and a seven-year-old child. It returned **67 Express offers and 213 named
+hotels in one page**, in 2,752ms for that one uncached request. The selected STRAT
+comparison returned 20 photos and a **USD 375.90** original-offer quote: USD 24 base
+stay and USD 351.90 combined taxes/fees. Details took 4,407ms, including one HTTP
+request with two separate provider resolvers. These are single observations,
+not latency percentiles. The actual browser displayed the total and breakdown;
+after its one-minute expiry, refreshing restored the quote. Hotel identity is
+still an evidence-based possibility, not a verified outcome.
+
+Following the corrected original-offer URL opened Priceline with the same three
+nights, two rooms, four adults and one child. Its expanded price details displayed
+USD 24 base, USD 7.98 taxes/fees and USD 339.78 property fees, totaling USD 371.76.
+The API quote was USD 375.90. This remaining source-context difference is recorded,
+not attributed to a proven promotion or presented as exact checkout-price parity.
+No booking was made.
+
+Search cards retain listing prices, with clearly labeled provider-advertised
+room-rate discounts. Inclusive quotes are fetched only for a selected offer;
+retrieving full prices for every result would add upstream work. The quote expires
+after one minute independently of the five-minute offer relationship. A current
+provider page can apply different pricing or promotions; this is not a guarantee
+of a final checkout amount.
+
+Local capacity measurements used a stub, never Priceline. The 25-search workload
+peaked at 404.77MiB RSS on the development Mac; this is not Linux/VPS sizing proof.
+An eight-operation HTTP cap bounds cache/shared-request serialization work. A
+separate cached burst still measured about 477ms health latency, so saturation
+responsiveness remains an explicit limit. Reports are under
+`output/verification/capacity-*`. The external monitor now checks app-reported
+provider availability without fetching inventory. Real hosted deployment, TLS,
+rollback/reboot, physical devices, VoiceOver and first-time-user signoff remain open.
+
+Current performance uses installed Chrome 152.0.7977.83, a fresh 390×844 context
+per run, 4× CPU throttling, 150ms latency, 1.6Mbps down/0.75Mbps up and disabled
+browser cache. All inventory is intercepted before navigation. The original
+selected-design baseline measured LCP **5.748/5.712/8.020s**. Static compression
+and early homepage-only image discovery reduced it to **2.804/2.548/2.528s**, still
+above the target. Keeping the same mobile photo dimensions/crop and compressing
+its AVIF from 113,860 to 46,294 bytes produced **2.352/2.144/2.160s**; all three
+final runs meet 2.5s. CLS remained **0.001181**. This is laboratory evidence, not
+field percentiles. The final report is
+`output/verification/performance-frontend-ux--2026-09-08T04-15-39-751Z/`.
+Direct results/detail navigation made no homepage-hero requests. The 100-offer
+fixture renders 12 cards and made no extra upstream calls for sorting, expansion
+or pagination. Final input-to-verified-render proxies were 126–184ms for validation,
+88–112ms for sorting, 109–111ms for expansion and 108–147ms for pagination. These
+sampled proxies do not establish field INP.
+
+## Earlier live checkpoint (`22a957a`)
 
 This application integration builds on `eb27e2d` (worldwide destinations and trip
 controls) and `b3f8b59` (live adapter and durable request recovery). The verification

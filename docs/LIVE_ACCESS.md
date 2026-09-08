@@ -64,7 +64,7 @@ call. It is evidence for that request size in that search, not a worldwide page
 limit guarantee, controlled latency benchmark or measured reduction in blocking.
 Retrieved completeness never means every possible hidden hotel was identified.
 
-The final actual app journey began at the homepage on
+The earlier actual app journey began at the homepage on
 [127.0.0.1:4320](http://127.0.0.1:4320): type/select Tel Aviv, choose September 21–26,
 one room and two adults, then click Search. It returned four Express offers and
 20 displayed candidates after checking **332 named hotels in one page**. Crowne
@@ -140,9 +140,17 @@ amount, corroborated by the modern response's explicit tax/fee description. A
 separate rendered website check showed USD 418.77 for the linked offer. Those
 amounts did not agree, and the cause was not established; neither this field nor
 the handoff link guarantees an identical website or final checkout price. A saved
-legacy family offer also subsequently displayed as unavailable. The corrected
-modern implementation's fresh family search/details/provider-handoff journey is
-still awaiting verification; these API probes alone do not establish bookability.
+legacy family offer also subsequently displayed as unavailable.
+
+The corrected application subsequently completed the fresh family journey:
+`ux-live-search.json` and `ux-live-detail.json` record 67 offers/213 named hotels,
+USD 4 nightly, USD 24 base and USD 375.90 inclusive original quote for the STRAT
+comparison (not a confirmed identity). The actual browser displayed the quote,
+expired it and refreshed it. Its original link opened Priceline with September
+21–24, two rooms, four adults and one child. Expanded provider price details showed
+USD 24 base, USD 7.98 taxes/fees and USD 339.78 property fees: USD 371.76 total.
+This remaining API/website difference has no established cause. No booking was
+made, and neither future availability nor exact checkout-price parity is claimed.
 
 If original pricing is missing, invalid, ambiguous or unavailable, no inclusive
 total is invented and the listing quote remains. Named details can still be

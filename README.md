@@ -59,9 +59,10 @@ Safari, physical mobile-device, or assistive-technology signoff.
 
 Generated evidence lives in ignored `output/`, `test-results/`, and
 `playwright-report/`. See [acceptance evidence](docs/ACCEPTANCE.md) for the current
-claims and missing release gates. The current integration passed lint, 129 native
-tests, the production build, and 140 browser cases without retries or skips; its
-real homepage-to-search-to-details-to-Priceline flow was also checked locally.
+claims and missing release gates. The current integration passed lint, 169 native
+tests and the production build. All 200 browser cases are covered and passing
+across four engine/viewport configurations; the evidence records the exact runs.
+Real search, selected-offer pricing and provider handoff are checked separately.
 
 ## Application boundaries
 
