@@ -15,7 +15,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace frontend",
     "start": "node backend/server.js",
-    "test": "node --test backend/domain/*.test.js backend/destinations/*.test.js backend/provider/*.test.js backend/*.test.js",
+    "test": "node --test backend/domain/*.test.js backend/destinations/*.test.js backend/provider/*.test.js backend/*.test.js frontend/src/traveler/*.test.js",
     "test:browser": "playwright test",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",

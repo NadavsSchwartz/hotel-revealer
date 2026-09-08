@@ -38,6 +38,19 @@ test('same neighborhood and stars alone do not produce a plausible candidate', (
   assert.equal(result.unassessedCount, 1);
 });
 
+test('public comparisons retain the actual clue values and distinguish missing information', () => {
+  const original = offer();
+  const result = matchOffers([original], [hotel('partial', { reviewCount: null })])[0];
+  assert.deepEqual(result.clues, original.clues);
+  assert.deepEqual(result.candidates[0].evidence.comparisons, {
+    neighborhood: 'match', stars: 'match', guestRating: 'match', reviewCount: 'unknown', amenities: 'match',
+  });
+  result.clues.guestRating.value = 10;
+  result.clues.amenities.codes.push('SPA');
+  assert.equal(original.clues.guestRating.value, 8);
+  assert.deepEqual(original.clues.amenities.codes, ['WIFI']);
+});
+
 test('coverage counts unique unassessed hotel IDs across offers', () => {
   const offers = [offer(), offer({ offerId: 'offer2' })];
   const hotels = [hotel('unassessed', { neighborhoodId: null }), hotel('unassessed', { neighborhoodId: null }), hotel('supported')];

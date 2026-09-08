@@ -2,6 +2,7 @@ import { deduplicateHotels, deduplicateOffers, normalizeAmenityCodes, normalizeN
 import { normalizedId } from './validation.js';
 
 const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const familyLabels = { guestRating: 'Guest rating', reviewCount: 'Review count', amenities: 'Advertised amenities' };
 
 // Conservative application budgets, not documented provider limits.
 export const MAX_MATCH_COMPARISONS = 100_000;
@@ -43,9 +44,9 @@ function compareHotel(offer, hotel) {
       (neighborhood.every(value => value !== null) && neighborhood[0] !== neighborhood[1]) ||
       (stars.every(value => value !== null) && stars[0] !== stars[1])) return null;
   const families = [
-    ['Guest rating', compareNumericClue(offer.clues?.guestRating, hotel.guestRating, { max: 10 })],
-    ['Review count', compareNumericClue(offer.clues?.reviewCount, hotel.reviewCount, { integer: true })],
-    ['Advertised amenities', compareAmenities(offer.clues?.amenities, hotel)],
+    ['guestRating', compareNumericClue(offer.clues?.guestRating, hotel.guestRating, { max: 10 })],
+    ['reviewCount', compareNumericClue(offer.clues?.reviewCount, hotel.reviewCount, { integer: true })],
+    ['amenities', compareAmenities(offer.clues?.amenities, hotel)],
   ];
   if (families.some(([, state]) => state === 'contradiction')) return null;
   if (neighborhood.includes(null) || stars.includes(null)) return 'unassessed';
@@ -66,8 +67,9 @@ function candidateFrom(hotel, families) {
     thumbnailUrl: hotel.thumbnailUrl ?? null,
     tier: matched.length === families.length ? 'supported' : 'partial',
     evidence: {
-      supporting: ['Neighborhood matches', 'Star rating matches', ...matched.map(([label]) => `${label} match`)],
-      missing: families.filter(([, state]) => state === 'unknown').map(([label]) => `${label} cannot be compared`),
+      supporting: ['Neighborhood matches', 'Star rating matches', ...matched.map(([family]) => `${familyLabels[family]} match`)],
+      missing: families.filter(([, state]) => state === 'unknown').map(([family]) => `${familyLabels[family]} cannot be compared`),
+      comparisons: { neighborhood: 'match', stars: 'match', ...Object.fromEntries(families) },
     },
   };
 }
@@ -127,6 +129,7 @@ export function matchListings(offers, hotels) {
       offerId: offer.offerId,
       neighborhoodName: offer.neighborhoodName ?? null,
       stars: offer.stars ?? null,
+      clues: structuredClone(offer.clues),
       quote: offer.quote,
       handoffUrl: offer.handoffUrl ?? null,
       candidates: [...tiers.supported, ...tiers.partial],

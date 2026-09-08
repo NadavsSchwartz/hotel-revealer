@@ -5,6 +5,8 @@ const initialState = {
   search: { key: null, requestId: null, status: 'idle', error: null },
   detail: {
     key: null,
+    tripKey: null,
+    searchAtStart: null,
     requestId: null,
     status: 'idle',
     data: null,
@@ -51,6 +53,8 @@ export function travelerReducer(state = initialState, action) {
       ...state,
       detail: {
         key: action.key,
+        tripKey: action.tripKey,
+        searchAtStart: state.searches[action.tripKey],
         requestId: action.requestId,
         status: 'loading',
         data: null,
@@ -64,16 +68,28 @@ export function travelerReducer(state = initialState, action) {
   ) {
     return {
       ...state,
-      detail: { ...state.detail, status: 'success', data: action.data },
+      detail: { ...state.detail, searchAtStart: null, status: 'success', data: action.data },
     };
   }
   if (
     action.type === 'detail/error' &&
     state.detail.requestId === action.requestId
   ) {
+    let searches = state.searches;
+    const { tripKey, searchAtStart } = state.detail;
+    if (
+      action.error.code === 'INVALID_SELECTION' &&
+      searchAtStart && state.searches[tripKey] === searchAtStart
+    ) {
+      // A rejection invalidates the shortlist used for this selection, but a
+      // search that completed after detail/start owns its newer cache entry.
+      searches = { ...state.searches };
+      delete searches[tripKey];
+    }
     return {
       ...state,
-      detail: { ...state.detail, status: 'error', error: action.error },
+      searches,
+      detail: { ...state.detail, searchAtStart: null, status: 'error', error: action.error },
     };
   }
   return state;
@@ -124,7 +140,8 @@ function request(kind, path, input, key) {
       timedOut = true;
       controller.abort();
     }, 30000);
-    dispatch({ type: `${kind}/start`, key, requestId });
+    const tripKey = contextKey(input);
+    dispatch({ type: `${kind}/start`, key, tripKey, requestId });
     try {
       const data = await post(path, input, controller.signal);
       if (
@@ -147,12 +164,13 @@ function request(kind, path, input, key) {
       ) {
         throw controlledError('INVALID_SELECTION');
       }
-      dispatch({ type: `${kind}/success`, key, requestId, data });
+      dispatch({ type: `${kind}/success`, key, tripKey, requestId, data });
     } catch (error) {
       if (controller.signal.aborted && !timedOut) return;
       dispatch({
         type: `${kind}/error`,
         key,
+        tripKey,
         requestId,
         error: controlledError(
           timedOut ? 'DEADLINE_EXCEEDED' : error.code || 'NETWORK_ERROR',
