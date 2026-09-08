@@ -7,7 +7,7 @@ export function BrandIcon({ className = 'brand-symbol', light = false }) {
       <path d="M4 4h8v11h16V4h8v32h-8V23H12v13H4Z" fill="currentColor" />
       <path d="m25 25 3-2v13l-3 2Z" fill="currentColor" />
       {light && <svg x="12" y="23" width="13" height="15" viewBox="0 0 13 15" overflow="hidden">
-        <rect className="brand-light" x="-6" width="6" height="15" />
+        <rect className="brand-light" x="3" width="6" height="15" />
       </svg>}
     </svg>
   );

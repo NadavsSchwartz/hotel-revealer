@@ -423,7 +423,14 @@ test('the first search shows progress until the request returns an explicit empt
   try {
     await expect(progress).toBeVisible();
     await expect(progress).toHaveAttribute('aria-busy', 'true');
-    await expect(progress.getByRole('heading', { name: 'Finding your hotel matches', exact: true })).toBeVisible();
+    await expect(progress.getByRole('heading', { name: 'Searching hotel deals', exact: true })).toBeVisible();
+    await expect(page.getByRole('form', { name: 'Search hotels', exact: true })).toBeHidden();
+    await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
+    await expect(page.getByLabel('Where are you going?')).toBeFocused();
+    await page.getByRole('button', { name: 'Close editor', exact: true }).click();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(progress.locator('.brand-light')).toHaveCSS('animation-name', 'none');
+    await expect(progress.locator('.brand-light')).toHaveCSS('opacity', '1');
     await expect(page.getByRole('heading', { name: 'No Express offers were returned', exact: true })).toHaveCount(0);
     await expect(page.locator('.offer-list > article')).toHaveCount(0);
   } finally {
@@ -455,7 +462,8 @@ test('cached comparisons remain visible during a refresh and after an update fai
   try {
     await expect.poll(() => searches).toBe(2);
     await expect(page.getByRole('region', { name: 'Hotel search results', exact: true })).toHaveAttribute('aria-busy', 'true');
-    await expect(page.getByText('Updating prices and hotel matches', { exact: true })).toBeVisible();
+    await expect(page.getByText('Updating hotel deals', { exact: true })).toBeVisible();
+    await expect(page.locator('.results-updating .search-mark')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Hotel search progress', exact: true })).toHaveCount(0);
     await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();

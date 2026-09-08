@@ -1,19 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { BrandIcon } from './Brand.jsx';
 import './progress.css';
 
-export default function SearchProgress() {
-  const [showMotion, setShowMotion] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setShowMotion(true), 150);
-    return () => clearTimeout(timer);
-  }, []);
-  return <section className={`search-progress${showMotion ? ' search-progress-ready' : ''}`} aria-busy="true" aria-label="Hotel search progress">
-    <div className="search-progress-wordmark" aria-hidden="true">
-      <span>hotel</span>
-      <div><strong>revealer</strong><i /></div>
-    </div>
-    <h2>Finding your hotel matches</h2>
-    <p>Comparing the area, guest ratings and listed features.</p>
-    <span className="search-progress-signal" aria-hidden="true"><i /><i /><i /></span>
-  </section>;
+export default function SearchProgress({ variant = 'search' }) {
+  const compact = variant === 'refresh';
+  const preparing = variant === 'preparing';
+  const Container = compact ? 'div' : 'section';
+  const Heading = compact ? 'strong' : 'h2';
+  const title = preparing ? 'Preparing your search' : compact ? 'Updating hotel deals' : 'Searching hotel deals';
+  return (
+    <Container className={compact ? 'results-updating' : 'search-progress'} aria-busy="true"
+      aria-label={compact ? undefined : preparing ? 'Search preparation' : 'Hotel search progress'}>
+      <BrandIcon className={`search-mark${compact ? ' search-mark-compact' : ''}`} light />
+      <div>
+        <Heading>{title}</Heading>
+        <p>{compact ? 'Your current results remain available.' : preparing ? 'Getting your search ready.' : 'We’ll show the results as soon as they’re ready.'}</p>
+      </div>
+    </Container>
+  );
 }

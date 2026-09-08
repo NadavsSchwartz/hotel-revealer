@@ -100,6 +100,7 @@ export default function Results() {
   const coolingDown = Boolean(cooldownUntil) && !cooldownExpired;
   const visibleError = coolingDown ? { code: 'PROVIDER_COOLDOWN', retryAt: cooldownUntil } : error;
   const params = new URLSearchParams(location.search);
+  const waitingForFirstResults = valid && !data && (loading || !visibleError);
   const sort = params.get('sort') === 'price' ? 'price' : 'evidence';
   const expanded = params.has('expanded') ? params.getAll('expanded')
     : Array.isArray(view.expanded) ? view.expanded : [];
@@ -268,8 +269,8 @@ export default function Results() {
     ? 'Review your trip details.'
     : loading
       ? data
-        ? 'Updating prices and hotel matches. Previous results remain available.'
-        : 'Searching Express offers and comparing available hotel clues.'
+        ? 'Updating hotel deals. Previous results remain available.'
+        : 'Searching hotel deals.'
       : visibleError
         ? `Search could not be completed.${data ? ' Previous results remain available.' : ''}`
         : data
@@ -277,7 +278,7 @@ export default function Results() {
           : '';
 
   return (
-    <div className="page-shell results-page">
+    <div className={`page-shell results-page${waitingForFirstResults ? ' is-searching' : ''}`}>
       <Link className="back-link" to="/">
         ← New trip
       </Link>
@@ -304,7 +305,7 @@ export default function Results() {
           <p>{Object.values(validation.errors).join(' ')}</p>
         </div>
       )}
-      {valid && loading && !data && <SearchProgress />}
+      {waitingForFirstResults && <SearchProgress />}
       {valid && !loading && visibleError && (
         <>
           <ErrorNotice error={visibleError} onRetry={refresh} onEdit={editTrip} />
@@ -313,12 +314,7 @@ export default function Results() {
       )}
       {valid && data && (
         <section className="results-content" aria-label="Hotel search results" aria-busy={loading}>
-          {loading && (
-            <div className="results-updating" role="status">
-              <span className="results-updating-mark" aria-hidden="true" />
-              <div><strong>Updating prices and hotel matches</strong><p>You can keep comparing while we check this trip again.</p></div>
-            </div>
-          )}
+          {loading && <SearchProgress variant="refresh" />}
           {stale && !loading && <StaleNotice onRefresh={refresh} disabled={coolingDown} />}
           {data.coverage.status === 'partial' && (
             <div className="coverage-notice" role="note">

@@ -8,16 +8,17 @@ import {
 } from 'react-router-dom';
 import Home from './traveler/Home.jsx';
 import Brand from './traveler/Brand.jsx';
+import SearchProgress from './traveler/SearchProgress.jsx';
 import './traveler/home.css';
 
 const Results = React.lazy(() => import('./traveler/Results.jsx'));
 const Details = React.lazy(() => import('./traveler/Details.jsx'));
 
-function RouteLoading({ message }) {
+function RouteLoading({ message, search = false }) {
   return (
     <div className="page-shell route-loading" aria-busy="true">
-      <p className="eyebrow">A closer look</p>
-      <p role="status">{message}</p>
+      {search ? <SearchProgress variant="preparing" /> : <p className="eyebrow">A closer look</p>}
+      <p role="status" className={search ? 'sr-only' : undefined}>{message}</p>
     </div>
   );
 }
@@ -246,7 +247,7 @@ export default function App() {
               element={
                 <React.Suspense
                   fallback={
-                    <RouteLoading message="Loading your hotel shortlist…" />
+                    <RouteLoading message="Preparing your search" search />
                   }
                 >
                   <Results />
