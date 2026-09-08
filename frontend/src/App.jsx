@@ -52,9 +52,8 @@ function Policy({ privacy }) {
           <p>
             Trip details and candidate IDs appear in the page address. Your open
             comparisons, sort choice, and scroll position are kept in this tab’s
-            session storage. Results are held in application memory; a selected
-            offer and candidate may also be retained in browser history so you
-            can return to your comparison.
+            session storage. Your unfinished search and results are held in
+            application memory so you can return to your comparison.
           </p>
           <p>
             This application does not require an account and does not include
@@ -90,9 +89,9 @@ function Policy({ privacy }) {
           </p>
           <h2>Candidates are uncertain</h2>
           <p>
-            A supported candidate has matching evidence across the guest rating,
+            A Strong match has matching evidence across the guest rating,
             review count, and amenity clue groups, in addition to the required
-            location and star checks. A partial candidate has less supporting
+            location and star checks. A Possible match has less supporting
             evidence. Neither label verifies the hidden hotel’s identity. A
             hotel missing required evidence may remain unassessed.
           </p>
@@ -154,7 +153,7 @@ function PageBehavior() {
   const navigationType = useNavigationType();
   const previousPath = useRef(null);
   useEffect(() => {
-    if (previousPath.current === location.pathname) return undefined;
+    const pathChanged = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
     const titles = {
       '/': 'A great deal. A clearer picture.',
@@ -165,6 +164,20 @@ function PageBehavior() {
       '/credits': 'Data & credits',
     };
     document.title = `Hotel Revealer — ${titles[location.pathname] || 'Page not found'}`;
+    if (location.hash) {
+      const frame = requestAnimationFrame(() => {
+        const section = document.getElementById(location.hash.slice(1));
+        if (!section) return;
+        const labelledBy = section.getAttribute('aria-labelledby')?.split(/\s+/)[0];
+        const heading = (labelledBy && document.getElementById(labelledBy))
+          || section.querySelector('h1, h2, h3') || section;
+        if (heading.tabIndex < 0) heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+        section.scrollIntoView();
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    if (!pathChanged) return undefined;
     if (navigationType === 'POP' || location.state?.restore) return;
     window.scrollTo(0, 0);
     const frame = requestAnimationFrame(() =>
@@ -173,11 +186,7 @@ function PageBehavior() {
       }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [location.pathname, navigationType, location.state?.restore]);
-  useEffect(() => {
-    if (location.hash)
-      document.getElementById(location.hash.slice(1))?.scrollIntoView();
-  }, [location.hash, location.pathname]);
+  }, [location.pathname, location.hash, navigationType, location.state?.restore]);
   return null;
 }
 
@@ -210,7 +219,9 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  const isHome = useLocation().pathname === '/';
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+  const homeDraft = useRef(null);
   return (
     <div className={`unboxed-application ${isHome ? 'unboxed-application-home' : ''}`}>
       <a className="skip-link" href="#main">
@@ -224,11 +235,11 @@ export default function App() {
           <span className="currency">USD</span>
         </nav>
       </header>
-      <ErrorBoundary>
-        <PageBehavior />
+      <PageBehavior />
+      <ErrorBoundary key={location.pathname}>
         <main id="main" tabIndex="-1">
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Home draftRef={homeDraft} />} />
             <Route
               path="/results"
               element={

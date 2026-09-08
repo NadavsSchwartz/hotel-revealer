@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import SearchForm from './SearchForm.jsx';
 
-export default function Home() {
+export default function Home({ draftRef }) {
   return (
     <div className="unboxed-direction">
       <section className="unboxed-hero" aria-labelledby="home-title">
@@ -24,13 +24,13 @@ export default function Home() {
       </section>
       <section className="unboxed-search" id="unboxed-search" aria-labelledby="search-title">
         <div className="unboxed-search-intro">
-          <strong id="search-title">Your next stay starts here.</strong>
+          <strong id="search-title" tabIndex="-1">Your next stay starts here.</strong>
           <span>City, dates, travelers. We’ll connect the clues.</span>
         </div>
-        <SearchForm />
+        <SearchForm draftRef={draftRef} />
       </section>
       <section className="unboxed-story" id="how-it-works" aria-labelledby="method-title">
-        <h2 id="method-title">The price is only<br />half the story.</h2>
+        <h2 id="method-title" tabIndex="-1">The price is only<br />half the story.</h2>
         <div>
           <p>See possible hotels alongside the location, ratings and amenities that connect them to an Express Deal. Compare the clues, then book the original unnamed offer on Priceline.</p>
           <Link to="/terms#how-it-works">See how it works <span aria-hidden="true">↗</span></Link>
