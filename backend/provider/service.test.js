@@ -86,7 +86,7 @@ test('detail cache and in-flight work retain the selected children and age-speci
   const { service, clock, calls } = setup({ adapter: {
     async hotelDetails(request) {
       calls.push(['detail', request]);
-      return { description: `Age ${request.context.childrenAges[0]}`, images: [], amenities: [] };
+      return { description: `Age ${request.context.childrenAges[0]}`, images: [], amenities: [], originalQuote: originalQuote() };
     },
   } });
   const infant = { ...selection, childrenAges: [0] };
@@ -194,7 +194,10 @@ test('a later-page timeout returns partial results at the admission deadline', a
 });
 
 test('details require the current context relationship and missing retail stays independent', async () => {
-  const { service, clock, calls } = setup();
+  const { service, clock, calls } = setup({ adapter: { async hotelDetails(request) {
+    calls.push(['detail', request]);
+    return { description: 'Hotel information', retailQuote: null, originalQuote: originalQuote() };
+  } } });
   await service.search(futureContext);
   await assert.rejects(service.detail({ ...selection, hotelId: 'wrong-hotel' }), { code: 'INVALID_SELECTION' });
   assert.equal(calls.length, 1);
@@ -203,7 +206,7 @@ test('details require the current context relationship and missing retail stays 
   const result = await request;
   assert.equal(result.detailStatus, 'available');
   assert.equal(result.details.retailQuote, null);
-  assert.equal(result.offer.quote.nightlyCents, 10_000);
+  assert.equal(result.offer.quote.nightlyCents, 6600);
   await service.detail(selection);
   assert.equal(calls.length, 2);
   await clock.advance(60_000);
@@ -283,6 +286,32 @@ test('invalid original quote enrichment preserves known listing prices and indep
     assert.equal(detail.offer.quoteExpiresAt, undefined);
     assert.equal(detail.details.description, 'Named hotel information');
     assert.equal(detail.detailStatus, 'available');
+  }
+});
+
+test('an unavailable total can be explicitly retried and only the successful quote is cached', async () => {
+  for (const request of [selection, { ...futureContext, offerId: selection.offerId }]) {
+    let attempts = 0;
+    const { service, clock } = setup({ adapter: { async hotelDetails() {
+      attempts += 1;
+      return { description: 'Named hotel information', originalQuote: attempts === 1 ? null : originalQuote() };
+    } } });
+    await service.search(futureContext);
+    const pending = service.detail(request);
+    await clock.advance(1000);
+    const first = await pending;
+    assert.equal(first.quoteStatus, 'unavailable');
+    assert.equal(first.detailStatus, request.hotelId ? 'available' : 'not_requested');
+    assert.equal(first.offer.handoffUrl, listingRows()[0].handoffUrl);
+    const retry = Promise.all([service.detail(request), service.detail(request)]);
+    await clock.advance(1000);
+    const [second, shared] = await retry;
+    assert.equal(second.quoteStatus, 'available');
+    assert.equal(second.offer.quote.totalCents, 43902);
+    assert.deepEqual(second, shared);
+    assert.equal(attempts, 2);
+    assert.deepEqual(await service.detail(request), second);
+    assert.equal(attempts, 2);
   }
 });
 
@@ -583,7 +612,10 @@ test('summary metrics identify cache reuse and upstream work without input or pr
 });
 
 test('detail envelopes cannot extend offer freshness and cached details are clamped to revalidated search', async () => {
-  const { service, clock, calls } = setup();
+  const { service, clock, calls } = setup({ adapter: { async hotelDetails(request) {
+    calls.push(['detail', request]);
+    return { description: 'Hotel information', originalQuote: originalQuote() };
+  } } });
   const search = await service.search(futureContext);
   await clock.advance(299_000);
   const first = await service.detail(selection);

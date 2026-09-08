@@ -330,7 +330,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
         };
         // Missing retailQuote does not imply Express unavailability.
         const bytes = assertJsonSize(result);
-        if (cacheable && deadline > clock.now()) details.set(key, result, { bytes, expiresAt: retrievedAt + DETAIL_TTL });
+        // An explicit retry must be able to recover a previously unavailable total.
+        if (cacheable && originalQuote && deadline > clock.now()) details.set(key, result, { bytes, expiresAt: retrievedAt + DETAIL_TTL });
         return result;
       });
       return observe('detail', request, admittedAt, metrics, requestId);
