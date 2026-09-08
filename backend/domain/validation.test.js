@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateDetail, validateSearch } from './index.js';
-import { canonicalCityName, cityNames } from '../../shared/cities.js';
 import { getDestination } from '../destinations/index.js';
 import { addCalendarDays } from '../../shared/travel.js';
 
@@ -10,12 +9,10 @@ const input = { cityName: 'New York, New York', checkIn: '2026-09-07', checkOut:
 const canonicalInput = () => ({ ...input, destinationId: 'geonames:5128581', cityName: getDestination('geonames:5128581').label });
 const error = code => value => value.code === code && value.status === 400 && typeof value.message === 'string';
 
-test('canonical cities retain all 1,000 unique original choices', () => {
-  assert.equal(cityNames.length, 1000);
-  assert.equal(new Set(cityNames).size, 1000);
-  assert.equal(canonicalCityName('  NEW   YORK, New York  '), 'New York, New York');
-  assert.equal(canonicalCityName('New York'), null);
-  assert.equal(canonicalCityName({ toString: () => 'New York, New York' }), null);
+test('legacy searches normalize city labels without accepting ambiguous or coerced names', () => {
+  assert.equal(validateSearch({ ...input, cityName: '  NEW   YORK, New York  ' }, now).destinationId, 'geonames:5128581');
+  for (const cityName of ['New York', { toString: () => 'New York, New York' }])
+    assert.throws(() => validateSearch({ ...input, cityName }, now), error('INVALID_CITY'));
 });
 
 test('search validates and returns only normalized supported context without mutation', () => {

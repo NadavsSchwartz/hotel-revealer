@@ -1,4 +1,5 @@
 import legacyDestinations from '../../../data/destinations-legacy-public.json' with { type: 'json' };
+import { normalizeDestinationText as legacyKey } from '../../../shared/destinationText.js';
 import {
   DEFAULT_OCCUPANCY,
   isCalendarDate,
@@ -6,13 +7,8 @@ import {
   validateTripFields,
 } from '../../../shared/travel.js';
 
-const legacyKey = value => value.normalize('NFKD').toLowerCase().replace(/\p{M}/gu, '')
-  .replace(/['’‘ʼ`.]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const legacyByName = new Map(legacyDestinations.map(([name, id, label]) => [legacyKey(name), { id, label }]));
-export const cityNames = legacyDestinations.map(([name]) => name);
 export { DEFAULT_OCCUPANCY, TRAVEL_LIMITS, addCalendarDays, isCalendarDate, localToday } from '../../../shared/travel.js';
-// Kept as a defaults alias for callers that create an empty trip.
-export const fixedContext = DEFAULT_OCCUPANCY;
 
 const integerParameter = (params, key, fallback) => {
   if (!params.has(key)) return fallback;

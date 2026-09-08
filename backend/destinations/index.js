@@ -1,9 +1,5 @@
 import { readFileSync } from 'node:fs';
-
-function normalize(value) {
-  return value.normalize('NFKD').toLowerCase().replace(/\p{M}/gu, '')
-    .replace(/['’‘ʼ`.]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-}
+import { normalizeDestinationText as normalize } from '../../shared/destinationText.js';
 
 export function validQuery(query) {
   if (typeof query !== 'string' || query.length > 100) return false;

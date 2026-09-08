@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { getDestination, resolveLegacyCity, searchDestinations } from './index.js';
+import legacyDestinations from './fixtures/legacy-destinations.json' with { type: 'json' };
 
 test('worldwide source includes cities beyond a US or popular-city shortlist', () => {
   const metadata = JSON.parse(readFileSync(new URL('../../data/destinations-source.json', import.meta.url), 'utf8'));
@@ -86,10 +87,8 @@ test('lookup rejects unknown IDs and does not trust an unverified city label', (
 });
 
 test('all original city+state URLs retain an exact geographic identity', () => {
-  const source = readFileSync(new URL('../../shared/cities.js', import.meta.url), 'utf8');
-  const labels = [...source.matchAll(/^\s+"([^"]+)",?$/gm)].map(match => match[1]);
-  assert.ok(labels.length > 900);
-  for (const label of labels) assert.ok(resolveLegacyCity(label), label);
+  assert.equal(legacyDestinations.length, 1000);
+  for (const [label, id] of legacyDestinations) assert.equal(resolveLegacyCity(label)?.id, id, label);
   const bridge = JSON.parse(readFileSync(new URL('../../data/destinations-legacy-public.json', import.meta.url), 'utf8'));
   for (const [originalLabel, id, label] of bridge) {
     assert.equal(resolveLegacyCity(originalLabel).id, id);

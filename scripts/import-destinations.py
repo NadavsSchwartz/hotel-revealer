@@ -111,9 +111,9 @@ def import_catalog(directory):
     if len({row[0] for row in rows}) != len(rows):
         raise ValueError("Duplicate GeoNames IDs")
 
-    # Freeze the original US city+state URLs to exact IDs without shipping this list to browsers.
-    original = (ROOT / "shared/cities.js").read_text()
-    legacy_names = re.findall(r'^\s+"([^"]+)",?$', original, re.MULTILINE)
+    # Retain the original US city+state URLs from the fixed compatibility fixture.
+    original = json.loads((ROOT / "backend/destinations/fixtures/legacy-destinations.json").read_text())
+    legacy_names = [label for label, _destination_id in original]
     legacy = {}
     legacy_public = []
     unresolved = []

@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { money, safeHref } from './context.js';
+import { contextFromSearch, money, safeHref } from './context.js';
+import legacyDestinations from '../../../backend/destinations/fixtures/legacy-destinations.json' with { type: 'json' };
+
+test('legacy URLs retain the destination identity of all 1,000 original city choices', () => {
+  assert.equal(legacyDestinations.length, 1000);
+  for (const [cityName, destinationId] of legacyDestinations)
+    assert.equal(contextFromSearch(`?${new URLSearchParams({ cityName })}`).destinationId, destinationId, cityName);
+});
 
 test('money displays integer cents as USD and rejects missing or invalid amounts', () => {
   for (const [cents, expected] of [

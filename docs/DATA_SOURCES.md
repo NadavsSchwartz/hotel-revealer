@@ -78,7 +78,8 @@ IDs for old URLs. `data/destinations-legacy-public.json` is a separate 74,104-by
 browser-safe bridge containing `[originalLabel, destinationId, canonicalLabel]`
 tuples. It lets existing URLs acquire the same canonical identity on both sides of
 the API without sending the worldwide catalog to the browser. Original names come
-from `shared/cities.js`; three spelling bridges are explicit in the import script
+from the fixed `backend/destinations/fixtures/legacy-destinations.json`
+compatibility fixture; three spelling bridges are explicit in the import script
 and resolve to source records in the specified state.
 
 ## Reproduce or refresh
