@@ -1,4 +1,4 @@
-.search-progress { display: grid; justify-items: center; align-content: center; min-height: 360px; padding: 48px 24px; border-block: 1px solid var(--line); text-align: center; }
+.search-progress { display: grid; justify-items: center; align-content: center; min-height: 360px; padding: 48px 24px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); text-align: center; }
 .search-mark { display: block; width: 96px; height: 96px; flex-shrink: 0; color: var(--ink); }
 .search-progress > .search-mark { margin-bottom: 24px; }
 .search-mark-compact { width: 24px; height: 24px; }

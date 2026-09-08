@@ -1,7 +1,7 @@
 .trip-form.trip-form {
   padding: 8px;
   border: 1px solid var(--line, #d4d6cb);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface, #fff);
   box-shadow: 0 10px 32px #2530230d;
   color: var(--ink, #253023);
@@ -30,9 +30,9 @@
 .travelers-control .travelers-trigger:focus-visible { outline: 0; }
 .trip-control .field-error { margin: 7px 0 0; color: #b42332; font-size: 11px; line-height: 1.5; }
 .date-control .ant-picker { width: 100%; padding: 0; height: 32px; border: 0; box-shadow: none; background: transparent; font-family: inherit; }
-.date-control .ant-picker-input > input { min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: var(--ink, #253023); font-size: 14px; font-weight: 600; cursor: pointer; }
+.date-control .ant-picker-input > input { min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: var(--ink, #253023); font-size: 16px; font-weight: 500; cursor: pointer; }
 .date-control .ant-picker-suffix { color: #5b6854; margin-left: 5px; font-size: 14px; }
-.travelers-trigger { display: flex; width: 100%; min-height: 32px; padding: 0; align-items: center; justify-content: space-between; gap: 7px; border: 0; background: transparent; color: var(--ink, #253023); font-size: 14px; font-weight: 600; text-align: left; }
+.travelers-trigger { display: flex; width: 100%; min-height: 32px; padding: 0; align-items: center; justify-content: space-between; gap: 7px; border: 0; background: transparent; color: var(--ink, #253023); font-size: 16px; font-weight: 500; text-align: left; }
 .travelers-trigger svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .travelers-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
 .trip-search-fields .search-button.ant-btn { min-width: 116px; min-height: 62px; display: flex; align-items: center; justify-content: center; gap: 9px; align-self: start; margin: 4px; padding: 13px 17px; border: 1px solid var(--blue, #34482f); border-radius: 9px; background: var(--blue, #34482f); color: white; font-size: 14px; font-weight: 650; }
@@ -113,13 +113,17 @@
   .travelers-control { border-left: 0; }
   .trip-control > label { font-size: 11px; }
   .destination-control .ant-input, .destination-control .ant-select-selection-search-input { font-size: 16px; }
-  .date-control .ant-picker-input > input { font-size: 14px; }
+  .date-control .ant-picker-input > input { font-size: 16px; }
   .trip-search-fields .search-button.ant-btn { min-height: 48px; margin: 8px 0 0; width: 100%; }
   .destination-status-panel { left: 0; width: 100%; max-width: 100%; }
 }
 @media (max-width: 350px) {
   .trip-control { padding-inline: 8px; }
-  .date-control .ant-picker-input > input { font-size: 12px; }
+  .date-control .ant-picker-input > input { font-size: 16px; }
   .date-control .ant-picker-suffix { font-size: 12px; margin-left: 2px; }
   .travelers-panel { padding: 16px; }
+}
+@media (max-width: 400px) {
+  .travel-dates { grid-template-columns: minmax(0, 1fr); }
+  .travel-dates > .trip-control { border-left: 0; }
 }

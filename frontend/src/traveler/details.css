@@ -1,6 +1,5 @@
 .detail-page {
-  width: calc(100% - 96px);
-  max-width: 1328px;
+  width: min(var(--page-width), calc(100% - 128px));
   padding-bottom: 64px;
 }
 
@@ -35,7 +34,7 @@
   max-width: 1000px;
   margin: 0 0 12px;
   font-size: clamp(38px, 4.2vw, 60px);
-  font-weight: 450;
+  font-weight: 500;
   line-height: 1.1;
   letter-spacing: -2.3px;
   overflow-wrap: anywhere;
@@ -80,6 +79,7 @@
   aspect-ratio: 16 / 10;
   gap: 7px;
   overflow: hidden;
+  border-radius: var(--radius-card);
 }
 
 .detail-page .detail-gallery img {
@@ -89,7 +89,7 @@
   min-width: 0;
   min-height: 0;
   object-fit: cover;
-  background: #e3e7d8;
+  background: var(--surface-muted);
 }
 
 .detail-page .detail-gallery-1 {
@@ -139,7 +139,8 @@
 
 .detail-page .detail-guest-rating strong {
   padding: 5px 9px;
-  background: #e3e7d8;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
   color: var(--forest);
   font-size: 19px;
   font-weight: 750;
@@ -163,8 +164,8 @@
   padding: 24px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-top: 3px solid #ae9368;
-  box-shadow: 0 12px 30px #25302306;
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 32px #23372b08;
 }
 
 .detail-page .detail-quote-panel h2 {
@@ -248,7 +249,7 @@
   min-height: 46px;
   height: auto;
   padding: 12px 10px;
-  border-radius: 0;
+  border-radius: var(--radius-control);
   text-align: center;
   white-space: normal;
   font-size: 14px;
@@ -288,12 +289,11 @@
 
 .detail-page :is(.detail-property-section, .detail-retail) h2 {
   margin: 0 0 18px;
-  font-family: 'Room Bodoni', Georgia, serif;
-  font-style: italic;
-  font-size: 32px;
+  font-family: Manrope, sans-serif;
+  font-size: 28px;
   line-height: 1.25;
-  letter-spacing: -.8px;
-  font-weight: 400;
+  letter-spacing: -.035em;
+  font-weight: 500;
 }
 
 .detail-page .detail-property-section > p {
@@ -423,7 +423,8 @@
 .detail-page .detail-retail {
   margin-top: 34px;
   padding: 24px;
-  background: #e9ecdf;
+  background: var(--surface-muted);
+  border-radius: var(--radius-card);
 }
 
 .detail-page .detail-retail-heading > .eyebrow {
@@ -473,7 +474,7 @@
   height: auto;
   padding: 10px 16px;
   border: 1px solid #a9b29b;
-  border-radius: 0;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--blue);
   white-space: normal;
@@ -495,10 +496,6 @@
 }
 
 @media (max-width: 1000px) {
-  .detail-page {
-    width: calc(100% - 64px);
-  }
-
   .detail-page .detail-layout {
     grid-template-columns: minmax(0, 1fr) 285px;
     column-gap: 28px;
@@ -515,7 +512,7 @@
 
 @media (max-width: 760px) {
   .detail-page {
-    width: calc(100% - 40px);
+    width: calc(100% - 64px);
     padding-bottom: 35px;
   }
 

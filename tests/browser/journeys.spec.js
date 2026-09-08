@@ -228,16 +228,19 @@ async function auditAccessibility(page) {
 
 test('landing and result states have no automated WCAG A/AA violations', async ({ page }) => {
   await page.goto('/');
+  const sharedBackground = await page.locator('.unboxed-application').evaluate(element => getComputedStyle(element).backgroundColor);
   await page.getByRole('link', { name: 'Skip to content', exact: true }).focus();
   let results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
   await mockOffers(page);
   await page.goto(searchPath);
+  await expect(page.locator('.unboxed-application')).toHaveCSS('background-color', sharedBackground);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
   await page.getByRole('link', { name: /View likely hotel:.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect(page.locator('.unboxed-application')).toHaveCSS('background-color', sharedBackground);
   results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
 });

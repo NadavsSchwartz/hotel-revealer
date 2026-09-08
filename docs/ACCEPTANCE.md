@@ -141,6 +141,22 @@ manual accessibility and first-time-user sessions remain open release gates.
 Neither these checks nor a unique match establish measured identity accuracy or
 website/checkout price parity.
 
+## Shared application design
+
+The accepted homepage palette, Manrope typography, page gutters, rounded controls,
+and light card surfaces now also govern results, offer details, policies, loading
+and recovery. The homepage retains its photographic header treatment; legal prose
+retains its readable column width. Duplicate homepage shell rules were removed.
+Verification used isolated `986e3ee` plus this styling patch: `npm run check` passed
+with 216 native tests, then all 316 existing browser cases passed. A final tablet
+editor adjustment passed 12 targeted reruns. Existing tests now check shared page
+backgrounds and complete date text at 832px and 320px. Desktop/tablet/mobile
+production renders confirmed the first mobile hotel and room rate remain visible.
+Independent review approved the resolved button, gutter and date-layout findings.
+Evidence is in `output/verification/app-design/`; pictured hotels are test fixtures.
+This evidence excludes concurrent currency/theme features. No runtime logic or
+dependencies were added by the styling pass.
+
 ## Homepage copy and navigation cleanup
 
 The final landing composition uses a warm ivory canvas, a photographic hero with

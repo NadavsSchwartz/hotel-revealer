@@ -24,8 +24,17 @@ test('mobile results show a hotel and its price without the full search form tak
   await expect(city).toBeHidden();
   await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
   await expect(city).toHaveValue('Unsubmitted edit');
-  await page.setViewportSize({ width: 320, height: 900 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  for (const width of [832, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    const dateFits = await page.locator('.results-search .date-control input').evaluateAll(inputs => inputs.map(input => {
+      const style = getComputedStyle(input);
+      const canvas = document.createElement('canvas').getContext('2d');
+      canvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      return input.value.length > 0 && canvas.measureText(input.value).width <= input.clientWidth;
+    }));
+    expect(dateFits).toEqual([true, true]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
 });
 
 test('invalid travel links reveal the mobile editor and the landing copy uses readable text', async ({ page }, testInfo) => {

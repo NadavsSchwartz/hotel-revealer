@@ -6,29 +6,15 @@
   font-display: swap;
 }
 
-.unboxed-application.room-application {
-  --ink: #23372b;
-  --muted: #606d60;
-  --line: #d6dace;
-  --surface: #f7f6ef;
-  --blue: #294633;
-  --brass: #dfc899;
-  position: relative;
-  background: #f6f4ec;
-  color: var(--ink);
-}
 .room-home :is(h1, h2, h3, h4, p, figure) { margin: 0; }
 .room-home :is(h1, h2, h3, h4) { font-family: Manrope, sans-serif; }
 .room-home :is(section, h1, h2) { scroll-margin-top: 28px; }
 .room-home a { text-decoration: none; }
 .room-content { width: min(1200px, calc(100% - 128px)); margin-inline: auto; }
 .room-application > .skip-link { color: #23372b; background: #f6f4ec; }
-.room-application > .direction-header { position: absolute; z-index: 3; top: 18px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100% - 128px)); height: 80px; padding: 0; background: transparent; }
+.room-application > .direction-header { position: absolute; z-index: 3; top: 18px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100% - 128px)); height: 80px; padding: 0; border: 0; background: transparent; }
 .room-application .direction-header .brand { color: #f8f5ea; }
-.room-application > .direction-footer { width: min(1200px, calc(100% - 128px)); margin-inline: auto; padding: 40px 0; color: var(--muted); background: transparent; font-size: 12px; border: 0; }
-.room-application .direction-footer a { min-height: 44px; }
-.room-application .direction-footer .brand { color: #23372b; }
-.room-application .direction-footer :is(.brand-type, .brand-symbol) { color: inherit; }
+.room-application .direction-header .brand:focus-visible { outline-color: #f8f5ea; }
 
 /* One photographic entrance. Only the decorative layer clips its contents. */
 .room-scene { position: relative; width: min(1560px, calc(100% - 32px)); margin: 16px auto 0; padding-bottom: 56px; color: #f8f5ea; }
@@ -119,7 +105,7 @@
   .room-closing { padding: 36px; }
 }
 @media (max-width: 650px) {
-  .room-content, .room-application > .direction-footer { width: calc(100% - 64px); }
+  .room-content { width: calc(100% - 64px); }
   .room-application > .direction-header { top: 12px; width: calc(100% - 64px); height: 72px; }
   .room-scene { width: calc(100% - 24px); margin-top: 12px; padding-bottom: 36px; }
   .room-home .room-view { border-radius: 16px; }
@@ -145,7 +131,6 @@
   .room-steps { grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 28px; }
   .room-closing { flex-direction: column; align-items: flex-start; gap: 28px; padding: 28px; }
   .room-closing .room-button { width: 100%; gap: 16px; }
-  .room-application > .direction-footer { padding-block: 32px; gap: 24px; }
 }
 @media (max-width: 400px) {
   .room-reception .travel-dates { grid-template-columns: minmax(0, 1fr); gap: 0; }
