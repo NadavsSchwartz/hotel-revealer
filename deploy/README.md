@@ -112,8 +112,16 @@ tests do not substitute for those checks.
 ## Health notifications and maintenance
 
 Set repository variables `HEALTH_HOST` and `HEALTHCHECK_ENABLED=true` after release.
-The scheduled workflow requests only HTTPS `/health` twice hourly; it never runs
-a search or provider refresh. Enable failed-workflow email notifications in your
+`HEALTH_HOST` must be a plain lowercase DNS name or IPv4 address, without a scheme,
+port or path. The scheduled workflow makes one HTTPS `/health` request twice hourly
+and requires HTTP 200, `status: "ok"` and `provider.available: true`. A disabled or
+blocked live provider therefore fails the monitor even when the process responds.
+The check has a 20-second deadline, a 4 KiB response limit, rejects redirects and
+does not retry. It never runs a search, refreshes inventory or resets provider state.
+This verifies the application's reported readiness, not current provider inventory
+or the ability to complete a booking. Run the same check manually with
+`HEALTH_HOST=hotel.example.com node scripts/check-health.mjs`, replacing the example
+host with the deployed hostname. Enable failed-workflow email notifications in your
 GitHub notification settings and manually run a failure/recovery drill to verify
 delivery. GitHub schedules can be delayed or disabled after inactivity, so this
 is lightweight monitoring, not an uptime guarantee. No message destination is

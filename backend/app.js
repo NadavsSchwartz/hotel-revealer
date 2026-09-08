@@ -2,9 +2,11 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { createHotelRoutes } from './routes/hotelDealsRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 import { createProviderService } from './provider/service.js';
+import { ServiceError } from './provider/errors.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
 import { searchDestinations } from './destinations/index.js';
 
@@ -18,6 +20,7 @@ const contentSecurityPolicy = [
 
 export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory } = {}) {
   const app = express();
+  let hotelOperations = 0;
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     req.requestId = randomUUID();
@@ -39,6 +42,25 @@ export function createApp({ logger = console, service = createProviderService({ 
     });
     next();
   });
+  app.use((req, res, next) => {
+    if (req.method !== 'POST' || !/^\/api\/v1\/(?:hotelDeals|deal)\/?$/i.test(req.path)) return next();
+    // Bound response cloning/serialization even when calls share work or hit cache.
+    if (hotelOperations >= 8) return next(new ServiceError('PROVIDER_BUSY'));
+    hotelOperations += 1;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      hotelOperations -= 1;
+      res.off('finish', release);
+      res.off('close', release);
+      req.off('aborted', release);
+    };
+    res.once('finish', release);
+    res.once('close', release);
+    req.once('aborted', release);
+    next();
+  });
   app.use(express.json({ limit: '16kb', strict: true }));
   app.get('/api/v1/destinations', (req, res) => {
     const url = new URL(req.originalUrl, 'http://localhost');
@@ -57,12 +79,49 @@ export function createApp({ logger = console, service = createProviderService({ 
   app.use('/api/v1', createHotelRoutes(service));
   app.use('/api', notFound);
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(frontendDirectory, { dotfiles: 'deny', index: false }));
+    // Read the immutable build once; direct results/details loads do not need the hero.
+    const html = readFile(path.join(frontendDirectory, 'index.html'), 'utf8').then(
+      (home) => ({ home, other: home.replace(/<link\b[^>]*\bdata-home-preload\b[^>]*>\s*/g, '') }),
+      (error) => ({ error }),
+    );
+    async function sendHtml(req, res, next) {
+      try {
+        const variants = await html;
+        if (variants.error) return next(variants.error);
+        res.set('Cache-Control', 'no-store').type('html').send(req.path === '/' ? variants.home : variants.other);
+      } catch (error) { next(error); }
+    }
+    const encoded = Object.fromEntries(['br', 'gzip'].map((encoding) => [encoding,
+      express.static(path.join(frontendDirectory, '.encoded', encoding), {
+        dotfiles: 'deny', index: false, redirect: false,
+        setHeaders: (res) => res.set('Content-Encoding', encoding),
+      }),
+    ]));
+    app.use((req, res, next) => {
+      if (!['GET', 'HEAD'].includes(req.method) || !/^\/assets\/.*\.(?:js|css)$/.test(req.path)) return next();
+      res.vary('Accept-Encoding');
+      function serve(available) {
+        const encoding = req.acceptsEncodings(available);
+        if (!encoding) return res.status(406).set('Cache-Control', 'no-store').end();
+        if (encoding === 'identity') return next();
+        encoded[encoding](req, res, (error) => {
+          if (error) {
+            if (!res.headersSent) res.removeHeader('Content-Encoding');
+            return next(error);
+          }
+          serve(available.filter((value) => value !== encoding));
+        });
+      }
+      serve(['br', 'gzip', 'identity']);
+    });
+    app.get('/index.html', sendHtml);
+    app.use(express.static(frontendDirectory, {
+      dotfiles: 'deny', index: false,
+      setHeaders: (res, file) => { if (path.extname(file) === '.html') res.set('Cache-Control', 'no-store'); },
+    }));
     app.get('*', (req, res, next) => {
       if (path.extname(req.path) || !req.accepts('html')) return next();
-      res.set('Cache-Control', 'no-store').sendFile(path.join(frontendDirectory, 'index.html'), (error) => {
-        if (error) next(error);
-      });
+      return sendHtml(req, res, next);
     });
   }
   app.use(notFound);

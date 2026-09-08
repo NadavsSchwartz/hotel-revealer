@@ -9,6 +9,7 @@ RUN npm ci
 COPY frontend ./frontend
 COPY shared ./shared
 COPY data/destinations-legacy-public.json ./data/destinations-legacy-public.json
+COPY scripts/compress-build.mjs ./scripts/compress-build.mjs
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS dependencies
