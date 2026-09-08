@@ -1,15 +1,14 @@
 # Provider boundary
 
-`createProviderService()` has no live adapter and returns
-`PROVIDER_NOT_CONFIGURED` (503) for searches and details. No environment variable,
-credential, test query parameter, or reset operation enables live requests.
-The production server does not import the old scraping, cookie, or database path.
+`createProviderService()` requires an adapter and otherwise returns
+`PROVIDER_NOT_CONFIGURED` (503) without provider requests or state I/O.
+Runtime configuration supplies the live adapter explicitly. The coordinator does
+not use the old scraping, cookie, or database path.
 
-An operational adapter is blocked on permission that explicitly covers automated
-pre-booking supplier comparison and public display, plus current authorized API
-documentation. Partner membership alone does not satisfy that gate. See
-`docs/IMPLEMENTATION.md` for the evidence and release status. The injectable seam
-supports offline tests; passing those tests does not validate live integration.
+The current implementation direction permits ordinary public-endpoint access;
+provider permission remains unverified. See `docs/LIVE_ACCESS.md` for that decision
+and `docs/IMPLEMENTATION.md` for release evidence. Injected offline tests verify
+coordinator behavior; they do not establish live integration or matching accuracy.
 
 ## Adapter interface
 
@@ -25,7 +24,7 @@ hotelDetails({ context, offerId, hotelId, signal })
 //      retailQuote: null | normalizedQuote, available?: boolean }
 ```
 
-`context` is the validated city/date/one-room/two-adult/USD contract. The first
+`context` is the validated destination/date/room/adult/child-age/USD contract. The first
 listing cursor is `null`; a terminal page must explicitly return `nextCursor:null`.
 Listing rows pass through the domain normalizer once. Duplicate observations from
 different pages go to the domain matcher together so conflicting evidence cannot
@@ -35,8 +34,8 @@ JSON. The serializer checks UTF-8 bytes and escaping while walking values so
 repeated candidate fields cannot first expand into an unbounded response string.
 Oversized payloads fail before caching or shared-response cloning.
 
-The eventual adapter owns mapping its documented API responses to this boundary,
-marking exact/minimum/range clues only where supported by authorized semantics,
+The adapter owns mapping its upstream responses to this boundary,
+marking exact/minimum/range clues only where supported by observed semantics,
 and binding any supplied original-offer handoff URL to the complete trip context.
 The service does not synthesize supplier URLs. Images are limited to the shared
 approved HTTPS host list. Hotel descriptions and addresses are plain text, never
@@ -52,8 +51,10 @@ throw new ProviderFailure('challenge');
 ```
 
 `retryAfter` accepts seconds or an HTTP date. Missing/invalid values default to a
-60-second cooldown. Other thrown errors become a controlled provider-unavailable
-response. An adapter that ignores abort keeps the active slot until it settles;
+60-second cooldown. Deliberate `ServiceError('PROVIDER_RESPONSE_INVALID')` and
+`ServiceError('RESULT_TOO_LARGE')` retain their controlled classification. Other
+thrown errors become a controlled provider-unavailable response. An adapter that
+ignores abort keeps the active slot until it settles;
 the service never dispatches overlapping calls to compensate.
 
 ## Budgets, caches, and state
@@ -81,21 +82,32 @@ during a provider cooldown. Challenges clear caches and disable the service.
 Optional detail failures preserve the usable parent offer and return
 `detailStatus: 'unavailable'`; that fallback is not cached.
 
-Cooldown and challenge state are atomically persisted as a minimal JSON object in
-`PROVIDER_STATE_FILE`, default `var/provider-state.json`. Unreadable/corrupt state
-fails closed. `resetProviderState()` is for the local operator CLI only; restart
-after resetting. Reset does not configure a provider or establish authorization.
+Cooldown and challenge state use a minimal JSON object in `PROVIDER_STATE_FILE`,
+default `var/provider-state.json`. Before every provider call, the coordinator
+atomically writes a conservative disabled record. After the call settles, it
+replaces that record with the classified clean, cooldown, or disabled state.
+No provider call starts if the first write fails. A failed outcome write or a
+process stop during a call leaves the next process disabled, even if the previous
+record allowed requests. This intentionally requires operator review after an
+interrupted call. Healthy calls and ordinary classified transport failures restore
+availability; persisted rate limits and challenges keep their existing behavior.
+
+The scheduler holds its active slot through persistence. State-write time is part
+of the admission deadline, and the one-second gap is measured at actual adapter
+dispatch. Unreadable/corrupt state fails closed. Temporary files are synchronized
+before replacement; disabled records also synchronize the containing directory.
+An availability-restoring rename is the last fallible step, so a later reported
+write error cannot leave a clean record behind. This verifies local file/process
+recovery, not arbitrary storage loss or deployment-volume durability.
+
+`resetProviderState()` is for the local operator CLI only. Stop the application,
+review the block or interrupted call, reset, then restart. Reset does not configure
+a provider or establish authorization.
 
 These limits are per process. Run one application process against one persistent
 state file. Multiple workers/replicas require a separately designed shared queue
 and state coordinator before release. Summary logs contain only controlled event,
 operation, cache/reuse, upstream/page/queue counts, outcome, and duration fields.
-
-Durability limitation before live release: if persisting a new block fails, the
-current process disables requests, but a later restart may read the prior clean
-state. Atomic replacement and routine restart tests do not prove crash/disk-failure
-durability. Settle the startup/recovery policy and verify that failure path before
-enabling an authorized live adapter. The current default adapter remains disabled.
 
 ## Offline verification
 

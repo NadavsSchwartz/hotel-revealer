@@ -1,9 +1,10 @@
 import { isRecord, normalizedId } from './validation.js';
+import { MAX_OFFER_ID_LENGTH } from '../../shared/identifiers.js';
 
 const unknown = () => ({ kind: 'unknown' });
 const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export const SAFE_IMAGE_HOSTS = Object.freeze([
-  'www.priceline.com', 'images.priceline.com', 'mobileimg.priceline.com', 'q-xx.bstatic.com', 'cf.bstatic.com',
+  'www.priceline.com', 'images.priceline.com', 'mobileimg.priceline.com', 'mobileimg.pclncdn.com', 'q-xx.bstatic.com', 'cf.bstatic.com',
 ]);
 
 export function numberOrNull(value, { min = 0, max = Number.MAX_SAFE_INTEGER, integer = false } = {}) {
@@ -49,12 +50,18 @@ export function normalizeQuote(value) {
   const source = isRecord(value) ? value : {};
   const normalized = Object.hasOwn(source, 'nightlyCents') || Object.hasOwn(source, 'stayCents');
   const usd = (normalized ? source.currency : source.minCurrencyCode) === 'USD';
-  return {
+  const quote = {
     nightlyCents: usd ? normalized ? numberOrNull(source.nightlyCents, { integer: true }) : cents(source.minPrice) : null,
     stayCents: usd ? normalized ? numberOrNull(source.stayCents, { integer: true }) : cents(source.displayPricePerStay) : null,
     currency: 'USD',
     taxesFees: usd && ['included', 'excluded'].includes(source.taxesFees) ? source.taxesFees : 'unknown',
   };
+  if (Number.isInteger(source.roomCount) && source.roomCount >= 1 && source.roomCount <= 8) {
+    quote.roomCount = source.roomCount;
+    if (source.nightlyBasis === 'per-room') quote.nightlyBasis = 'per-room';
+    if (source.stayBasis === 'all-rooms') quote.stayBasis = 'all-rooms';
+  }
+  return quote;
 }
 
 export function normalizeNumericClue(value, options = {}) {
@@ -115,7 +122,7 @@ function normalizeHotel(row) {
 }
 
 function normalizeOffer(row) {
-  const offerId = normalizedId(row.pclnId);
+  const offerId = normalizedId(row.pclnId, MAX_OFFER_ID_LENGTH);
   if (!offerId) return null;
   return {
     offerId,
@@ -180,7 +187,7 @@ export function deduplicateHotels(hotels) {
 export function deduplicateOffers(offers) {
   const groups = new Map();
   for (const offer of offers) {
-    if (!isRecord(offer) || !normalizedId(offer.offerId)) continue;
+    if (!isRecord(offer) || !normalizedId(offer.offerId, MAX_OFFER_ID_LENGTH)) continue;
     const rows = groups.get(offer.offerId) ?? [];
     rows.push(offer);
     groups.set(offer.offerId, rows);

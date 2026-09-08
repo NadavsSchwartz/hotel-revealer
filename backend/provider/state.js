@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -30,8 +30,19 @@ export function createFileStateStore(filePath = process.env.PROVIDER_STATE_FILE 
       await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
       const temporary = `${filePath}.${randomUUID()}.tmp`;
       try {
-        await writeFile(temporary, `${JSON.stringify(state)}\n`, { mode: 0o600, flag: 'wx' });
+        const handle = await open(temporary, 'wx', 0o600);
+        try {
+          await handle.writeFile(`${JSON.stringify(state)}\n`);
+          await handle.sync();
+        } finally { await handle.close(); }
         await rename(temporary, filePath);
+        if (state.disabled) {
+          const directory = await open(path.dirname(filePath), 'r');
+          try { await directory.sync(); } finally { await directory.close(); }
+        }
+        // When restoring availability, rename must be the last fallible step.
+        // Metadata rollback can retain the earlier disabled record safely;
+        // a failure after installing clean state must not report a lost block.
       } finally {
         await unlink(temporary).catch(() => {});
       }

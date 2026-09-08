@@ -14,6 +14,21 @@ const named = (fields = {}) => ({
 });
 const express = (fields = {}) => named({ pclnId: 'opaque-1', ratesSummary: { programName: 'Express_Deal', minPrice: 99.99, minCurrencyCode: 'USD' }, ...fields });
 
+test('live-sized opaque offer IDs survive normalization while oversized IDs remain rejected', () => {
+  const opaqueId = 'A9'.repeat(168);
+  const { offers, invalidRows } = normalizeListings([express({ pclnId: opaqueId }), express({ pclnId: 'F'.repeat(1025) })]);
+  assert.equal(offers.length, 1);
+  assert.equal(offers[0].offerId, opaqueId);
+  assert.equal(invalidRows, 1);
+  assert.equal(safeImageUrl('https://mobileimg.pclncdn.com/htlimg/master/123?auto=webp'), 'https://mobileimg.pclncdn.com/htlimg/master/123?auto=webp');
+});
+
+test('multi-room price basis survives normalization without synthesizing a total or claiming fees', () => {
+  const quote = normalizeQuote({ minPrice: '190.00', displayPricePerStay: '1140', minCurrencyCode: 'USD', roomCount: 2, nightlyBasis: 'per-room', stayBasis: 'all-rooms' });
+  assert.deepEqual(quote, { nightlyCents: 19000, stayCents: 114000, currency: 'USD', taxesFees: 'unknown', roomCount: 2, nightlyBasis: 'per-room', stayBasis: 'all-rooms' });
+  assert.equal(normalizeQuote({ minPrice: '190.00', minCurrencyCode: 'USD', roomCount: 2, nightlyBasis: 'per-room' }).stayCents, null);
+});
+
 test('observed legacy listing shape normalizes numeric strings and stable code sets', () => {
   const raw = { data: { listings: { hotels: [named(), express()] } } };
   const snapshot = JSON.stringify(raw);

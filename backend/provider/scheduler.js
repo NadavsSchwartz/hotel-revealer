@@ -7,11 +7,12 @@ export const realClock = {
 };
 
 export class ProviderScheduler {
-  constructor({ clock = realClock, gapMs = 1_000, maxWaiting = 4, beforeDispatch = async () => {} } = {}) {
+  constructor({ clock = realClock, gapMs = 1_000, maxWaiting = 4, beforeDispatch = async () => {}, afterDispatch = async () => {} } = {}) {
     this.clock = clock;
     this.gapMs = gapMs;
     this.maxWaiting = maxWaiting;
     this.beforeDispatch = beforeDispatch;
+    this.afterDispatch = afterDispatch;
     this.queue = [];
     this.active = null;
     this.lastStart = -Infinity;
@@ -70,15 +71,22 @@ export class ProviderScheduler {
   async dispatch(entry) {
     try {
       await this.beforeDispatch();
-      if (entry.settled || entry.deadline <= this.clock.now()) throw new ServiceError('DEADLINE_EXCEEDED');
-      this.lastStart = this.clock.now();
-      const value = await entry.task(entry.controller.signal);
+      let value;
+      try {
+        if (entry.settled || entry.deadline <= this.clock.now()) throw new ServiceError('DEADLINE_EXCEEDED');
+        this.lastStart = this.clock.now();
+        value = await entry.task(entry.controller.signal);
+      } finally {
+        // Complete durable control-state changes before admitting another call,
+        // including when preparation used the remaining admission budget.
+        await this.afterDispatch();
+      }
       if (entry.deadline <= this.clock.now()) throw new ServiceError('DEADLINE_EXCEEDED');
       this.settle(entry, null, value);
     } catch (error) {
       this.settle(entry, error);
     } finally {
-      // Keep the active slot until the adapter actually settles after abort.
+      // Keep the active slot until the adapter and control-state work settle.
       // An adapter that ignores AbortSignal must never create overlapping calls.
       this.active = null;
       this.pump();

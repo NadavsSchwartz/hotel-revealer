@@ -32,7 +32,7 @@ function withDeadline(operation, deadline, clock) {
 }
 
 /**
- * There is deliberately no live adapter. An authorized adapter implements
+ * An adapter implements
  * listingsPage({context,cursor,signal}) => {listings: rawRows, nextCursor:null|string},
  * hotelDetails({context,offerId,hotelId,signal}) => display fields, honors AbortSignal,
  * and classifies challenges/rate limits with ProviderFailure.
@@ -62,16 +62,27 @@ export function createProviderService({ adapter = null, clock = realClock, state
     if (!allowCooldown && state.cooldownUntil > clock.now()) throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil) });
   }
 
-  const scheduler = new ProviderScheduler({ clock, beforeDispatch: available });
-
-  async function persistBlock() {
+  async function persistState(value = state) {
     try {
-      await stateStore.write(state);
+      await stateStore.write(value);
     } catch {
       state.disabled = true;
+      searches.clear();
+      details.clear();
       throw new ServiceError('PROVIDER_DISABLED');
     }
   }
+
+  const scheduler = new ProviderScheduler({
+    clock,
+    async beforeDispatch() {
+      await available();
+      // A crash or a failed outcome write must leave the next process blocked.
+      // Keep live availability in memory; only the durable copy is conservative.
+      await persistState({ ...state, disabled: true });
+    },
+    afterDispatch: () => persistState(),
+  });
 
   async function call(method, parameters, deadline, metrics) {
     return scheduler.run(async (signal) => {
@@ -83,15 +94,14 @@ export function createProviderService({ adapter = null, clock = realClock, state
           state.disabled = true;
           searches.clear();
           details.clear();
-          await persistBlock();
           throw new ServiceError('PROVIDER_DISABLED');
         }
         if (error instanceof ProviderFailure && error.kind === 'rate_limit') {
           state.cooldownUntil = retryAfterDeadline(error.retryAfter, clock.now());
-          await persistBlock();
           throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil) });
         }
         if (signal.aborted) throw new ServiceError('DEADLINE_EXCEEDED');
+        if (error instanceof ServiceError && ['PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'RESULT_TOO_LARGE'].includes(error.code)) throw error;
         throw new ServiceError('PROVIDER_UNAVAILABLE');
       }
     }, { deadline });
@@ -225,7 +235,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         const cached = details.get(key);
         if (cached) {
           metrics.cache = 'hit';
-          const result = { ...cached, offer, candidate,
+          const result = { ...cached, offer, candidate, offerExpiresAt: search.expiresAt,
             expiresAt: iso(Math.min(Date.parse(search.expiresAt), Date.parse(cached.retrievedAt) + DETAIL_TTL)) };
           assertJsonSize(result);
           return result;
@@ -247,7 +257,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         }
         const retrievedAt = clock.now();
         const result = {
-          context, retrievedAt: iso(retrievedAt), expiresAt: iso(Math.min(Date.parse(search.expiresAt), retrievedAt + DETAIL_TTL)),
+          context, retrievedAt: iso(retrievedAt), expiresAt: iso(Math.min(Date.parse(search.expiresAt), retrievedAt + DETAIL_TTL)), offerExpiresAt: search.expiresAt,
           offer, candidate, details: normalizedDetails, detailStatus,
         };
         // Missing retailQuote does not imply Express unavailability.

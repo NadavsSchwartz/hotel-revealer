@@ -81,3 +81,43 @@ test('admission deadline includes slow pre-dispatch state checks', async () => {
   await flush();
   assert.equal(called, false);
 });
+
+test('preparation time does not shorten the gap between actual upstream starts', async () => {
+  const clock = manualClock();
+  let finishPreparation;
+  let preparations = 0;
+  const scheduler = new ProviderScheduler({ clock, beforeDispatch: async () => {
+    preparations += 1;
+    if (preparations === 1) await new Promise((resolve) => { finishPreparation = resolve; });
+  } });
+  const starts = [];
+  const first = scheduler.run(() => { starts.push(clock.now()); }, { deadline: clock.now() + 20_000 });
+  const second = scheduler.run(() => { starts.push(clock.now()); }, { deadline: clock.now() + 20_000 });
+  await clock.advance(1_500);
+  finishPreparation();
+  await first;
+  await clock.advance(999);
+  assert.equal(starts.length, 1);
+  await clock.advance(1);
+  await second;
+  assert.equal(starts[1] - starts[0], 1_000);
+});
+
+test('completion persistence keeps the active slot even after the admission deadline', async () => {
+  const clock = manualClock();
+  let finishPersistence;
+  let completions = 0;
+  const scheduler = new ProviderScheduler({ clock, afterDispatch: async () => {
+    completions += 1;
+    if (completions === 1) await new Promise((resolve) => { finishPersistence = resolve; });
+  } });
+  let calls = 0;
+  const rejected = assert.rejects(scheduler.run(() => { calls += 1; }, { deadline: clock.now() + 100 }), { code: 'DEADLINE_EXCEEDED' });
+  const second = scheduler.run(() => { calls += 1; }, { deadline: clock.now() + 10_000 });
+  await clock.advance(2_000);
+  await rejected;
+  assert.equal(calls, 1);
+  finishPersistence();
+  await second;
+  assert.equal(calls, 2);
+});

@@ -115,10 +115,12 @@ test('DST and year boundaries keep travel dates as calendar values', () => {
 });
 
 test('detail requires both distinct wire IDs and preserves canonical search context', () => {
+  const opaqueId = 'A9'.repeat(168);
+  assert.equal(validateDetail({ ...input, offerId: opaqueId, hotelId: '49205' }, now).offerId, opaqueId);
   assert.deepEqual(validateDetail({ ...input, offerId: 'offer:12', hotelId: 'hotel_3' }, now), {
     ...canonicalInput(), rooms: 1, adults: 2, childrenAges: [], currency: 'USD', offerId: 'offer:12', hotelId: 'hotel_3',
   });
-  for (const offerId of [null, '', 12, ' a', '../x', '<script>', 'x'.repeat(201)]) {
+  for (const offerId of [null, '', 12, ' a', '../x', '<script>', 'x'.repeat(1025)]) {
     assert.throws(() => validateDetail({ ...input, offerId, hotelId: 'hotel' }, now), error('INVALID_OFFER_ID'));
   }
   assert.throws(() => validateDetail({ ...input, offerId: 'offer' }, now), error('INVALID_HOTEL_ID'));

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createProviderService } from './service.js';
-import { ProviderFailure } from './errors.js';
+import { ProviderFailure, ServiceError } from './errors.js';
 import { createMemoryStateStore, createFileStateStore, resetProviderState } from './state.js';
 import { futureContext, listingRows, manualClock, flush } from './test-helpers.js';
 import { MAX_JSON_BYTES } from './size.js';
@@ -258,6 +259,112 @@ test('invalid response, persistence failure, and graceful drain fail closed', as
   await assert.rejects(normal.service.search(futureContext), { code: 'SERVICE_DRAINING' });
 });
 
+test('failed pre-dispatch persistence never calls the provider, including after restart', async () => {
+  const store = createMemoryStateStore();
+  const unavailableStore = { read: () => store.read(), write: async () => { throw new Error('Disk full'); } };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { service, calls } = setup({ stateStore: unavailableStore });
+    await assert.rejects(service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('failed outcome persistence leaves a durable block for success, challenge, and rate limit', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'hotel-provider-outcome-'));
+  try {
+    for (const outcome of ['success', 'challenge', 'rate_limit']) {
+      const store = createFileStateStore(path.join(directory, `${outcome}.json`));
+      await resetProviderState({ stateStore: store });
+      let writes = 0;
+      let calls = 0;
+      const failedStore = { read: () => store.read(), async write(value) {
+        writes += 1;
+        if (writes > 1) throw new Error('Disk failed after dispatch');
+        await store.write(value);
+      } };
+      const { service } = setup({ stateStore: failedStore, adapter: { async listingsPage() {
+        calls += 1;
+        assert.equal((await store.read()).disabled, true);
+        if (outcome !== 'success') throw new ProviderFailure(outcome, { retryAfter: '120' });
+        return { listings: listingRows(), nextCursor: null };
+      } } });
+      await assert.rejects(service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+      await assert.rejects(service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+      const restarted = setup({ stateStore: store });
+      await assert.rejects(restarted.service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+      assert.equal(calls, 1);
+      assert.equal(restarted.calls.length, 0);
+    }
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('process termination inside a provider call leaves restart blocked until operator reset', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'hotel-provider-crash-'));
+  const file = path.join(directory, 'state.json');
+  const store = createFileStateStore(file);
+  try {
+    await resetProviderState({ stateStore: store });
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { createProviderService } from ${JSON.stringify(new URL('./service.js', import.meta.url).href)};
+      import { createFileStateStore } from ${JSON.stringify(new URL('./state.js', import.meta.url).href)};
+      import { futureContext } from ${JSON.stringify(new URL('./test-helpers.js', import.meta.url).href)};
+      const service = createProviderService({
+        stateStore: createFileStateStore(${JSON.stringify(file)}),
+        adapter: {
+          async listingsPage() { process.kill(process.pid, 'SIGKILL'); },
+          async hotelDetails() { throw new Error('Not used'); },
+        },
+        logger: null,
+      });
+      await service.search(futureContext);
+    `], { encoding: 'utf8', timeout: 5_000 });
+    assert.equal(child.signal, 'SIGKILL', child.stderr);
+    const restarted = setup({ stateStore: store });
+    await assert.rejects(restarted.service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+    assert.equal(restarted.calls.length, 0);
+    await resetProviderState({ stateStore: store });
+    const recovered = setup({ stateStore: store });
+    await recovered.service.search(futureContext);
+    assert.equal(recovered.calls.length, 1);
+    assert.equal((await store.read()).disabled, false);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('deadline during pre-dispatch persistence restores state without dispatching', async () => {
+  const store = createMemoryStateStore();
+  let release;
+  const { service, clock, calls } = setup({ stateStore: {
+    read: () => store.read(),
+    async write(value) {
+      await store.write(value);
+      if (value.disabled) await new Promise((resolve) => { release = resolve; });
+    },
+  } });
+  const rejected = assert.rejects(service.search(futureContext), { code: 'DEADLINE_EXCEEDED' });
+  await clock.advance(20_000);
+  await rejected;
+  assert.equal((await store.read()).disabled, true);
+  release();
+  await flush();
+  assert.equal(calls.length, 0);
+  assert.equal((await store.read()).disabled, false);
+});
+
+test('adapter validation and size failures keep their controlled error classification', async () => {
+  for (const code of ['PROVIDER_RESPONSE_INVALID', 'RESULT_TOO_LARGE']) {
+    let calls = 0;
+    const { service, clock } = setup({ adapter: { async listingsPage() {
+      calls += 1;
+      throw new ServiceError(code);
+    } } });
+    await assert.rejects(service.search(futureContext), { code });
+    const rejected = assert.rejects(service.search(futureContext), { code });
+    await clock.advance(1_000);
+    await rejected;
+    assert.equal(calls, 2);
+  }
+});
+
 test('fresh cached searches survive cooldown, expired searches do not dispatch, and challenges clear cache', async () => {
   let fail;
   let count = 0;
@@ -339,16 +446,28 @@ test('detail envelopes cannot extend offer freshness and cached details are clam
   await clock.advance(299_000);
   const first = await service.detail(selection);
   assert.equal(first.expiresAt, search.expiresAt);
+  assert.equal(first.offerExpiresAt, search.expiresAt);
   assert.equal(Date.parse(first.expiresAt) - clock.now(), 1_000);
   await clock.advance(500);
   const cached = await service.detail(selection);
   assert.equal(cached.expiresAt, search.expiresAt);
+  assert.equal(cached.offerExpiresAt, search.expiresAt);
   await clock.advance(501);
   const refreshed = await service.detail(selection);
   assert.equal(refreshed.retrievedAt, first.retrievedAt);
   assert.equal(refreshed.expiresAt, new Date(Date.parse(first.retrievedAt) + 60_000).toISOString());
   assert.equal(calls.filter(([type]) => type === 'search').length, 2);
   assert.equal(calls.filter(([type]) => type === 'detail').length, 1);
+});
+
+test('hotel metadata cache expiry does not shorten the original offer freshness', async () => {
+  const { service, clock } = setup();
+  const search = await service.search(futureContext);
+  const request = service.detail(selection);
+  await clock.advance(1_000);
+  const detail = await request;
+  assert.equal(detail.offerExpiresAt, search.expiresAt);
+  assert.ok(Date.parse(detail.expiresAt) < Date.parse(detail.offerExpiresAt));
 });
 
 test('a later-page challenge rejects the search and persists the block instead of returning earlier offers', async () => {

@@ -1,5 +1,6 @@
 import { getDestination, resolveLegacyCity } from '../destinations/index.js';
 import { validateTripFields } from '../../shared/travel.js';
+import { MAX_OFFER_ID_LENGTH, validIdentifier } from '../../shared/identifiers.js';
 
 export { isCalendarDate } from '../../shared/travel.js';
 
@@ -16,13 +17,12 @@ export function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function normalizedId(value) {
+export function normalizedId(value, maximum = 200) {
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value) || value < 0) return null;
     value = String(value);
   }
-  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(value)
-    ? value : null;
+  return validIdentifier(value, maximum) ? value : null;
 }
 
 function context(input, now, allowedKeys) {
@@ -55,7 +55,7 @@ export function validateSearch(input, now = new Date()) {
 export function validateDetail(input, now = new Date()) {
   const result = context(input, now, [...searchKeys, 'offerId', 'hotelId']);
   // Wire IDs are strings even when the provider originally used numeric IDs.
-  if (typeof input.offerId !== 'string' || !normalizedId(input.offerId)) {
+  if (typeof input.offerId !== 'string' || !normalizedId(input.offerId, MAX_OFFER_ID_LENGTH)) {
     throw new ValidationError('INVALID_OFFER_ID', 'A valid original offer ID is required.');
   }
   if (typeof input.hotelId !== 'string' || !normalizedId(input.hotelId)) {
