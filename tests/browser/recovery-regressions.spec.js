@@ -38,7 +38,7 @@ test('a failed same-selection price refresh retains property information and a f
   await page.goto(detailPath);
   const heading = page.getByRole('heading', { name: 'Juniper House', exact: true });
   const photo = page.getByRole('img', { name: /property photograph 1/ });
-  const handoff = page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ });
+  const handoff = page.getByRole('link', { name: /Check (current )?price on Priceline/ });
   await expect(heading).toBeVisible();
   await expect(photo).toBeVisible();
   await page.clock.fastForward(61000);
@@ -78,9 +78,9 @@ test('browser Forward cannot restore a candidate excluded by newer results while
   });
   await page.goto(searchPath);
   await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
-  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toBeVisible();
   await page.goBack();
-  await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
+  await page.getByRole('button', { name: 'Update prices', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'View likely hotel: Desert House', exact: true })).toBeVisible();
   await page.goForward();
@@ -89,11 +89,11 @@ test('browser Forward cannot restore a candidate excluded by newer results while
     await expect(page.getByText('Loading hotel details and total price…', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
     await expect(page.getByRole('img', { name: /property photograph/ })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
+    await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
   } finally { release(); }
   await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
+  await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
   expect(searches).toBe(2);
 });
 
@@ -101,6 +101,7 @@ test('retained detail data honors cooldown across every price refresh and return
   const now = Date.now();
   await page.clock.install({ time: now });
   const data = populatedDetail(now);
+  data.details.retailQuote = { nightlyCents: 15900, stayCents: 31800, currency: 'USD', taxesFees: 'included' };
   const retryAt = new Date(now + 601000).toISOString();
   await mockPhoto(page);
   let details = 0;
@@ -144,9 +145,10 @@ test('offer-only requests retry after connectivity loss and a newly matched resp
     } });
   });
   await page.goto(searchPath);
-  await page.getByRole('link', { name: /Check total price/ }).click();
+  await expect(page.getByRole('heading', { name: 'No hotel matches found', exact: true })).toBeVisible();
+  await expect(page.locator('.offer-card')).toHaveCount(0);
+  await page.goto(`/deal?${new URLSearchParams({ ...context, offerId: offer.offerId })}`);
   await expect(page.getByRole('heading', { name: 'We could not connect', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveAttribute('href', offer.handoffUrl);
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View the likely hotel', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
@@ -171,7 +173,7 @@ test('opening Priceline and returning after expiry preserves trip and handoff wh
   await page.goto(path);
   await expect(page.locator('.quote-price')).toHaveText('$270 total');
   const popupEvent = page.waitForEvent('popup');
-  await page.getByRole('link', { name: /View original Express offer/ }).click();
+  await page.getByRole('link', { name: /Check price on Priceline/ }).click();
   const popup = await popupEvent;
   await expect(popup.getByRole('heading', { name: 'Synthetic supplier offer' })).toBeVisible();
   expect(popup.url()).toBe(detail.offer.handoffUrl);
@@ -202,7 +204,7 @@ test('form edits survive an earlier response, and Back restores the completed or
   await page.getByRole('button', { name: 'Increase adults', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   release();
-  await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Travelers, 3 guests · 1 room', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect.poll(() => requests.length).toBe(2);

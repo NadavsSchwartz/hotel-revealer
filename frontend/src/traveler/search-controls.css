@@ -26,13 +26,15 @@
 }
 .destination-control input::placeholder, .date-control input::placeholder { color: #5b6854; opacity: 1; font-weight: 400; }
 .trip-control input:focus-visible { outline: 0; }
-.trip-control:has(input:focus-visible) { outline: 2px solid var(--blue, #34482f); outline-offset: -2px; }
+.trip-control:has(input:focus-visible), .travelers-control:has(.travelers-trigger:focus-visible) { outline: 2px solid var(--blue, #34482f); outline-offset: 2px; }
+.travelers-control .travelers-trigger:focus-visible { outline: 0; }
 .trip-control .field-error { margin: 7px 0 0; color: #b42332; font-size: 11px; line-height: 1.5; }
 .date-control .ant-picker { width: 100%; padding: 0; height: 32px; border: 0; box-shadow: none; background: transparent; font-family: inherit; }
 .date-control .ant-picker-input > input { min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: var(--ink, #253023); font-size: 14px; font-weight: 600; cursor: pointer; }
 .date-control .ant-picker-suffix { color: #5b6854; margin-left: 5px; font-size: 14px; }
 .travelers-trigger { display: flex; width: 100%; min-height: 32px; padding: 0; align-items: center; justify-content: space-between; gap: 7px; border: 0; background: transparent; color: var(--ink, #253023); font-size: 14px; font-weight: 600; text-align: left; }
-.travelers-trigger svg { width: 16px; height: 16px; fill: none; stroke: #5b6854; stroke-width: 1.7; flex-shrink: 0; }
+.travelers-trigger svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.travelers-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
 .trip-search-fields .search-button.ant-btn { min-width: 116px; min-height: 62px; display: flex; align-items: center; justify-content: center; gap: 9px; align-self: start; margin: 4px; padding: 13px 17px; border: 1px solid var(--blue, #34482f); border-radius: 9px; background: var(--blue, #34482f); color: white; font-size: 14px; font-weight: 650; }
 .trip-search-fields .search-button.ant-btn:hover { background: #263b22; border-color: #263b22; }
 .search-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
@@ -70,12 +72,13 @@
 .travelers-panel { width: 340px; max-width: calc(100vw - 26px); max-height: min(620px, calc(100dvh - 100px)); overflow-y: auto; overscroll-behavior: contain; padding: 20px; font-family: inherit; }
 .travelers-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 12px; }
 .travelers-panel-heading h3 { margin: 0; font-size: 17px; font-weight: 700; }
-.travelers-panel-heading > button { min-width: 32px; min-height: 32px; padding: 0; background: #f2f5f8; color: #5b6854; border: 0; border-radius: 50%; font-size: 22px; line-height: 1; }
+.travelers-panel-heading > button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 40px; padding: 0; background: #f2f5f8; color: #5b6854; border: 0; border-radius: 50%; }
+.travelers-panel-heading > button svg, .traveler-counter button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .traveler-counter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid #e8edf2; }
 .traveler-counter-label { font-size: 14px; font-weight: 650; }
 .traveler-counter-row small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.4; color: #5b6854; }
 .traveler-counter { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.traveler-counter button { width: 36px; height: 36px; padding: 0; background: white; color: #34482f; border: 1px solid #bdc6b3; border-radius: 50%; font-size: 23px; line-height: 1; }
+.traveler-counter button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; background: white; color: #34482f; border: 1px solid #bdc6b3; border-radius: 50%; }
 .traveler-counter button:hover { background: #edf0e7; }
 .traveler-counter button:disabled { color: #b4bdc7; border-color: #e0e5ea; background: #f8f9fa; cursor: not-allowed; }
 .traveler-counter output { min-width: 18px; text-align: center; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }

@@ -47,20 +47,20 @@ test('all same-trip refresh controls honor cooldown and recover at its deadline'
     return route.fulfill({ json: { ...data, expiresAt: searches > 2 ? new Date(now + 300000).toISOString() : data.expiresAt } });
   });
   await page.goto(searchPath);
-  await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
+  await page.getByRole('button', { name: 'Update prices', exact: true }).click();
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Refresh search', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Update prices', exact: true })).toBeDisabled();
   await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toBeVisible();
   const edit = page.getByRole('button', { name: 'Edit trip', exact: true });
   if (await edit.isVisible()) await edit.click();
   await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeDisabled();
   await page.clock.fastForward(61000);
   await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Refresh search', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Update prices', exact: true })).toBeEnabled();
   expect(searches).toBe(2);
-  await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
+  await page.getByRole('button', { name: 'Update prices', exact: true }).click();
   await expect.poll(() => searches).toBe(3);
-  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toBeVisible();
 });
 
 test('returning to a cooling-down trip preserves its retry after expiry without an automatic request', async ({ page }) => {
@@ -85,7 +85,7 @@ test('returning to a cooling-down trip preserves its retry after expiry without 
   await page.getByRole('combobox', { name: 'Check-out', exact: true }).click();
   await page.locator(`.travel-calendar-popup:visible td[title="${tripB.checkOut}"] button`).click();
   await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
@@ -96,7 +96,7 @@ test('returning to a cooling-down trip preserves its retry after expiry without 
   await expect(page.locator('.results-page > [role="status"]')).toHaveText('The provider pause has ended. You can try this search again.');
   expect(requests).toEqual([context, tripB]);
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toHaveCount(0);
   expect(requests).toEqual([context, tripB, context]);
 });

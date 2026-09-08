@@ -23,7 +23,6 @@ import {
   ErrorNotice,
   ProviderLink,
   Quote,
-  StaleNotice,
   Stars,
   TripSummary,
   useExpired,
@@ -96,7 +95,7 @@ export default function Results() {
   const visibleError = coolingDown ? cooldownError : error || (!data ? cooldownError : null);
   const params = new URLSearchParams(location.search);
   const waitingForFirstResults = valid && !data && (loading || !visibleError);
-  const sort = params.get('sort') === 'price' ? 'price' : 'evidence';
+  const sort = params.get('sort') === 'rating' ? 'rating' : 'price';
   const rawPage = Number(params.get('page') || 1);
   const requestedPage = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const stale = useExpired(data?.expiresAt);
@@ -170,26 +169,24 @@ export default function Results() {
     return () => window.removeEventListener('scroll', saveScroll);
   }, [key]);
 
-  const offers = [...(data?.offers || [])].sort((a, b) => {
-    const priceDifference =
-      comparableNightly(a, context.rooms) - comparableNightly(b, context.rooms);
-    if (sort === 'price')
-      return priceDifference || a.offerId.localeCompare(b.offerId);
-    const isMatched = (offer) => offer.resolution?.status === 'matched';
-    return (
-      Number(isMatched(b)) - Number(isMatched(a)) ||
-      priceDifference ||
-      a.offerId.localeCompare(b.offerId)
-    );
-  });
+  const offers = (data?.offers || [])
+    .filter(offer => validResolution(offer) && offer.resolution.status === 'matched')
+    .sort((a, b) => {
+      if (sort === 'rating') {
+        const ratingA = a.candidates[0].guestRating;
+        const ratingB = b.candidates[0].guestRating;
+        const difference = (Number.isFinite(ratingB) ? ratingB : -Infinity) -
+          (Number.isFinite(ratingA) ? ratingA : -Infinity);
+        if (difference) return difference;
+      }
+      return comparableNightly(a, context.rooms) - comparableNightly(b, context.rooms) ||
+        a.offerId.localeCompare(b.offerId);
+    });
   const pageCount = Math.max(1, Math.ceil(offers.length / PAGE_SIZE));
   const page = Math.min(requestedPage, pageCount);
   const firstOffer = (page - 1) * PAGE_SIZE;
   const visibleOffers = offers.slice(firstOffer, firstOffer + PAGE_SIZE);
-  const candidateCount = offers.reduce(
-    (total, offer) => total + Number(offer.resolution?.status === 'matched'),
-    0,
-  );
+
 
   useEffect(() => {
     if (!data) return;
@@ -236,7 +233,7 @@ export default function Results() {
       id: focusId,
       to: searchUrl(context, '/deal', {
         offerId: offer.offerId,
-        ...(candidate ? { hotelId: candidate.hotelId } : {}),
+        hotelId: candidate.hotelId,
       }),
       state: {
         resultsUrl: `/results${location.search}`,
@@ -256,13 +253,13 @@ export default function Results() {
           ? 'The provider pause has ended. You can try this search again.'
           : 'Search could not be completed.'}${data ? ' Previous results remain available.' : ''}`
         : data
-          ? `${offers.length} Express offers found with ${candidateCount} likely hotels.${data.coverage.status === 'partial' ? ' Results are partial.' : ''} Showing page ${page} of ${pageCount}.`
+          ? `${offers.length} hotel deals found with a likely hotel.${data.coverage.status === 'partial' ? ' The search was incomplete.' : ''} Showing page ${page} of ${pageCount}.`
           : '';
 
   return (
     <div className={`page-shell results-page${waitingForFirstResults ? ' is-searching' : ''}`}>
       <Link className="back-link" to="/">
-        ← New trip
+        <svg className="action-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M16 10H4m5-5-5 5 5 5" /></svg> New trip
       </Link>
       <header className="page-heading">
         <p className="eyebrow">YOUR TRIP / EXPRESS DEALS</p>
@@ -297,60 +294,51 @@ export default function Results() {
       {valid && data && (
         <section className="results-content" aria-label="Hotel search results" aria-busy={loading}>
           {loading && <SearchProgress variant="refresh" />}
-          {stale && !loading && <StaleNotice onRefresh={refresh} disabled={coolingDown} />}
-          {data.coverage.status === 'partial' && (
-            <div className="coverage-notice" role="note">
-              <strong>Partial results</strong>
-              <p>
-                We could not assess all available listings. These are the offers
-                checked so far. Hotel names remain unresolved until a complete search is available.
-              </p>
-            </div>
-          )}
           <div className="results-toolbar">
             <div>
               <h2 id="results-count" tabIndex="-1">
-                {offers.length} Express {offers.length === 1 ? 'offer' : 'offers'}
+                {offers.length} hotel {offers.length === 1 ? 'deal' : 'deals'}
               </h2>
-              <p>
-                Updated {new Date(data.retrievedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              <p className="results-updated">
+                Prices checked {new Date(data.retrievedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 {pageCount > 1 && ` · Showing ${firstOffer + 1}–${Math.min(firstOffer + PAGE_SIZE, offers.length)}`}
+                {offers.length > 0 && <Button className="results-refresh" onClick={refresh} disabled={loading || coolingDown}>{loading ? 'Updating…' : 'Update prices'}</Button>}
               </p>
             </div>
             {offers.length > 0 && (
               <div className="sort-control">
                 <label htmlFor="offer-sort">Sort by</label>
-                <select
-                  id="offer-sort"
-                  value={sort}
-                  onChange={(event) => updateView(event.target.value, 1)}
-                >
-                  <option value="evidence">Likely hotels first</option>
-                  <option value="price">Room rate before taxes</option>
-                </select>
+                <div className="sort-select">
+                  <select
+                    id="offer-sort"
+                    value={sort}
+                    onChange={(event) => updateView(event.target.value, 1)}
+                  >
+                    <option value="price">Lowest room rate</option>
+                    <option value="rating">Highest guest rating</option>
+                  </select>
+                  <svg className="control-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
+                </div>
               </div>
             )}
           </div>
           {offers.length > 0 && (
             <p className="results-comparison-intro">
-              A likely hotel name is inferred from the deal information, and is not guaranteed. Open an offer to check its total price.
+              Hotel names are inferred from the deal information, not guaranteed. Open a hotel to check the complete price.
             </p>
           )}
           {offers.length === 0 && (
             <div className="empty-panel">
-              <span className="empty-symbol" aria-hidden="true">∅</span>
-              <h2>No Express offers were returned</h2>
-              <p>
-                Try a different city or set of dates. This does not mean that
-                every hotel is sold out.
-              </p>
+              <h2>No hotel matches found</h2>
+              <p>{data.coverage.status === 'partial'
+                ? 'The search did not finish, so we could not identify hotels reliably. Try again.'
+                : 'We could not identify a hotel for these dates. Try different dates or a nearby destination.'}</p>
+              {data.coverage.status === 'partial' && <Button onClick={refresh} disabled={loading || coolingDown}>Try search again</Button>}
             </div>
           )}
           <div className="offer-list">
             {visibleOffers.map((offer, index) => {
-              const candidate = validResolution(offer) && offer.resolution.status === 'matched' && offer.candidates?.length === 1
-                ? offer.candidates[0] : null;
-              const resolved = validResolution(offer);
+              const candidate = offer.candidates[0];
               const panelId = `offer-${encodeURIComponent(offer.offerId)}`;
               return (
                 <article className="offer-card" key={offer.offerId} aria-labelledby={`${panelId}-title`}>
@@ -367,33 +355,22 @@ export default function Results() {
                         <span aria-hidden="true"> · </span>Hotel name withheld
                       </p>
                     </div>
-                    <Quote quote={offer.quote} compact expired={stale} />
-                    {candidate ? (
-                      <div className="offer-preview">
-                        <p className="preview-label">Likely hotel</p>
-                        <Link className="candidate-preview" {...candidateLink(offer, candidate, `preview-${encodeURIComponent(offer.offerId)}-${encodeURIComponent(candidate.hotelId)}`)} aria-label={`View likely hotel: ${candidate.name}`}>
-                          <CandidatePhoto candidate={candidate} eager={index === 0} />
-                          <span className="candidate-preview-copy">
-                            <strong>{candidate.name}</strong>
-                            <span className="candidate-preview-meta"><Stars value={candidate.stars} />{candidate.guestRating != null && ` · ${candidate.guestRating}/10 guests`}</span>
-                            <span className="candidate-preview-action">View hotel &amp; total price <span aria-hidden="true">↗</span></span>
-                          </span>
-                        </Link>
-                      </div>
-                    ) : (
-                      <div className="offer-preview-empty">
-                        <strong>{resolved ? 'We couldn’t identify this hotel.' : 'Refresh this search to continue.'}</strong>
-                        <p>{resolved ? {
-                          no_match: 'No hotel met the matching rules for this offer.',
-                          ambiguous: 'More than one hotel fits this offer’s information.',
-                          missing_facts: 'The listing information is incomplete or inconsistent.',
-                          incomplete_search: 'Some listings could not be checked.',
-                        }[offer.resolution.reason] : 'These saved results use an older format.'}</p>
-                        {resolved ? <Link className="candidate-link" {...candidateLink(offer, null, `offer-price-${encodeURIComponent(offer.offerId)}`)}>Check total price <span aria-hidden="true">↗</span></Link>
-                          : <Button onClick={refresh} disabled={loading || coolingDown}>Refresh results</Button>}
-                      </div>
-                    )}
+                    <Quote quote={offer.quote} compact title={stale ? 'Last seen room rate' : 'Room rate'} />
+                    <div className="offer-preview">
+                      <p className="preview-label">Likely hotel</p>
+                      <Link className="candidate-preview" {...candidateLink(offer, candidate, `preview-${encodeURIComponent(offer.offerId)}-${encodeURIComponent(candidate.hotelId)}`)} aria-label={`View likely hotel: ${candidate.name}`}>
+                        <CandidatePhoto candidate={candidate} eager={index === 0} />
+                        <span className="candidate-preview-copy">
+                          <strong>{candidate.name}</strong>
+                          <span className="candidate-preview-meta"><Stars value={candidate.stars} />{candidate.guestRating != null && ` · ${candidate.guestRating}/10 guests`}</span>
+                        </span>
+                      </Link>
+                    </div>
                     <div className="offer-booking">
+                      <Link className="offer-detail-link button-link" {...candidateLink(offer, candidate, `details-${encodeURIComponent(offer.offerId)}`)}>
+                        View hotel &amp; prices
+                        <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>
+                      </Link>
                       <ProviderLink offer={offer} stale={stale} refreshing={loading} />
                     </div>
                   </div>
@@ -403,22 +380,11 @@ export default function Results() {
           </div>
           {pageCount > 1 && (
             <nav className="results-pagination" aria-label="Results pages">
-              <Button onClick={() => changePage(page - 1)} disabled={page === 1}><span aria-hidden="true">←</span> Previous</Button>
+              <Button onClick={() => changePage(page - 1)} disabled={page === 1}><svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4m5-5-5 5 5 5" /></svg> Previous</Button>
               <span>Page <strong>{page}</strong> of {pageCount}</span>
-              <Button onClick={() => changePage(page + 1)} disabled={page === pageCount}>Next <span aria-hidden="true">→</span></Button>
+              <Button onClick={() => changePage(page + 1)} disabled={page === pageCount}>Next <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg></Button>
             </nav>
           )}
-          <details className="results-footnote">
-            <summary>About these results</summary>
-            <p>
-              Matches are based on {data.coverage.namedHotelsChecked ?? 0} hotel listings checked for your trip.
-              {data.coverage.unassessedHotels > 0 ? ' Some listings had too little information to compare.' : ''}
-              {' '}Other hotels may be available outside these results.
-            </p>
-            <p>
-              Prices retrieved {new Date(data.retrievedAt).toLocaleString('en-US')}. Rates and availability can change.
-            </p>
-          </details>
         </section>
       )}
     </div>

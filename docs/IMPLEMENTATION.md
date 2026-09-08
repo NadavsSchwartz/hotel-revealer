@@ -1,7 +1,9 @@
 # Hotel Revealer implementation contract
 
-Approved scope: Room shows one inferred hotel or an unresolved Express offer,
+Approved scope: Room shows only deals with one inferred hotel in search results,
 fetches complete prices on demand, and preserves the original supplier handoff.
+Unresolved observations remain in the API for diagnostics and revalidation; they
+are excluded from result counts, sorting and pagination.
 The application supports English, USD, worldwide destination search, room/adult
 counts and children’s ages. This milestone covers local implementation and
 verification; public-release gates remain separate. No demo substitute.
@@ -81,8 +83,9 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   otherwise empty. Missing or malformed resolution requires a controlled refresh;
   an older candidates-only response cannot establish an identification.
 - Candidate: `{hotelId,name,neighborhoodName,stars,guestRating,reviewCount,
-  amenities,thumbnailUrl}`. The UI says “Likely hotel” or “We couldn’t identify
-  this hotel” and explains that the name is inferred from deal information.
+  amenities,thumbnailUrl}`. Cards say “Likely hotel” and explain once that names
+  are inferred from deal information. A search with no matched offers shows
+  “No hotel matches found”, with a retry explanation for incomplete searches.
   Matching is not a guarantee or a measured identification-accuracy claim.
 - Detail input: context fields plus required `offerId` and optional `hotelId`.
   An omitted hotel is valid; supplied empty, null or malformed hotel IDs are not.
@@ -107,7 +110,7 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   the five-minute search relationship; it does not extend price freshness or
   determine whether a safe supplier URL can be opened. Cached inclusive quotes
   are reused only while their own expiry
-  is fresh. Stale price claims are withdrawn while a separately validated, safe
+  is fresh. Expired complete totals in Details are withdrawn while a separately validated, safe
   supplier URL remains usable, including during refresh. The action becomes
   “Check current price on Priceline” for stale or unavailable prices. An unsafe or
   missing URL remains unavailable. A named hotel’s retail URL never substitutes
@@ -132,14 +135,24 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   match. Existing page, row and payload bounds also apply. Display normalization
   and grouping by distinct hotel ID happen after matching; conflicting rows must
   not manufacture a coherent identity.
-- Result cards retain listing prices, label supported nightly amounts per room
-  per night, and show unknown tax/fee treatment. Price sorting is “Room rate before
-  taxes.” Supplier room-rate discounts are not total-price savings. There are no
-  automatic card-total requests or pending-price card states.
-- Matched cards open `/deal` with trip, offer and hotel IDs. Unresolved cards use
-  “Check total price” with trip and offer ID only. Offer-only details show the
-  original offer, trip, total or unavailable state, retry and supplier handoff;
-  hotel photos, address and amenities require a bound candidate.
+- Results show only valid `matched` offers. Full matching and API observations
+  remain intact; filtering reduces the rendered list, not provider search work.
+  Result counts describe deals, since different offers can infer the same hotel.
+- Cards retain listing room rates with their supported per-room/night basis and
+  unknown tax/fee treatment. Sorting offers “Lowest room rate” (default) and
+  “Highest guest rating”, with unavailable values last and stable price/ID ties.
+  Sorting and paging do not issue provider requests. Supplier room-rate discounts
+  remain separate from total-price savings.
+- The five-minute search-cache expiry no longer hides historical listing prices
+  or raises a page-wide alert. Cards label them “Last seen room rate”; one short
+  date/time and “Update prices” action appear above the list. Updates respect the
+  existing service cache and cooldown. The one-minute complete-total expiry in
+  Details is unchanged. No automatic pricing or polling is added.
+- “View hotel & prices” is the primary card action and opens `/deal` with trip,
+  offer and hotel IDs. The original Priceline offer is a secondary external link.
+  The technical “About these results” disclosure is retired. Existing offer-only
+  URLs remain supported for recovery, with no result-card entry point; those
+  views retain their null-candidate binding rules and pricing/handoff behavior.
 - The existing Redux structure and singleton request status remain. Request IDs
   prevent superseded completions from restoring loading or stale results. Detail
   guards check offer membership for offer-only views and offer-plus-hotel

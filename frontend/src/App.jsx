@@ -96,7 +96,7 @@ function Policy({ privacy }) {
             or the search is incomplete, the offer remains unidentified.
           </p>
           <p>
-            You can still open an unidentified offer to check its total price.
+            Results show only offers with one likely hotel.
             Listing rates may exclude taxes and fees; complete totals are requested
             when you open an offer and may be unavailable. No rate, saving,
             availability or inventory coverage is guaranteed. A separate retail

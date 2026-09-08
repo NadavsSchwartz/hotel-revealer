@@ -28,16 +28,16 @@
 }
 .results-page .results-heading-prefix { font-family: 'Room Bodoni', Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: -.035em; }
 .results-page .trip-summary { font-size: 13px; gap: 8px; color: var(--muted); }
-.results-page .results-search { padding: 18px 22px 21px; border: 1px solid var(--line); background: var(--surface); }
+.results-page .results-search { padding: 12px; border: 1px solid var(--line); background: var(--surface); }
 .results-page .trip-form.trip-form { padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-family: Manrope, sans-serif; }
-.results-page .trip-control { padding: 3px 18px 4px; }
-.results-page .destination-control { padding-left: 0; }
-.results-page .trip-control > label { margin-bottom: 7px; font-size: 12px; font-family: inherit; color: var(--muted); }
+.results-page .trip-control { padding: 10px 16px; }
+.results-page .trip-control > label { margin-bottom: 5px; font-size: 12px; font-family: inherit; color: var(--muted); }
 .results-page .trip-control-invalid > label { color: #b42332; }
 .results-page .trip-control:focus-within { border-radius: 0; background: #e9ecdf; }
 .results-page .trip-search-fields .search-button.ant-btn {
-  min-height: 59px;
-  margin: 0 0 0 19px;
+  min-height: 62px;
+  align-self: center;
+  margin: 0 0 0 12px;
   padding: 11px 19px;
   border-radius: 0;
   border-color: var(--blue);
@@ -49,9 +49,15 @@
 .results-page .results-toolbar { margin: 37px 0 13px; gap: 20px; }
 .results-page .results-toolbar h2 { font-size: 24px; font-weight: 650; letter-spacing: -.7px; margin: 0 0 7px; scroll-margin-top: 24px; }
 .results-page .results-toolbar p { font-size: 13px; color: var(--muted); }
+.results-page .results-updated { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.results-page .results-refresh { display: inline-flex; align-items: center; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.results-page .results-refresh:disabled { color: var(--muted); cursor: not-allowed; text-decoration: none; }
 .results-page .sort-control { gap: 12px; font-size: 13px; }
 .results-page .sort-control label { color: var(--muted); }
-.results-page .sort-control select { border: 1px solid #a9b29b; background: var(--surface); border-radius: 0; min-width: 0; min-height: 44px; padding: 9px 28px 9px 11px; max-width: 225px; font-size: 14px; }
+.results-page .sort-select { position: relative; display: flex; min-width: 0; }
+.results-page .sort-control select { appearance: none; width: 205px; border: 1px solid #a9b29b; background: var(--surface); border-radius: 0; min-width: 0; min-height: 44px; padding: 10px 39px 10px 13px; max-width: 100%; font-size: 14px; cursor: pointer; }
+.results-page .control-chevron, .results-page .action-icon { display: block; width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.results-page .sort-select .control-chevron { position: absolute; top: 50%; right: 11px; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
 .results-page .results-comparison-intro { margin: 0 0 29px; max-width: 780px; font-size: 14px; line-height: 1.8; color: var(--muted); }
 .results-page .offer-list { display: grid; gap: 24px; }
 .results-page .offer-card { padding: 28px; border: 1px solid var(--line); background: var(--surface); }
@@ -74,14 +80,13 @@
 .results-page .candidate-preview-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .results-page .candidate-preview-copy > strong { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.6px; line-height: 1.35; margin: 7px 0 6px; overflow-wrap: anywhere; }
 .results-page .candidate-preview-meta { font-size: 13px; line-height: 1.6; color: var(--muted); }
-.results-page .candidate-preview-action { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 36px; margin-top: 5px; font-size: 14px; font-weight: 750; color: var(--blue); }
-.results-page .candidate-preview:hover .candidate-preview-action { text-decoration: underline; text-underline-offset: 4px; }
+.results-page .candidate-preview:hover .candidate-preview-copy > strong { text-decoration: underline; text-underline-offset: 4px; }
 .results-page .tier { background: transparent; border: 0; padding: 0; color: #756244; font-size: 12px; font-weight: 750; letter-spacing: .2px; }
 .results-page .tier::before { content: ''; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; margin-right: 6px; align-self: center; }
 .results-page .tier-supported { color: #455c35; }
 .results-page .tier-supported::before { background: currentColor; }
 .results-page .preview-more { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
-.results-page .offer-booking { grid-area: handoff; min-width: 0; padding-left: 27px; border-left: 1px solid var(--line); align-self: start; }
+.results-page .offer-booking { grid-area: handoff; display: grid; gap: 8px; min-width: 0; padding-left: 27px; border-left: 1px solid var(--line); align-self: start; }
 .results-page .quote-compact { padding: 0; border: 0; }
 .results-page .quote .eyebrow { font-size: 12px; letter-spacing: 1px; color: var(--muted); }
 .results-page .quote-price { font-size: 37px; font-weight: 650; letter-spacing: -1.5px; margin: 11px 0 5px; line-height: 1.18; overflow-wrap: anywhere; }
@@ -89,10 +94,13 @@
 .results-page .quote-stay { font-size: 14px; margin-bottom: 5px; overflow-wrap: anywhere; }
 .results-page .quote-stay span, .results-page .quote-taxes { color: var(--muted); }
 .results-page .quote-taxes { font-size: 13px; line-height: 1.7; }
-.results-page .offer-booking .provider-handoff { padding: 0; gap: 10px; }
-.results-page .offer-booking .provider-handoff :is(.button-link, .ant-btn) { width: 100%; min-height: 48px; height: auto; border-radius: 0; padding: 11px 12px; gap: 8px; font-size: 14px; line-height: 1.7; white-space: normal; text-align: center; }
-.results-page .offer-booking .button-link { background: var(--blue); border-color: var(--blue); color: white; }
-.results-page .offer-booking .button-link:hover { background: var(--forest); border-color: var(--forest); color: white; }
+.results-page .offer-detail-link.button-link { width: 100%; min-height: 48px; height: auto; border-radius: 0; padding: 11px 14px; gap: 10px; font-size: 14px; line-height: 1.6; white-space: normal; text-align: center; background: var(--blue); border-color: var(--blue); color: white; }
+.results-page .offer-detail-link.button-link:hover { background: var(--forest); border-color: var(--forest); color: white; }
+.results-page .offer-booking .provider-handoff { padding: 0; gap: 2px; }
+.results-page .offer-booking .provider-handoff .button-link { justify-content: flex-start; min-height: 44px; padding: 8px 0; gap: 7px; border: 0; border-radius: 0; background: transparent; color: var(--blue); font-size: 13px; line-height: 1.5; }
+.results-page .offer-booking .provider-handoff .button-link:hover { background: transparent; color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
+.results-page .offer-booking .provider-handoff .action-icon { width: 16px; height: 16px; }
+.results-page .offer-booking .provider-handoff .ant-btn { width: 100%; min-height: 44px; height: auto; border-radius: 0; padding: 8px 12px; font-size: 13px; white-space: normal; }
 .results-page .offer-booking .provider-handoff p { font-size: 13px; line-height: 1.75; color: var(--muted); }
 .results-page .offer-action { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px 0 0; margin-top: 24px; border-top: 1px solid var(--line); background: transparent; }
 .results-page .offer-action p { font-size: 13px; color: var(--muted); }
@@ -142,7 +150,6 @@
   .results-page .trip-search-fields { grid-template-columns: minmax(0, 1.2fr) minmax(265px, 1.5fr) minmax(160px, 1fr); }
   .results-page .trip-search-fields .search-button.ant-btn { min-height: 46px; margin: 14px 0 0; }
   .results-page .trip-control { padding-inline: 12px; }
-  .results-page .destination-control { padding-left: 0; }
   .results-page .offer-overview { column-gap: 30px; grid-template-columns: minmax(0, 1fr) 249px; }
   .results-page .offer-booking, .results-page .offer-overview > .quote { padding-left: 22px; }
   .results-page .candidate-preview { grid-template-columns: 142px minmax(0, 1fr); gap: 18px; }
@@ -153,7 +160,6 @@
   .results-page .candidate-preview { grid-template-columns: 110px minmax(0, 1fr); gap: 15px; align-items: start; }
   .results-page .candidate-preview-copy > strong { font-size: 18px; }
   .results-page .candidate-preview-photo { aspect-ratio: 1; }
-  .results-page .candidate-preview-action { min-height: 36px; }
 }
 @media (max-width: 760px) {
   .results-page.page-shell { width: calc(100% - 44px); padding-bottom: 26px; }
@@ -162,36 +168,34 @@
   .results-page .page-heading h1 { font-size: 34px; letter-spacing: -1.4px; margin: 0; min-width: 0; }
   .results-page .page-heading .eyebrow { display: none; }
   .results-page .results-heading-row { margin-bottom: 12px; }
-  .results-page .results-heading-prefix, .results-page .sort-control label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .results-page .results-heading-prefix { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .results-page .edit-trip-toggle { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 44px; height: auto; border-radius: 0; border-color: #a9b29b; background: transparent; font-size: 13px; }
   .results-page .trip-summary { font-size: 13px; gap: 6px; line-height: 1.8; }
-  .results-page .results-search { display: none; padding: 4px 0 17px; border-inline: 0; background: transparent; }
+  .results-page .results-search { display: none; padding: 8px; background: var(--surface); }
   .results-page .results-search.is-editing { display: block; }
   .results-page .trip-search-fields { grid-template-columns: minmax(0, 1fr); }
-  .results-page .trip-control { padding: 12px 0; }
-  .results-page .travel-dates > .trip-control:last-child { padding-left: 16px; }
+  .results-page .trip-control { padding: 12px 10px; }
   .results-page .trip-control > label { font-size: 12px; margin-bottom: 5px; }
   .results-page .trip-search-fields .search-button.ant-btn { margin: 8px 0 0; min-height: 48px; }
-  .results-page .results-toolbar { margin-top: 18px; flex-direction: row; align-items: center; gap: 12px; }
+  .results-page .results-toolbar { margin-top: 18px; flex-direction: column; align-items: stretch; gap: 12px; }
   .results-page .results-toolbar h2 { font-size: 20px; }
-  .results-page .sort-control { justify-content: flex-end; min-width: 0; width: auto; flex: 0 0 170px; }
-  .results-page .sort-control select { width: 170px; max-width: 100%; font-size: 13px; }
+  .results-page .sort-control { justify-content: space-between; min-width: 0; width: 100%; }
+  .results-page .sort-control select { font-size: 13px; }
   .results-page .results-comparison-intro { margin-bottom: 20px; font-size: 13px; line-height: 1.65; }
   .results-page .offer-list { gap: 0; }
   .results-page .offer-card { padding: 23px 0 24px; border: 0; border-top: 1px solid var(--line); background: transparent; }
-  .results-page .offer-overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'identity price' 'preview preview' 'handoff handoff'; grid-template-rows: auto; gap: 20px 18px; }
+  .results-page .offer-overview { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'identity' 'preview' 'price' 'handoff'; grid-template-rows: auto; gap: 20px; }
   .results-page .offer-overview > .quote { padding: 0; border: 0; }
-  .results-page .offer-overview > .quote > .eyebrow { display: none; }
+  .results-page .offer-overview > .quote > .eyebrow { font-size: 11px; line-height: 1.5; letter-spacing: .5px; }
   .results-page .offer-index { font-size: 12px; letter-spacing: .5px; }
   .results-page .offer-identity h3 { font-size: 20px; }
   .results-page .candidate-previews { gap: 18px; }
   .results-page .candidate-preview { grid-template-columns: minmax(110px, 34%) minmax(0, 1fr); gap: 18px; align-items: center; }
   .results-page .candidate-preview-photo { aspect-ratio: 4 / 3; }
   .results-page .candidate-preview-copy > strong { font-size: 21px; }
-  .results-page .offer-booking { display: block; padding: 0; border: 0; }
+  .results-page .offer-booking { padding: 0; border: 0; }
   .results-page .quote-price { font-size: 32px; display: block; margin: 9px 0 5px; }
   .results-page .offer-booking .provider-handoff { padding: 0; }
-  .results-page .offer-booking .provider-handoff :is(.button-link, .ant-btn) { min-height: 48px; }
   .results-page .offer-action { margin-top: 15px; padding-top: 12px; flex-direction: row; gap: 20px; }
   .results-page .offer-action .ant-btn { gap: 19px; }
   .results-page .candidate-heading { align-items: flex-start; flex-direction: column; gap: 9px; }
@@ -208,9 +212,6 @@
   .results-page .candidate-preview-photo { aspect-ratio: 1; }
   .results-page .candidate-preview-copy > strong { font-size: 18px; margin-top: 6px; }
   .results-page .tier { font-size: 12px; }
-  .results-page .candidate-preview-action { margin-top: 3px; }
-  .results-page .offer-booking { grid-template-columns: 1fr; gap: 18px; }
-  .results-page .offer-booking .provider-handoff { gap: 8px; }
   .results-page .quote-price { font-size: clamp(24px, 8vw, 34px); }
   .results-page .quote-price span { display: block; margin-left: 0; }
   .results-page .offer-action { flex-direction: column; align-items: stretch; gap: 7px; margin-top: 19px; }

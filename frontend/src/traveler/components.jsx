@@ -59,13 +59,13 @@ export function Quote({
           {total || nightly || 'Rate unavailable'}
           {total ? <span> total</span> : nightly && <span>{quote.nightlyBasis === 'per-room' ? ' / room / night' : ' / night'}</span>}
         </p>
-        <p className="quote-stay">
+        {(total || !compact || !nightly || stay !== nightly || quote?.roomCount > 1) && <p className="quote-stay">
           {total ? `${quote.roomCount > 1 ? `${quote.roomCount} rooms · ` : ''}Entire stay · Taxes & fees included`
             : stay ? quote.stayBasis === 'all-rooms' && quote.roomCount > 1
               ? `${stay} for ${quote.roomCount} rooms, entire stay`
               : `${stay} for the stay` : 'Stay total unavailable'}{' '}
           <span>· USD</span>
-        </p>
+        </p>}
         {total ? <details className="quote-breakdown">
           <summary>Price breakdown</summary>
           <dl>
@@ -290,18 +290,6 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
   );
 }
 
-export function StaleNotice({ onRefresh, refreshing = false, disabled = false }) {
-  return (
-    <div className="stale-notice" role="status">
-      <div>
-        <strong>{refreshing ? 'Updating your offers…' : 'These quotes need a refresh.'}</strong>
-        <p>{refreshing ? 'Your previous results stay here while the latest offers load.' : 'Saved prices are hidden. Check current prices on Priceline or refresh these results.'}</p>
-      </div>
-      <Button onClick={onRefresh} disabled={refreshing || disabled}>{refreshing ? 'Updating…' : 'Refresh search'}</Button>
-    </div>
-  );
-}
-
 export function ProviderLink({ offer, stale, unavailable = false, refreshing = false }) {
   const href = safeHref(offer?.handoffUrl, true);
   const quote = offer?.quote;
@@ -312,7 +300,8 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
     <div className="provider-handoff">
       {href ? (
         <a className="button-link" href={href} target="_blank" rel="noopener noreferrer">
-          {currentPrice ? 'Check current price on Priceline' : 'View original Express offer'} <span aria-hidden="true">↗</span>
+          {currentPrice ? 'Check current price on Priceline' : 'Check price on Priceline'}
+          <svg className="action-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 4h5v5M9 11l7-7" /></svg>
           <span className="sr-only"> (opens a new tab)</span>
         </a>
       ) : (

@@ -12,9 +12,9 @@ function Counter({ name, value, minimum, maximum, hint, onChange }) {
     <div className="traveler-counter-row">
       <div><span id={`${name.toLowerCase()}-label`} className="traveler-counter-label">{name}</span><small>{hint}</small></div>
       <div className="traveler-counter" role="group" aria-labelledby={`${name.toLowerCase()}-label`}>
-        <button type="button" aria-label={`Decrease ${name.toLowerCase()}`} disabled={valid && value <= minimum} onClick={() => onChange(valid ? Math.max(minimum, value - 1) : minimum)}><span aria-hidden="true">−</span></button>
+        <button type="button" aria-label={`Decrease ${name.toLowerCase()}`} disabled={valid && value <= minimum} onClick={() => onChange(valid ? Math.max(minimum, value - 1) : minimum)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12" /></svg></button>
         <output aria-label={name} aria-live="polite">{valid ? value : '—'}</output>
-        <button type="button" aria-label={`Increase ${name.toLowerCase()}`} disabled={valid && value >= maximum} onClick={() => onChange(valid ? Math.min(maximum, value + 1) : minimum)}><span aria-hidden="true">+</span></button>
+        <button type="button" aria-label={`Increase ${name.toLowerCase()}`} disabled={valid && value >= maximum} onClick={() => onChange(valid ? Math.min(maximum, value + 1) : minimum)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M10 4v12" /></svg></button>
       </div>
     </div>
   );
@@ -155,7 +155,7 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
 
   const content = (
     <div ref={attachPanel} id="travelers-panel" role="dialog" aria-labelledby="travelers-title" className="travelers-panel" style={{ maxHeight: panelLayout.maxHeight }} onKeyDown={panelKeyDown}>
-      <div className="travelers-panel-heading"><h3 id="travelers-title">Who’s traveling?</h3><button type="button" aria-label="Close travelers" onClick={() => close(true)}>×</button></div>
+      <div className="travelers-panel-heading"><h3 id="travelers-title">Who’s traveling?</h3><button type="button" aria-label="Close travelers" onClick={() => close(true)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M5 15 15 5" /></svg></button></div>
       <Counter name="Rooms" value={trip.rooms} minimum={1} maximum={TRAVEL_LIMITS.maxRooms} hint="At least 1 adult per room" onChange={(rooms) => onChange({ rooms })} />
       <Counter name="Adults" value={trip.adults} minimum={1} maximum={TRAVEL_LIMITS.maxAdults} hint="Ages 18 and above" onChange={(adults) => onChange({ adults })} />
       <Counter name="Children" value={ages.length} minimum={0} maximum={TRAVEL_LIMITS.maxChildren} hint="Ages 0–17" onChange={(count) => onChange({ childrenAges: count < ages.length ? ages.slice(0, count) : [...ages, null] })} />
@@ -213,7 +213,7 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
           if (event.key === 'Enter' || event.key === ' ') keyboardOpen.current = true;
           if (event.key === 'Escape' && open) close(true);
         }}>
-          <span>{summary}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
+          <span>{summary}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
         </button>
       </Popover>
       {hasErrors && !open && <span className="field-error">{errors[occupancyErrors[0]]}</span>}

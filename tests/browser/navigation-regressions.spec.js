@@ -8,7 +8,8 @@ async function chooseHomeTrip(page) {
   await page.getByLabel('Where are you going?').fill('Las');
   await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: destination.name }).click();
   for (const [label, field] of [['Check-in', 'checkIn'], ['Check-out', 'checkOut']]) {
-    await page.getByRole('combobox', { name: label, exact: true }).click();
+    const input = page.getByRole('combobox', { name: label, exact: true });
+    if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
     const calendar = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
     const day = calendar.locator(`td[title="${context[field]}"]`);
     for (let month = 0; month < 13 && await day.count() === 0; month++) {
@@ -33,7 +34,7 @@ for (const destination of ['home', 'privacy']) {
     await page.goBack();
     await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Reload page', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toHaveCount(0);
   });
 }

@@ -117,6 +117,9 @@ export default function Details() {
   const thumbnail = safeHref(candidate?.thumbnailUrl);
   if (!images.length && thumbnail) images.push(thumbnail);
   const amenities = data?.details?.amenities || [];
+  const retailQuote = data?.details?.retailQuote;
+  const hasRetailPrice = [retailQuote?.nightlyCents, retailQuote?.stayCents, retailQuote?.totalCents]
+    .some(value => Number.isSafeInteger(value) && value >= 0);
   const address = typeof data?.details?.address === 'string'
     ? data.details.address.trim()
     : null;
@@ -137,8 +140,8 @@ export default function Details() {
         <div className="empty-panel" role="alert">
           <h1>This offer link is incomplete</h1>
           <p>
-            This page needs a valid destination, travel dates and Express offer.
-            A hotel ID, when included, must also be valid.
+            This link is missing valid trip or offer information.
+            Return to results and choose a hotel deal.
           </p>
           <Link className="button-link" to="/">
             Start a search
@@ -248,7 +251,7 @@ export default function Details() {
                       <ul>
                         {amenities.map((amenity, index) => (
                           <li key={index}>
-                            <span aria-hidden="true">↗</span>
+                            <span aria-hidden="true">•</span>
                             {typeof amenity === 'string'
                               ? amenity.replaceAll('_', ' ')
                               : amenity?.name || 'Amenity not specified'}
@@ -265,7 +268,7 @@ export default function Details() {
                   <p>The Express offer and available hotel clues are still shown.</p>
                 </div>
               )}
-              {candidate && data && (
+              {candidate && hasRetailPrice && (
                 <section className="detail-retail">
                   <div className="detail-retail-heading">
                     <span className="eyebrow">A separate option</span>
@@ -276,16 +279,14 @@ export default function Details() {
                       <p role="status">The retail price is out of date.</p>
                       <Button onClick={retry} disabled={loading || coolingDown}>Refresh retail price</Button>
                     </>
-                  ) : data.details?.retailQuote ? (
+                  ) : (
                     <>
-                      <Quote quote={data.details.retailQuote} title="Separate retail quote" />
+                      <Quote quote={retailQuote} title="Separate retail quote" />
                       <p>
                         A separately named listing. Its room, cancellation policy,
                         and inclusions may differ from the Express offer.
                       </p>
                     </>
-                  ) : (
-                    <p>No retail quote is available. The original Express offer is shown separately.</p>
                   )}
                 </section>
               )}
