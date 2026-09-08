@@ -11,7 +11,7 @@ permission or exception to the published terms has been established.
 | Domain correctness | Original-rule parity and resolution tests passed | Raw types, ordered amenities/icons, duplicate limits, partial coverage and conflicting identities; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 316/316 passed at `2e53c01` | 79 scenarios across Chromium, mobile Chromium, Firefox and WebKit; isolated committed source excludes concurrent homepage design work. Earlier intermittent WebKit focus failure recorded below |
+| Browser journeys | 316/316 passed at `a63bd9c` | 79 scenarios across Chromium, mobile Chromium, Firefox and WebKit; final source includes the committed landing and results changes. Earlier failures and their scope are recorded below |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
@@ -21,6 +21,44 @@ permission or exception to the published terms has been established.
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Matched results and control cleanup
+
+Verified code: `a63bd9c86cd1394f4a393504d7f331dfb94842e8` (results implementation
+`f2943dd`, followed by the mobile first-screen correction). This user-directed
+follow-up supersedes the earlier decision to display unresolved offers.
+
+- Results include only matched deals, filtered before counts, sorting and paging.
+  Empty and incomplete searches explain why no hotel matches are shown. Internal
+  unresolved observations and existing offer-only URLs retain their recovery and
+  diagnostic behavior; filtering does not reduce upstream matching work.
+- Sorting is “Lowest room rate” or “Highest guest rating”. Hotel/prices is the
+  primary card action; Priceline is a secondary external link. Internal arrows,
+  traveler controls and sort indicators use aligned icons. Padded controls and
+  an outward focus ring replace the clipping inset border.
+- The five-minute search-cache timer no longer hides listing rates or raises a
+  page-wide alert. Historical rates say “Last seen room rate”, with one dated
+  “Prices checked” line and an update action. Complete detail quotes still expire
+  after one minute. The technical “About these results” block, repeated one-night
+  amount, noninteractive amenity arrows and empty retail-price section are removed.
+
+`HOTEL_PROVIDER=disabled npm run check` passed (lint, 213 native tests, production
+build); all 316 browser cases then passed without retries or skips. The final
+commit has the identical Git source tree to the tested snapshot (`0811a63`), as
+recorded in `output/verification/results-simplification/source-verification.json`.
+Initial browser checks caught a redundant click on an already-open checkout
+calendar and the mobile price/unit falling below the first screen. The helper now
+uses the open calendar; shorter repeated copy and 16px card gaps restore both the
+hotel and full nightly price/unit within 390×844. Assertions were retained.
+
+Separate skeptical source and visual reviews approved the changes. Rendered
+checks cover 320, 390, 768, 1280 and 1440px with no horizontal overflow; focused
+text has 10–16px of inset. Latest screenshots/measurements are under
+`output/playwright/results-controls/`; test logs and retained failure evidence are
+under `output/verification/results-simplification/`. Browser inventory was mocked;
+no hotel-provider requests, dependency changes or deployment were made in this
+follow-up. The local server was restarted and its current HTML/assets checked.
+Existing public-release and manual device/accessibility gates remain open.
 
 ## Single-hotel resolution and on-demand totals
 
