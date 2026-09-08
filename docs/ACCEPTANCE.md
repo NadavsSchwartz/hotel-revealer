@@ -11,16 +11,58 @@ permission or exception to the published terms has been established.
 | Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 292/292 passed in the latest full run | 73 existing scenarios across Chromium, mobile Chromium, Firefox and WebKit; final footer/navigation and reduced-motion changes also passed targeted checks below |
+| Browser journeys | 296/296 passed in the isolated hero/loading snapshot | 74 scenarios across Chromium, mobile Chromium, Firefox and WebKit; snapshot excludes concurrent uncommitted backend/configuration work, as recorded below |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Earlier Room build met the local mobile target | LCP 2.216/2.032/2.016s; CLS 0.000695. These are the earlier homepage measurements below; the subsequent shared-style pass was not remeasured. Field/hosted performance remains unverified |
+| Performance | Rebuilt hero meets the local mobile target | LCP 1.968/1.924/1.920s; CLS 0.001434. Isolated production snapshot and laboratory protocol below; field/hosted performance remains unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Rebuilt search hero and loading experience
+
+`1960fab` replaces the fixed-width floating reception with a centered 1360px
+content grid, large solid-surface headline, ivory form and separate photograph.
+The working panel measured 693px wide at 2560px. Its action was fully visible at
+1280x720; at 768px it ended at y=600, ahead of the photo at y=698. The shared
+filled H/doorway mark replaces the outlined emblem in header, footer and favicon.
+The old decorative FAQ emblem was removed in final cleanup.
+
+`7c488c0` replaces the timed word wipe/dots with a stateless branded search state,
+a compact refresh variant and a consistent lazy-route fallback. Trip context and
+editing remain available. Actual request state controls dismissal; cached results
+remain visible during refresh. The light sweep uses CSS transform/opacity only;
+reduced motion retains a static visible mark. No backend/API changes, dependencies,
+new stores or minimum loading duration were introduced.
+
+Independent reviews inspected all six planned viewport sizes, the mark at
+16/24/40px, animation frames, reduced motion, fast completion, refresh failure and
+request deadline. Development and production geometry/typography/color checks
+matched at 1280x720 and 390x844, with no hero contrast violations or page overflow.
+One wide/short-screen regression was added; existing readability and loading tests
+were extended rather than duplicated.
+
+Final verification used a detached `7c488c0` checkout plus only the FAQ-emblem
+cleanup: lint, 198 native tests, production build and all 296 browser cases passed.
+This isolated the UI from concurrent uncommitted backend/configuration edits;
+those edits are not certified by these results. Earlier active-tree failures
+(static-cache expectations and WebKit chunk reload) are retained in logs and were
+not patched as part of this UI task.
+
+The existing three-cold-context Chrome 152 lab measured LCP at
+1.968/1.924/1.920s and CLS at 0.001434 in every run. No page errors or Room-image
+requests on direct synthetic Results navigation were recorded. The report names
+`7c488c0-plus-emblem-cleanup` and measured HTML SHA-256
+`05a5f3ad9c8affd61bc1078bf88de06a4ab758369361eb978f207eb65315ac1e`.
+These are local laboratory results, not field p75 or live-provider latency.
+
+Evidence: `output/verification/hero-loading/`, including the review captures,
+`isolated-check.log`, `isolated-browser.log`, and `performance/browser-lab.json`.
+The hotel matcher, physical-device verification, manual assistive-technology
+coverage and public-release requirements remain separate from this visual work.
 
 ## Room visual completion across the search journey
 

@@ -139,8 +139,6 @@
 .room-questions-intro h2 { font-size: 48px; line-height: 1.08; letter-spacing: -1.8px; margin-top: 20px; }
 .room-questions-intro h2 em { color: var(--brass); font-size: 1.17em; letter-spacing: -.9px; }
 .room-questions-intro > p:last-of-type { font-size: 14px; color: #c0cab5; max-width: 268px; line-height: 1.85; margin-top: 27px; }
-.room-quiet-mark { display: block; border: 1px solid #bdc6ad66; width: 36px; height: 52px; margin-top: 39px; position: relative; }
-.room-quiet-mark::after { content: ''; position: absolute; inset: 7px -8px -8px 7px; border: 1px solid #bdc6ad33; }
 .room-question-list details { border-bottom: 1px solid #9caf8640; }
 .room-question-list details:first-child { border-top: 1px solid #9caf8640; }
 .room-question-list summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 22px; cursor: pointer; min-height: 66px; font-size: 14px; line-height: 1.7; font-weight: 550; padding-block: 18px; }
@@ -182,7 +180,6 @@
   .room-questions-intro h2 { font-size: 42px; }
   .room-questions-intro h2 br { display: none; }
   .room-questions-intro > p:last-of-type { max-width: 350px; margin-top: 20px; }
-  .room-quiet-mark { display: none; }
   .room-closing { display: block; padding-block: 55px; }
   .room-closing > .room-button { width: 100%; margin-top: 28px; }
 

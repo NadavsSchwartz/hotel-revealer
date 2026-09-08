@@ -89,7 +89,6 @@ export default function Home({ draftRef }) {
             <p className="room-eyebrow">The practical details</p>
             <h2 id="questions-title" tabIndex="-1">Before<br /> <em>you book.</em></h2>
             <p>A clearer picture of the hotel. A few practical things to know before reserving your stay.</p>
-            <span className="room-quiet-mark" aria-hidden="true" />
           </div>
           <div className="room-question-list">
             <details open><summary>What does a reveal show?</summary><p>One identified hotel for an Express Deal, with its details alongside the offer. A trip can return several deals, each with its own result.</p></details>
