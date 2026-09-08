@@ -70,3 +70,74 @@ Date existence, ordering, 30-night and one-year validation remain enforced.
 Provider quotes can differ from the subsequent Priceline page and are not a
 checkout-price guarantee. This task did not change provider integration or treat
 that previously recorded difference as a proven calculation defect.
+
+## Focused review remediation
+
+The later September 8 review remediation preserves the current matching policy,
+live-provider default, provider restrictions and existing URLs. Implementation
+through `92390b2` was verified on Node 24.20.0 / npm 11.19.0. Concurrent homepage
+and loading-design work was preserved and kept outside these commits.
+
+- `npm run check`: warning-free lint, **207 native tests**, and production build passed.
+- The complete browser run passed **296/296 cases** across Chromium, mobile
+  Chromium, Firefox and WebKit. These are 74 scenarios across four configurations.
+- Programmer failures, including falsy throws, now propagate instead of becoming
+  usable partial responses. Classified transport failures retain their fallbacks.
+  Logs retain generated request IDs, controlled causes and project source locations
+  without raw messages, stacks, absolute paths, request data or upstream content.
+- Expired cooldown searches keep an accessible manual retry; no automatic request
+  is added. Missing stars display correctly. Currency and link helpers have focused
+  native edge cases.
+- The unchanged reload assertions exposed [WebKit bug 270357](https://bugs.webkit.org/show_bug.cgi?id=270357).
+  Disabling dynamic JavaScript preloads in Vite fixes recovery while retaining
+  initial HTML preloads and lazy-route CSS. No retry wrapper or skipped assertion
+  was added; dynamic JavaScript dependencies can load later as a tradeoff.
+- Fixed test data preserves all 1,000 historical destination labels and IDs on
+  both sides of the API. The catalog importer also consumes that fixture; removing
+  its former JavaScript source did not remove the regeneration path.
+- The offline study still reports 60 original-rule pairs and 180 application-rule
+  pairs, including all 60 original pairs. The complete saved application output is
+  unchanged. A synthetic source-hotel omission leaves a unique compatible neighbor
+  under both policies; uniqueness does not establish identity. No booking study or
+  additional matching heuristic was introduced.
+
+Alternating old/new calls in one process produced these local CPU medians:
+
+| Workload | Before | After |
+| --- | ---: | ---: |
+| Ordinary destination query (`san`, 20 trials) | 17.21 ms | 15.38 ms |
+| 50 repeated tokens in 99 characters (20 trials) | 95.37 ms | 14.06 ms |
+| 100 offers × 1,000 hotels × 100 nonoverlapping amenity codes (3 trials) | 1,694.04 ms | 38.91 ms |
+
+The matcher stress case returns zero candidates. These are synthetic CPU results,
+not live provider or whole-journey timings. The baseline matcher uses the same
+normalization contracts; the old and new comparison implementations are measured
+separately. The original sources are retained at `4f0f8c1`.
+
+The complete local capacity scenario passed after updating its fresh-hit oracle
+to accommodate byte eviction: newest entry hits, oldest entry misses, with the
+same exact upstream-call assertions. Peak RSS was 409.27 MiB before and 352.30 MiB
+after. Maximum health latency was 319.67 ms before and 1,723.06 ms after; an isolated
+burst follow-up measured 260.80 ms. Accepted cached-burst responses also differed
+(14 versus 17 of 19 requests), so this is not a controlled latency comparison or
+evidence of a saturation-latency improvement. The 16 MiB cache weights do not bound
+RSS, and the ten-scan-per-second admission setting is not verified VPS capacity.
+
+Reproduce the maintained checks with the pinned toolchain:
+
+```sh
+HOTEL_PROVIDER=disabled npm run check
+HOTEL_PROVIDER=disabled npm run test:browser
+npm run measure:capacity
+npm run measure:capacity -- --bursts-only
+node --test scripts/matching-study/*.test.mjs
+```
+
+Saved-capture replay additionally needs its ignored input; the matching-study
+README documents that command. A fresh clone can run the deterministic checks
+and synthetic capacity scenario without hotel data or provider access.
+[The compact evidence record](remediation-evidence.json) retains source hashes,
+runtime, numerical summaries and local artifact locations. Raw captures and
+screenshots remain ignored. Independent reviews found no remaining actionable
+issues after the falsy-error correction. Hosted operation, physical devices,
+assistive technology, provider stability and identification accuracy remain open.

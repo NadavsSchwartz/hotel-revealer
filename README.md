@@ -59,17 +59,15 @@ Safari, physical mobile-device, or assistive-technology signoff.
 
 Generated evidence lives in ignored `output/`, `test-results/`, and
 `playwright-report/`. See [acceptance evidence](docs/ACCEPTANCE.md) for the current
-claims and missing release gates. The current integration passed lint, 178 native
-tests and the production build. All 288 browser cases are covered and passing
-across four engine/viewport configurations; the evidence records the exact runs.
+claims and missing release gates. That record identifies the native checks,
+production build and browser runs across four engine/viewport configurations.
 Real search, selected-offer pricing and provider handoff are checked separately.
 The [audit-fix record](docs/AUDIT_FIXES.md) maps the eleven reviewed issues to their
 corrections and verification.
 
 ## Application boundaries
 
-- `shared/`: shared calendar-date and traveler validation; original city labels
-  retained for legacy links.
+- `shared/`: calendar-date and traveler validation, and destination-text normalization.
 - `backend/destinations/` and `data/`: local GeoNames destination lookup and its
   attributable snapshot. The worldwide catalog stays on the server.
 - `backend/domain/`: input validation, conservative normalization and pure matching.
@@ -117,7 +115,11 @@ gap, at most four waiting requests, and at most three combined search pages of
 500 rows each. Admission-to-response deadlines are 20 seconds for searches and
 10 seconds for details. Provider and public JSON payloads are capped at 2 MiB.
 Search/detail caches hold at most 25/100 entries with five-minute/one-minute
-freshness. These are application limits, not verified provider allowances.
+freshness and a 16 MiB serialized-payload budget each. Byte accounting is not a
+process-memory bound. Autocomplete admits ten catalog scans per second with a
+burst of ten; short, invalid and exact-country queries do not consume scan capacity.
+Busy scans return `DESTINATIONS_BUSY` (503) with a one-second `Retry-After` hint.
+These are application limits, not verified provider allowances or host capacity.
 No automatic retry is used. Details revalidate the offer/candidate relationship.
 An expired retail quote is hidden and can be refreshed without disabling a still
 fresh original offer; missing retail inventory does not imply Express unavailability.
