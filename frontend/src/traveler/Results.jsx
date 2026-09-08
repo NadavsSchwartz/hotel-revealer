@@ -324,7 +324,7 @@ export default function Results() {
           </div>
           {offers.length > 0 && (
             <p className="results-comparison-intro">
-              Hotel names are inferred from the deal information, not guaranteed. Open a hotel to check the complete price.
+              Hotel names are inferred, not guaranteed.
             </p>
           )}
           {offers.length === 0 && (
