@@ -168,7 +168,10 @@ function PageBehavior() {
     document.title = `Hotel Revealer — ${titles[location.pathname] || 'Page not found'}`;
     if (location.hash) {
       const frame = requestAnimationFrame(() => {
-        const section = document.getElementById(location.hash.slice(1));
+        const hashId = location.hash.slice(1);
+        const targetId = location.pathname === '/' && ['questions', 'questions-title'].includes(hashId)
+          ? 'how-it-works' : hashId;
+        const section = document.getElementById(targetId);
         if (!section) return;
         const labelledBy = section.getAttribute('aria-labelledby')?.split(/\s+/)[0];
         const heading = (labelledBy && document.getElementById(labelledBy))

@@ -24,7 +24,6 @@
 .room-home a:hover { color: var(--brass); }
 .room-home :is(section, h1, h2) { scroll-margin-top: 28px; }
 .room-content { width: calc(100% - 152px); max-width: 1180px; margin-inline: auto; }
-.room-home .room-eyebrow { font-size: 11px; font-weight: 650; letter-spacing: .1em; line-height: 1.65; text-transform: uppercase; color: #c6cbb4; }
 
 .room-application > .direction-header {
   position: relative;
@@ -89,65 +88,47 @@
 /* The reveal and editorial sections share the Room palette, without app state. */
 .room-home .room-button { display: inline-flex; justify-content: center; align-items: center; min-height: 49px; padding: 13px 23px; background: var(--brass); color: #23301f; font-size: 13px; font-weight: 650; text-align: center; }
 .room-home .room-button:hover { background: #edcf9f; color: #23301f; }
-.room-example { padding-block: 78px 87px; }
-.room-example-intro { display: flex; justify-content: space-between; align-items: end; gap: 48px; margin-bottom: 30px; }
-.room-example-intro .room-eyebrow { margin-bottom: 16px; font-size: 12px; text-transform: none; letter-spacing: 0; }
-.room-example h2 { font-size: clamp(30px, 3vw, 42px); line-height: 1.15; letter-spacing: -.045em; }
-.room-example-intro > p { max-width: 330px; font-size: 14px; line-height: 1.85; color: var(--muted); }
-.room-folio { background: #293425; border: 1px solid #56634b; }
-.room-reveal-name { padding: 28px 30px; }
-.room-reveal-name h3 { font-family: 'Room Bodoni', Georgia, serif; font-style: italic; font-weight: 400; font-size: 38px; line-height: 1.3; margin-top: 10px; }
-.room-reveal-name > p:last-child { margin-top: 9px; color: var(--muted); font-size: 13px; }
-.room-example-table { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: left; font-size: 15px; line-height: 1.7; }
-.room-example-table .room-criterion { width: 30%; }
-.room-example-table th, .room-example-table td { padding: 20px 30px; border-top: 1px solid #59664f; overflow-wrap: anywhere; }
-.room-example-table thead th { font-size: 13px; font-weight: 650; color: #d7dfce; }
-.room-example-table tbody th { font-size: 13px; font-weight: 400; color: var(--muted); }
-.room-example-table tr > :last-child { background: #333f2c; }
-.room-home .room-example-note { border-top: 1px solid #59664f; padding: 23px 30px; font-size: 13px; line-height: 1.8; color: #c1cbb7; }
-.room-workflow { display: grid; grid-template-columns: .8fr 1.2fr; gap: 100px; padding-block: 80px; border-top: 1px solid var(--line); }
-.room-workflow h2, .room-questions-intro h2 { font-size: 36px; line-height: 1.2; letter-spacing: -.035em; }
-.room-steps { list-style: decimal-leading-zero; padding-left: 38px; margin: 0; }
-.room-steps li { padding: 21px 0 21px 10px; border-top: 1px solid var(--line); }
-.room-steps li::marker { font-family: 'Room Bodoni', Georgia, serif; font-style: italic; color: var(--brass); font-size: 23px; }
-.room-steps h3 { font-size: 15px; font-weight: 650; }
-.room-steps p { color: var(--muted); font-size: 14px; line-height: 1.85; margin-top: 8px; }
-.room-questions { background: #2b3528; border-block: 1px solid #68795a40; }
-.room-questions-inner { display: grid; grid-template-columns: .8fr 1.2fr; gap: 100px; padding-block: 79px 84px; }
-.room-question-list details { border-bottom: 1px solid #9caf8640; }
-.room-question-list details:first-child { border-top: 1px solid #9caf8640; }
-.room-question-list summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 22px; cursor: pointer; min-height: 66px; font-size: 14px; line-height: 1.7; font-weight: 550; padding-block: 18px; }
-.room-question-list summary::-webkit-details-marker { display: none; }
-.room-question-list summary::after { content: ''; height: 13px; flex: 0 0 13px; background: linear-gradient(#c4d1b5,#c4d1b5) center/13px 1px no-repeat, linear-gradient(#c4d1b5,#c4d1b5) center/1px 13px no-repeat; }
-.room-question-list details[open] summary::after { background-size: 13px 1px, 0 0; }
-.room-question-list details[open] summary { color: #ebd1a9; }
-.room-question-list summary:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
-.room-question-list details > p { font-size: 14px; line-height: 1.85; color: #c0cab5; padding: 0 25px 23px 0; }
+/* One offer, before and after the hotel name is revealed. */
+.room-example { display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 96px; padding-block: 80px 96px; }
+.room-example h2 { max-width: 13ch; font-size: clamp(36px, 3.5vw, 50px); font-weight: 500; line-height: 1.14; letter-spacing: -.04em; }
+.room-example-intro > p { max-width: 36ch; margin-top: 24px; font-size: 17px; line-height: 1.7; color: var(--muted); }
+.room-hidden-offer { padding: 28px 32px 24px; background: #2b3527; border: 1px solid #56634b; border-bottom: 0; }
+.room-preview-label { font-size: 12px; font-weight: 650; letter-spacing: .06em; line-height: 1.5; text-transform: uppercase; }
+.room-hidden-offer .room-preview-label { color: var(--muted); }
+.room-hidden-offer h3 { margin-top: 12px; font-size: 22px; line-height: 1.4; font-weight: 500; }
+.room-home .room-hidden-name { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 20px; color: var(--muted); font-size: 14px; }
+.room-hidden-name span { color: var(--brass); font-size: 28px; line-height: 1; }
+.room-revealed-hotel { padding: 32px; background: #eeede2; color: #253023; border-left: 3px solid var(--brass); }
+.room-revealed-hotel .room-preview-label { color: #57634e; }
+.room-revealed-hotel h3 { margin-block: 15px 12px; font-family: 'Room Bodoni', Georgia, serif; font-style: italic; font-weight: 400; font-size: clamp(40px, 4vw, 56px); line-height: 1.1; }
+.room-revealed-hotel > p:last-child { font-size: 14px; line-height: 1.6; color: #57634e; }
+.room-reveal-preview figcaption { padding-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.room-guide { padding-block: 72px 80px; background: #eeede2; color: #253023; }
+.room-guide h2 { font-size: clamp(30px, 3vw, 42px); font-weight: 500; line-height: 1.2; letter-spacing: -.035em; }
+.room-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; list-style: decimal-leading-zero; padding-left: 28px; margin: 44px 0 0; }
+.room-steps li { padding: 20px 0 0 8px; border-top: 1px solid #25302333; }
+.room-steps li::marker { font-size: 14px; font-weight: 600; color: #64715b; }
+.room-steps h3 { font-size: 19px; font-weight: 650; line-height: 1.4; }
+.room-steps p { color: #57634e; font-size: 16px; line-height: 1.7; margin-top: 12px; }
 .room-closing { display: flex; align-items: center; justify-content: space-between; gap: 45px; padding-block: 75px 71px; }
 .room-closing h2 { font-size: 30px; letter-spacing: -.8px; line-height: 1.25; }
 .room-closing > .room-button { min-width: 218px; }
 
 @media (max-width: 900px) {
-  .room-example-intro { display: block; }
-  .room-example-intro > p { margin-top: 20px; max-width: 500px; }
-  .room-workflow { gap: 40px; padding-block: 79px; }
-  .room-questions-inner { gap: 37px; }
+  .room-example { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-block: 56px 64px; }
+  .room-example h2 { max-width: 20ch; }
+  .room-example-intro > p { max-width: 52ch; margin-top: 20px; }
+  .room-steps { gap: 32px; }
   .room-content, .room-application > .direction-footer { width: calc(100% - 64px); }
 }
 @media (max-width: 650px) {
-  .room-example { padding-block: 55px 64px; }
-  .room-example-intro { margin-bottom: 25px; }
-  .room-reveal-name { padding: 23px 18px; }
-  .room-example-table { font-size: 13px; }
-  .room-example-table th, .room-example-table td { padding: 17px 10px; }
-  .room-example-table thead th, .room-example-table tbody th { font-size: 12px; }
-  .room-home .room-example-note { padding: 20px 18px; }
-  .room-workflow { grid-template-columns: minmax(0, 1fr); gap: 42px; padding-block: 53px 64px; }
-  .room-workflow h2, .room-questions-intro h2 { font-size: 30px; }
-  .room-questions-inner { grid-template-columns: minmax(0, 1fr); gap: 35px; padding-block: 55px; }
-  .room-closing { display: block; padding-block: 55px; }
+  .room-hidden-offer, .room-revealed-hotel { padding: 24px; }
+  .room-hidden-offer h3 { font-size: 20px; }
+  .room-guide { padding-block: 48px 56px; }
+  .room-steps { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 32px; }
+  .room-closing { display: block; padding-block: 48px; }
   .room-closing > .room-button { width: 100%; margin-top: 28px; }
-
   .room-content, .room-application > .direction-footer { width: calc(100% - 48px); }
   .room-application > .direction-footer { gap: 22px; }
 }

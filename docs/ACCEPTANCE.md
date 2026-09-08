@@ -37,6 +37,18 @@ Screenshots are in `output/verification/home-clarity/` and the browser test outp
 This pass adds no components, dependencies or test suites. Prior performance
 measurements below were not rerun for this copy and navigation cleanup.
 
+The follow-up value section replaces the comparison table with a compact,
+explicitly fictional unnamed-offer → identified-hotel example. Process and FAQ
+copy are combined into three steps, including unresolved outcomes and the final
+Priceline booking checks. Retired question anchors focus the merged heading.
+`npm run check` passed again (207 native tests), followed by 20 targeted browser
+cases covering navigation, accessibility and reflow across all four projects.
+These checks preceded concurrent matcher/results edits and do not certify that work.
+Section renders at 1440, 768, 390 and 320px showed no overflow; development and
+production geometry matched at 1440 and 390px. Screenshots are in
+`output/verification/home-value/`. No new components, dependencies, assets or
+test suites were added; performance was not remeasured for these lower sections.
+
 ## Rebuilt search hero and loading experience
 
 `1960fab` replaces the fixed-width floating reception with a centered 1360px

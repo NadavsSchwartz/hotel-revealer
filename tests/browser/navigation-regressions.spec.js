@@ -55,6 +55,11 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await page.getByRole('link', { name: 'Back to home', exact: true }).click();
   await expect(page.locator('#home-title')).toBeFocused();
   await expect(page.getByRole('link', { name: 'Hotel Revealer home', exact: true })).toBeInViewport();
+  for (const hash of ['questions', 'questions-title']) {
+    await page.goto(`/#${hash}`);
+    await expect(page.locator('#method-title')).toBeFocused();
+    await expect(page.locator('#method-title')).toBeInViewport();
+  }
   await page.goto('/terms#how-it-works');
   await expect(page.getByRole('heading', { name: 'A comparison tool, not a booking service', exact: true })).toBeFocused();
 });
