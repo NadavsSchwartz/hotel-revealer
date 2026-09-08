@@ -270,7 +270,7 @@ async function runMeasurement() {
     const search = index => post('/api/v1/hotelDeals', context(index));
     await phase('idle-health', async () => { await delay(1000); return []; });
     if (!burstsOnly) {
-      const filled = await phase('fill-25-search-cache-entries', async () => {
+      const filled = await phase('fill-search-cache-with-25-searches', async () => {
         const results = [];
         for (let index = 0; index < 25; index += 1) {
           const result = await search(index);
@@ -280,9 +280,11 @@ async function runMeasurement() {
         return results;
       });
       assert.equal(filled.requests.statuses[200], 25, 'All 25 cache fills must succeed');
-      const hit = await phase('search-cache-hit', async () => [await search(0)]);
+      // Byte limits can evict early entries before the count limit. The latest
+      // entry is the fresh-hit oracle; the oldest is evicted under either limit.
+      const hit = await phase('search-cache-hit', async () => [await search(24)]);
       const inserted = await phase('search-cache-entry-26', async () => [await search(25)]);
-      const evicted = await phase('search-cache-evicted-entry', async () => [await search(1)]);
+      const evicted = await phase('search-cache-evicted-entry', async () => [await search(0)]);
       report.checks.searchCache = { filledCalls: filled.callDelta.search, freshHitCalls: hit.callDelta.search,
         insertionCalls: inserted.callDelta.search, evictedEntryCalls: evicted.callDelta.search };
       assert.deepEqual(report.checks.searchCache, { filledCalls: 25, freshHitCalls: 0, insertionCalls: 1, evictedEntryCalls: 1 });
