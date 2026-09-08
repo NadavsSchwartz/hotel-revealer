@@ -8,67 +8,60 @@ export default function Home({ draftRef }) {
     <div className="room-home">
       <section className="room-scene" aria-labelledby="home-title">
         <div className="room-introduction">
-          <h1 id="home-title" tabIndex="-1">Find the hotel<br />behind the deal.</h1>
-          <p className="room-description">Search Priceline Express Deals by destination and dates. Explore a likely hotel, check the total price, then continue to Priceline.</p>
+          <h1 id="home-title" tabIndex="-1">Your hotel.<br />Out of hiding.</h1>
+          <p className="room-description">Explore the likely hotel behind a Priceline Express Deal before you book.</p>
         </div>
         <section className="room-reception" id="unboxed-search" aria-labelledby="search-title">
-          <h2 id="search-title" tabIndex="-1">Your trip</h2>
+          <h2 id="search-title" tabIndex="-1">Start with your trip</h2>
           <SearchForm draftRef={draftRef} submitLabel="Find hotel deals" />
         </section>
         <figure className="room-view">
           <picture>
-            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.webp" type="image/webp" />
-            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.avif" type="image/avif" />
-            <source srcSet="/media/room-terrace.avif" type="image/avif" />
-            <img src="/media/room-terrace.webp" alt="" width="1536" height="1024" />
+            <source media="(max-width: 650px)" srcSet="/media/room-doorway-mobile.webp" type="image/webp" />
+            <source srcSet="/media/room-doorway.avif" type="image/avif" />
+            <img src="/media/room-doorway.webp" alt="" width="1280" height="853" decoding="async" />
           </picture>
         </figure>
       </section>
       <section className="room-example room-content" id="reveal-example" aria-labelledby="reveal-title">
-        <div className="room-example-intro">
-          <h2 id="reveal-title" tabIndex="-1">A great rate is only half the story.</h2>
-          <p>When the deal information points to one hotel, explore it before deciding. Some offers remain unidentified.</p>
-        </div>
-        <div className="room-reveal-preview">
-          <div className="room-hidden-offer">
-            <p className="room-preview-label">Priceline Express Deal</p>
-            <h3>A stay without a name.</h3>
-            <p className="room-hidden-name">Hotel name withheld <span aria-hidden="true">↓</span></p>
-          </div>
-          <div className="room-revealed-hotel">
-            <p className="room-preview-label">Hotel Revealer</p>
-            <h3>A likely hotel to explore.</h3>
-            <p>An inferred name and available details to help you decide.</p>
+        <div className="room-example-copy">
+          <p className="room-kicker">Inside a hotel result</p>
+          <h2 id="reveal-title" tabIndex="-1">A name opens<br />up the picture.</h2>
+          <p className="room-example-description">A likely hotel gives you somewhere to look closer. See the place behind the offer before deciding whether it fits your trip.</p>
+          <div className="room-preview-benefits">
+            <div><h3>Put the location in context.</h3><p>Check the address against the places you want to be.</p></div>
+            <div><h3>Find the details that matter.</h3><p>Explore available amenities and property information beyond the star rating.</p></div>
           </div>
         </div>
+        <article className="room-property-preview" aria-label="Hotel details preview">
+          <div className="room-preview-header"><span>Hotel details</span><span>Preview</span></div>
+          <div className="room-property-body">
+            <p className="room-property-location">Las Vegas, Nevada</p>
+            <h3>The STRAT<br /><span>Hotel, Casino &amp; Tower</span></h3>
+            <div className="room-property-address">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
+              <div><h4>Address</h4><p>2000 Las Vegas Blvd. S.</p></div>
+            </div>
+            <div className="room-property-amenities">
+              <h4>Listed amenities</h4>
+              <ul><li>Swimming pool</li><li>Restaurant</li><li>Fitness center</li></ul>
+            </div>
+          </div>
+        </article>
       </section>
 
-      <section className="room-guide" id="how-it-works" aria-labelledby="method-title">
-        <div className="room-content">
-          <h2 id="method-title" tabIndex="-1">Search. Reveal. Decide.</h2>
-          <ol className="room-steps">
-            <li><h3>Start with your stay.</h3><p>Choose your destination, dates and travelers to find Priceline Express Deals for your trip.</p></li>
-            <li><h3>See behind the offer.</h3><p>See one likely hotel when the deal information identifies a single match. Otherwise, the hotel remains unidentified.</p></li>
-            <li><h3>Make the choice yours.</h3><p>Open any offer to request a total price, including taxes and fees when available. Review the final price and terms on Priceline.</p></li>
-          </ol>
-        </div>
-      </section>
-
-      <section className="room-stay room-content" aria-labelledby="stay-title">
-        <img src="/media/room-stay.webp" alt="Palm trees and hotel balconies overlooking a swimming pool" width="900" height="1125" loading="lazy" decoding="async" />
-        <div className="room-stay-copy">
-          <h2 id="stay-title">Make the stay part of the trip.</h2>
-          <p>A hotel’s name opens up the rest of the decision. Get a feel for the place before you make it yours.</p>
-          <dl className="room-stay-details">
-            <div><dt>The neighborhood</dt><dd>See how the location fits the places you want to go.</dd></div>
-            <div><dt>The atmosphere</dt><dd>Explore the photos, amenities and guest ratings that help you picture your stay.</dd></div>
-          </dl>
-        </div>
+      <section className="room-guide room-content" id="how-it-works" aria-labelledby="method-title">
+        <h2 id="method-title" tabIndex="-1">Three steps.<br />A clearer choice.</h2>
+        <ol className="room-steps">
+          <li><h3>Pick your trip.</h3><p>Enter your destination, dates and travelers to search Priceline Express Deals.</p></li>
+          <li><h3>Look behind the offer.</h3><p>Explore one likely hotel and its available details. Deals that can’t be resolved stay unidentified.</p></li>
+          <li><h3>Decide, then book.</h3><p>Check the total price, then review the room and booking terms on Priceline.</p></li>
+        </ol>
       </section>
 
       <section className="room-closing room-content" aria-labelledby="closing-title">
-        <h2 id="closing-title">Where will you go next?</h2>
-        <Link className="room-button" to="/#unboxed-search">Find hotel deals</Link>
+        <h2 id="closing-title">Take a closer look.</h2>
+        <Link className="room-button" to="/#unboxed-search">Find hotel deals <span aria-hidden="true">↗</span></Link>
       </section>
     </div>
   );

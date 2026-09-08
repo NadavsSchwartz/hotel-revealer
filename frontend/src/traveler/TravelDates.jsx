@@ -98,6 +98,7 @@ const TravelDates = forwardRef(function TravelDates({ trip, errors, onChange }, 
               onOpenChange={(nextOpen) => setOpen((current) => nextOpen ? field : current === field ? null : current)}
               onChange={(date) => selectDate(field, date)}
               popupClassName="travel-calendar-popup"
+              dropdownAlign={{ overflow: { adjustX: true, adjustY: true, alwaysByViewport: true } }}
               role="combobox"
               aria-label={label}
               aria-haspopup="dialog"

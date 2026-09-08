@@ -1,0 +1,13 @@
+{
+  "source": "Priceline named-hotel details response",
+  "retrievedAt": "2026-09-08T04:03:25.934Z",
+  "hotelId": "48676",
+  "name": "The STRAT Hotel, Casino & Tower",
+  "address": "2000 Las Vegas Blvd. S. Las Vegas, Nv 89104, Las Vegas, NV, US",
+  "amenities": [
+    "Swimming Pool",
+    "Restaurant",
+    "Fitness Center"
+  ],
+  "usage": "Static hotel-details preview. This record does not establish the identity of an unnamed offer."
+}

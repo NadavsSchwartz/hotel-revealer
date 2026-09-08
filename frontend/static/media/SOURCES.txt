@@ -26,3 +26,11 @@ sketches/afterlight/assets/atlas-inspiration.webp to 900x1125, WebP quality 76.
 
 The Room homepage prefers mobile WebP with a matching preload; desktop prefers
 AVIF. Both formats are retained. Local measurement evidence is in docs/ACCEPTANCE.md.
+
+2026-09-08 doorway direction: room-doorway.avif/webp and room-doorway-mobile.webp
+use original generated architectural imagery made with the built-in image tool.
+Source and exact prompt: sketches/room/assets/room-doorway.png and doorway-prompt.txt.
+Production derivatives use existing Sharp 0.35.2 tooling, without a runtime dependency:
+1280px AVIF quality 48/effort 6; 1280px WebP quality 76/effort 6;
+720px mobile WebP quality 74/effort 6. No fabricated hotel name or offer is depicted.
+The previous terrace and pool assets remain available for historical references.

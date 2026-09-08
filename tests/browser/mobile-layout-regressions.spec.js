@@ -64,6 +64,22 @@ test('the search stays substantial on wide screens and reachable on a short desk
   await page.screenshot({ path: testInfo.outputPath('home-wide.png') });
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole('button', { name: 'Find hotel deals', exact: true })).toBeInViewport({ ratio: 1 });
+  const headline = page.locator('#home-title');
+  await expect(headline).toBeInViewport({ ratio: 1 });
+  expect(await headline.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  })).toBe(true);
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    await page.emulateMedia({ reducedMotion });
+    await page.getByRole('combobox', { name: 'Check-in', exact: true }).click();
+    const calendar = page.locator('.travel-calendar-popup:visible');
+    await expect(calendar).toHaveCSS('opacity', '1');
+    await expect(calendar).toHaveCSS('transform', 'none');
+    await expect(calendar).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press('Escape');
+    await expect(calendar).toHaveCount(0);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

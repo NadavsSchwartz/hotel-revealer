@@ -15,7 +15,7 @@ permission or exception to the published terms has been established.
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Current homepage meets the local mobile target | LCP 1.992/1.924/1.920s; CLS 0.000655. Local production laboratory protocol below; field/hosted performance remains unverified |
+| Performance | Current homepage meets the local mobile target | LCP 2.300/2.284/2.268s; CLS 0. Local production laboratory protocol below; field/hosted performance remains unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
@@ -74,6 +74,32 @@ Neither these checks nor a unique match establish measured identity accuracy or
 website/checkout price parity.
 
 ## Homepage copy and navigation cleanup
+
+The final landing composition uses a warm ivory canvas, a photographic hero with
+an inset working search, a sourced hotel-details preview, and a compact process
+and closing action. The STRAT preview contains saved property information only;
+it has no price, score, property photograph or confirmed-identity claim. Its small
+source record is in `sketches/room/assets/property-preview-source.json`.
+
+Verification used isolated `8e3d69d` plus only the landing changes/assets, because
+concurrent work was rebuilding the shared production directory. Lint, 213 native
+tests and the production build passed, followed by 52 affected browser cases
+across all four projects. Independent review checked full-page composition,
+contrast and open controls. Reported contrast issues were fixed; the calendar now
+uses the existing viewport-alignment option. Existing layout coverage checks both
+headline visibility and a fully visible calendar in normal/reduced motion.
+
+Production renders cover 2560, 1440, 1280, 768, 390 and 320px, with no horizontal
+overflow. The default action remains visible at 1280x720, 390x844 and 320x800.
+The homepage portion of the existing three-cold-run mobile protocol measured LCP
+2.300/2.284/2.268s and CLS 0 after adding the font preload and asynchronous image
+decoding. The initial 2.956/2.104/2.144s sample is retained; the retired comparison
+benchmark was excluded. These are local homepage measurements, not field p75.
+Evidence: `output/verification/landing-final/`, including production captures and
+both `performance/` and `performance-final/`. No dependency, store or new test
+suite was added. Unrelated concurrent results work is outside this UI evidence.
+
+Earlier homepage checkpoints follow.
 
 The current entrance joins a full-width search form to a bounded panorama, with
 responsive rows below 1100px. The requested form note, example caption and footer

@@ -143,7 +143,9 @@ function Credits() {
       <h2>Destinations</h2>
       <p>Destination names come from <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
       <h2>Photography</h2>
-      <p>The homepage terrace is an original generated scene created for Hotel Revealer. The pool photograph is by <a href="https://unsplash.com/photos/vmIWr0NnpCQ" target="_blank" rel="noreferrer">Christian Lambert on Unsplash</a>, used under the <a href="https://unsplash.com/license" target="_blank" rel="noreferrer">Unsplash License</a>. These images are travel inspiration and do not represent a hotel result or available offer.</p>
+      <p>The homepage doorway is an original generated scene created for Hotel Revealer. It illustrates the idea of revealing a stay and does not represent a hotel result or available offer.</p>
+      <h2>Product preview</h2>
+      <p>The homepage hotel-details preview uses The STRAT’s name, address and listed amenities from a Priceline property response retrieved on September 8, 2026. It demonstrates available property information, not a confirmed identity for an unnamed offer.</p>
       <h2>Typography</h2>
       <p>Manrope by Mikhail Sharanda and Mirko Velimirovic is distributed under the <a href="/fonts/OFL.txt">SIL Open Font License</a>.</p>
       <p>Bodoni Moda by The Bodoni Moda Project Authors is distributed under the <a href="/fonts/bodoni-LICENSE.txt">SIL Open Font License</a>.</p>
@@ -159,7 +161,7 @@ function PageBehavior() {
     const pathChanged = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
     const titles = {
-      '/': 'Find the hotel behind the deal.',
+      '/': 'Your hotel. Out of hiding.',
       '/results': 'Your Express deals',
       '/deal': 'Offer details and price',
       '/privacy': 'Privacy',
