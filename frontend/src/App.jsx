@@ -199,7 +199,7 @@ class ErrorBoundary extends React.Component {
           </p>
           <a
             className="button-link"
-            href={window.location.pathname + window.location.search}
+            href={window.location.href}
           >
             Reload page
           </a>

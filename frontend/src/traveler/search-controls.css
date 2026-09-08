@@ -54,10 +54,16 @@
 .travel-calendar-popup .ant-picker-header { padding: 7px 12px; }
 .travel-calendar-popup .ant-picker-header button { min-height: 36px; color: #102031; }
 .travel-calendar-popup .ant-picker-cell .ant-picker-cell-inner { border-radius: 7px; }
+.travel-calendar-popup .ant-picker-cell button.ant-picker-cell-inner { padding: 0; border: 0; background: transparent; color: inherit; font-family: inherit; font-size: inherit; font-weight: inherit; cursor: pointer; appearance: none; }
+.travel-calendar-popup .ant-picker-cell:not(.ant-picker-cell-disabled) .ant-picker-cell-inner { color: #102031; }
+.travel-calendar-popup .ant-picker-cell.ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner { color: white; }
+.travel-calendar-popup .ant-picker-cell button.ant-picker-cell-inner:disabled { cursor: not-allowed; }
+.travel-calendar-popup .ant-picker-cell button.ant-picker-cell-inner:focus-visible { outline: 2px solid #2259e7; outline-offset: 2px; }
 .travel-calendar-popup .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner { background: #2259e7; }
 .travel-calendar-popup .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before { border-color: #2259e7; border-radius: 7px; }
 .travel-calendar-popup .ant-picker-footer-extra { padding: 12px 14px; font-size: 11px; line-height: 1.5; color: #526176; }
-.travelers-popup.ant-popover { max-width: calc(100vw - 24px); padding-top: 12px; }
+.travel-calendar-popup .calendar-footer { display: grid; gap: 4px; max-width: 250px; white-space: normal; }
+.travelers-popup.ant-popover { max-width: calc(100vw - 24px); padding: 8px 0; }
 .travelers-popup .ant-popover-inner { border: 1px solid #d9e0e7; border-radius: 13px; box-shadow: 0 16px 48px #10203126; }
 .travelers-popup .ant-popover-inner-content { padding: 0; color: #102031; }
 .travelers-popup .ant-popover-arrow { display: none; }

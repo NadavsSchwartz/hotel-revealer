@@ -21,6 +21,39 @@ import {
   TripSummary,
   useExpired,
 } from './components.jsx';
+import './details.css';
+import './progress.css';
+
+function PropertyPhotos({ images, name, loading }) {
+  const [failedImages, setFailedImages] = useState([]);
+  const available = images.filter((image) => !failedImages.includes(image)).slice(0, 4);
+
+  if (!available.length) {
+    return loading ? null : (
+      <p className="detail-photos-unavailable">Property photos are unavailable.</p>
+    );
+  }
+
+  return (
+    <div
+      className={`detail-gallery detail-gallery-${available.length}`}
+      aria-label="Named hotel photographs"
+    >
+      {available.map((image, index) => (
+        <img
+          key={image}
+          src={image}
+          alt={`${name || 'Named hotel'}, property photograph ${index + 1}`}
+          width="960"
+          height="640"
+          loading={index === 0 ? 'eager' : 'lazy'}
+          referrerPolicy="no-referrer"
+          onError={() => setFailedImages((failed) => [...failed, image])}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function Details() {
   const location = useLocation();
@@ -70,6 +103,7 @@ export default function Details() {
     data?.offerExpiresAt || data?.expiresAt || search?.expiresAt || location.state?.expiresAt;
   const stale = useExpired(expiresAt);
   const detailsStale = useExpired(data?.expiresAt);
+  const priceStale = useExpired(offer?.quoteExpiresAt || expiresAt);
   const proposedReturn = location.state?.resultsUrl;
   const returnUrl =
     typeof proposedReturn === 'string' &&
@@ -101,11 +135,20 @@ export default function Details() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, valid, dispatch]);
 
-  const images = (data?.details?.images || [])
+  const images = [...new Set((data?.details?.images || [])
     .map((image) => safeHref(typeof image === 'string' ? image : image?.url))
-    .filter(Boolean);
+    .filter(Boolean))];
+  const thumbnail = safeHref(candidate?.thumbnailUrl);
+  if (!images.length && thumbnail) images.push(thumbnail);
   const amenities = data?.details?.amenities || [];
+  const address = typeof data?.details?.address === 'string'
+    ? data.details.address.trim()
+    : null;
   const retry = () => dispatch(loadDetail(context, offerId, hotelId));
+  const refreshOffers = () => navigate(resultsUrl, {
+    state: { restore: true, searchRevision: Date.now() },
+  });
+  const editTrip = () => navigate(resultsUrl);
 
   return (
     <div className="page-shell detail-page">
@@ -114,9 +157,9 @@ export default function Details() {
       </Link>
       {!valid ? (
         <div className="empty-panel" role="alert">
-          <h1>This candidate link is incomplete</h1>
+          <h1>This hotel link is incomplete</h1>
           <p>
-            A candidate needs a valid city, travel dates, Express offer, and
+            This page needs a valid destination, travel dates, Express offer, and
             hotel ID.
           </p>
           <Link className="button-link" to="/">
@@ -125,175 +168,86 @@ export default function Details() {
         </div>
       ) : (
         <>
-          <header className="page-heading">
-            <p className="eyebrow">A possibility, with the evidence attached</p>
-            <h1 tabIndex="-1">{candidate?.name || 'Your hotel candidate'}</h1>
-            <TripSummary context={context} />
-            {candidate && (
-              <div className="detail-metadata">
-                <Tier tier={candidate.tier} />
-                <span>
-                  <Stars value={candidate.stars} /> ·{' '}
-                  {candidate.neighborhoodName || context.cityName}
-                </span>
-              </div>
-            )}
+          <header className="detail-heading">
+            <p className="eyebrow">Possible hotel</p>
+            <h1 tabIndex="-1">{candidate?.name || 'Your hotel match'}</h1>
+            {candidate && <Tier tier={candidate.tier} />}
+            {candidate && offer?.candidates?.length > 1 && <p className="detail-location">One of {offer.candidates.length} hotels matching this offer</p>}
+            <p className="detail-location">
+              {candidate?.neighborhoodName && `${candidate.neighborhoodName} · `}
+              {context.cityName}
+            </p>
           </header>
           <p className="sr-only" role="status" aria-live="polite">
             {loading
-              ? 'Loading candidate details.'
+              ? 'Loading hotel details.'
               : error
-                ? 'Candidate details could not be loaded.'
+                ? 'Hotel details could not be loaded.'
                 : data
                   ? `Details loaded for ${candidate.name}. Candidate identity remains unverified.`
                   : ''}
           </p>
           {loading && (
             <div className="detail-loading" aria-busy="true">
-              <span className="loading-mark" aria-hidden="true" />
-              <p>Checking the candidate details…</p>
+              <span className="detail-progress-dot" aria-hidden="true" />
+              <p>Loading hotel details…</p>
             </div>
           )}
-          {error && <ErrorNotice error={error} onRetry={retry} />}
-          <div className="detail-grid">
-            <div className="detail-main">
-              {candidate && (
-                <section className="detail-section">
-                  <div className="section-heading">
-                    <span className="eyebrow">01 / The comparison</span>
-                    <h2>What connects this hotel to the offer?</h2>
-                  </div>
-                  <p className="candidate-disclaimer">
-                    This hotel is a candidate for the unnamed Express offer.
-                    Matching clues do not confirm its identity.
-                  </p>
-                  <Evidence candidate={candidate} />
-                </section>
-              )}
-              {data?.detailStatus === 'unavailable' && (
-                <div className="coverage-notice">
-                  <strong>Additional hotel details are unavailable</strong>
-                  <p>
-                    The original Express quote and candidate evidence remain
-                    above. Missing retail information does not mean the Express
-                    offer is unavailable.
-                  </p>
-                </div>
-              )}
-              {(data?.details?.description || data?.details?.address) && (
-                <section className="detail-section">
-                  <div className="section-heading">
-                    <span className="eyebrow">02 / The named hotel</span>
-                    <h2>A little more about the stay</h2>
-                  </div>
-                  {data.details.description && <p>{data.details.description}</p>}
-                  {data.details.address && (
-                    <p className="hotel-address">
-                      {typeof data.details.address === 'string'
-                        ? data.details.address
-                        : 'Address unavailable'}
-                    </p>
+          {error && (
+            <ErrorNotice
+              error={error}
+              onRetry={bindingRejected ? undefined : retry}
+              onEdit={editTrip}
+              onReturn={refreshOffers}
+            />
+          )}
+          {(candidate || offer) && <div className={`detail-layout${candidate ? '' : ' detail-layout-unverified'}`}>
+            {candidate && (
+              <div className="detail-property-preview">
+                <PropertyPhotos key={key} images={images} name={candidate.name} loading={loading} />
+                <div className="detail-property-facts" aria-label="Hotel ratings">
+                  {Number.isFinite(candidate.guestRating) && (
+                    <div className="detail-guest-rating">
+                      <strong>{candidate.guestRating}<span>/10</span></strong>
+                      <span>Guest rating</span>
+                    </div>
                   )}
-                </section>
-              )}
-              {images.length > 0 && (
-                <div
-                  className="hotel-images"
-                  aria-label="Named hotel photographs"
-                >
-                  {images.slice(0, 4).map((image, index) => (
-                    <img
-                      key={image}
-                      src={image}
-                      alt={`${candidate?.name || 'Named hotel'}, property photograph ${index + 1}`}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      onError={(event) => {
-                        event.currentTarget.hidden = true;
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-              {amenities.length > 0 && (
-                <section className="detail-section">
-                  <h2>Listed amenities</h2>
-                  <ul className="amenity-list">
-                    {amenities.map((amenity, index) => (
-                      <li key={index}>
-                        {typeof amenity === 'string'
-                          ? amenity.replaceAll('_', ' ')
-                          : amenity?.name || 'Amenity not specified'}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="muted">
-                    Listed amenities describe the named hotel. Confirm
-                    availability and any extra charges with the provider.
-                  </p>
-                </section>
-              )}
-              {data && (
-                <section className="detail-section retail-section">
-                  <h2>Named hotel retail price</h2>
-                  {detailsStale ? (
-                    <>
-                      <p role="status">The retail price is out of date.</p>
-                      <Button onClick={retry} disabled={loading}>Refresh retail price</Button>
-                    </>
-                  ) : data.details?.retailQuote ? (
-                    <>
-                      <Quote
-                        quote={data.details.retailQuote}
-                        title="Separate retail quote"
-                      />
-                      <p>
-                        This is a separately named retail listing. Its room,
-                        cancellation policy, and inclusions may differ from the
-                        Express offer.
-                      </p>
-                    </>
-                  ) : (
-                    <p>
-                      No retail quote is available. This tells us nothing about
-                      whether the original Express offer is still available.
-                    </p>
+                  {Number.isFinite(candidate.reviewCount) && (
+                    <p>{candidate.reviewCount.toLocaleString()} reviews</p>
                   )}
-                </section>
-              )}
-            </div>
+                  <p><Stars value={candidate.stars} />{Number.isFinite(candidate.stars) && ' hotel'}</p>
+                </div>
+              </div>
+            )}
             <aside
               className="detail-quote-panel"
               aria-label="Original Express offer"
             >
-              <span className="eyebrow">Keep the original in view</span>
-              <h2>{offer?.neighborhoodName || 'Your Express offer'}</h2>
+              <h2>Original Express offer</h2>
               {offer ? (
                 <>
-                  <p>
-                    <Stars value={offer.stars} /> · Hotel name withheld
+                  <p className="detail-offer-location">
+                    {offer.neighborhoodName && `${offer.neighborhoodName} · `}
+                    <Stars value={offer.stars} />
                   </p>
-                  <Quote quote={offer.quote} />
+                  <Quote quote={offer.quote} expired={Boolean(offer.quoteExpiresAt) && priceStale} onRefresh={retry} refreshing={loading} />
                   <TripSummary context={context} />
+                  {!bindingRejected && candidate && (
+                    <p className="detail-qualification">
+                      Property photos show this hotel. Room details are on the original offer.
+                    </p>
+                  )}
                   {stale && (
                     <div className="inline-stale">
                       <strong>This quote is out of date.</strong>
-                      <p>
-                        Return to the results and refresh the search before
-                        continuing.
-                      </p>
                     </div>
                   )}
                   {bindingRejected ? (
-                    <div className="provider-handoff">
-                      <Button disabled>Original offer unavailable</Button>
-                      <p role="status">
-                        This comparison could not be verified. Return to the
-                        results and refresh the search before continuing.
-                      </p>
-                    </div>
+                    <p className="detail-binding-status" role="status">
+                      Choose a hotel from refreshed results to continue.
+                    </p>
                   ) : (
-                    <ProviderLink offer={offer} stale={stale} />
+                    <ProviderLink offer={offer} stale={stale} onRefresh={refreshOffers} />
                   )}
                 </>
               ) : (
@@ -303,7 +257,79 @@ export default function Details() {
                 </p>
               )}
             </aside>
-          </div>
+            <div className="detail-property-content">
+              {candidate && (data || amenities.length > 0) && (
+                <section className="detail-property-section">
+                  <h2>About the property</h2>
+                  {data?.details?.description && <p>{data.details.description}</p>}
+                  {data && (
+                    <div className="detail-address">
+                      <span className="eyebrow">Address</span>
+                      <p>{address || 'Street address unavailable.'}</p>
+                    </div>
+                  )}
+                  {amenities.length > 0 && (
+                    <div className="detail-amenities">
+                      <h3>Listed amenities</h3>
+                      <ul>
+                        {amenities.map((amenity, index) => (
+                          <li key={index}>
+                            <span aria-hidden="true">↗</span>
+                            {typeof amenity === 'string'
+                              ? amenity.replaceAll('_', ' ')
+                              : amenity?.name || 'Amenity not specified'}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+              )}
+              {data?.detailStatus === 'unavailable' && (
+                <div className="detail-coverage-notice">
+                  <strong>Additional hotel details are unavailable</strong>
+                  <p>The Express offer and available hotel clues are still shown.</p>
+                </div>
+              )}
+              {candidate && (
+                <details className="detail-evidence">
+                  <summary>
+                    <h2>Why this match?</h2>
+                    <span aria-hidden="true">+</span>
+                  </summary>
+                  <div className="detail-evidence-content">
+                    <p>One possible hotel among those checked for this offer.</p>
+                    <Tier tier={candidate.tier} />
+                    <Evidence candidate={candidate} offer={offer} />
+                  </div>
+                </details>
+              )}
+              {data && (
+                <section className="detail-retail">
+                  <div className="detail-retail-heading">
+                    <span className="eyebrow">A separate option</span>
+                    <h2>Named hotel retail price</h2>
+                  </div>
+                  {detailsStale ? (
+                    <>
+                      <p role="status">The retail price is out of date.</p>
+                      <Button onClick={retry} disabled={loading}>Refresh retail price</Button>
+                    </>
+                  ) : data.details?.retailQuote ? (
+                    <>
+                      <Quote quote={data.details.retailQuote} title="Separate retail quote" />
+                      <p>
+                        A separately named listing. Its room, cancellation policy,
+                        and inclusions may differ from the Express offer.
+                      </p>
+                    </>
+                  ) : (
+                    <p>No retail quote is available. The original Express offer is shown separately.</p>
+                  )}
+                </section>
+              )}
+            </div>
+          </div>}
         </>
       )}
     </div>

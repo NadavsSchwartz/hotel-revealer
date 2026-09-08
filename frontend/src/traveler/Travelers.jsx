@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import Popover from 'antd/es/popover';
 import Select from 'antd/es/select';
 import Button from 'antd/es/button';
@@ -26,6 +26,8 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   const trigger = useRef(null);
   const panel = useRef(null);
   const focusField = useRef(null);
+  const keyboardOpen = useRef(false);
+  const [panelLayout, setPanelLayout] = useState({ placement: 'bottomRight', maxHeight: 620 });
   const ages = Array.isArray(trip.childrenAges) ? trip.childrenAges : [];
   const occupancyErrors = ['rooms', 'adults', 'childrenAges'].filter((field) => errors[field]);
   const hasErrors = occupancyErrors.length > 0;
@@ -35,28 +37,66 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   useImperativeHandle(ref, () => ({
     focus: (field) => {
       focusField.current = field;
+      const bounds = trigger.current?.getBoundingClientRect();
+      if (bounds && (bounds.top < 0 || bounds.bottom > window.innerHeight)) {
+        trigger.current.scrollIntoView({ block: 'nearest' });
+      }
+      positionPanel();
       setOpen(true);
       if (open) focusPanel();
     },
   }));
 
-  function focusPanel() {
-    const field = focusField.current;
-    const ageIndex = ages.findIndex((age) => !Number.isInteger(age) || age < 0 || age > 17);
-    const target = field === 'childrenAges' && ageIndex >= 0
-      ? panel.current?.querySelector(`#child-age-${ageIndex}`)
-      : panel.current?.querySelector(`button[aria-label="Increase ${field === 'adults' ? 'adults' : 'rooms'}"]`);
-    (target || panel.current?.querySelector('button:not([disabled])'))?.focus();
-    focusField.current = null;
-  }
+  const positionPanel = useCallback(() => {
+    const bounds = trigger.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const viewport = window.visualViewport;
+    const viewportTop = viewport?.offsetTop || 0;
+    const viewportBottom = viewportTop + (viewport?.height || window.innerHeight);
+    const above = Math.max(0, bounds.top - viewportTop);
+    const below = Math.max(0, viewportBottom - bounds.bottom);
+    const onBottom = below >= above;
+    setPanelLayout({
+      placement: onBottom ? 'bottomRight' : 'topRight',
+      maxHeight: Math.max(40, Math.min(620, (onBottom ? below : above) - 24)),
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
-    const timeout = setTimeout(focusPanel, 0);
-    return () => clearTimeout(timeout);
-    // Focus is moved only when the panel opens, never while the guest edits a count.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    const viewport = window.visualViewport;
+    window.addEventListener('resize', positionPanel);
+    viewport?.addEventListener('resize', positionPanel);
+    return () => {
+      window.removeEventListener('resize', positionPanel);
+      viewport?.removeEventListener('resize', positionPanel);
+    };
+  }, [open, positionPanel]);
+
+  function changeOpen(nextOpen) {
+    if (nextOpen) {
+      positionPanel();
+      if (!keyboardOpen.current) trigger.current?.focus({ preventScroll: true });
+    } else {
+      setActiveAgeDropdown(null);
+      focusField.current = null;
+      keyboardOpen.current = false;
+    }
+    setOpen(nextOpen);
+  }
+
+  function focusPanel() {
+    const field = focusField.current;
+    const ageIndex = ages.findIndex((age) => !Number.isInteger(age) || age < 0 || age > 17);
+    const counter = field === 'adults' ? 'adults' : field === 'childrenAges' ? 'children' : 'rooms';
+    const target = field === 'childrenAges' && ageIndex >= 0
+      ? panel.current?.querySelector(`#child-age-${ageIndex}`)
+      : panel.current?.querySelector(`button[aria-label="Increase ${counter}"]:not([disabled]), button[aria-label="Decrease ${counter}"]:not([disabled])`);
+    const control = target || panel.current?.querySelector('button:not([disabled])');
+    if (field) control?.scrollIntoView({ block: 'nearest' });
+    control?.focus({ preventScroll: true });
+    focusField.current = null;
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -65,7 +105,9 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
       event.preventDefault();
       setOpen(false);
       setActiveAgeDropdown(null);
-      trigger.current?.focus();
+      focusField.current = null;
+      keyboardOpen.current = false;
+      trigger.current?.focus({ preventScroll: true });
     };
     document.addEventListener('keydown', dismiss);
     return () => document.removeEventListener('keydown', dismiss);
@@ -74,7 +116,9 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   function close(returnFocus = false) {
     setOpen(false);
     setActiveAgeDropdown(null);
-    if (returnFocus) trigger.current?.focus();
+    focusField.current = null;
+    keyboardOpen.current = false;
+    if (returnFocus) trigger.current?.focus({ preventScroll: true });
   }
 
   function panelKeyDown(event) {
@@ -94,7 +138,7 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   }
 
   const content = (
-    <div ref={panel} id="travelers-panel" role="dialog" aria-labelledby="travelers-title" className="travelers-panel" onKeyDown={panelKeyDown}>
+    <div ref={panel} id="travelers-panel" role="dialog" aria-labelledby="travelers-title" className="travelers-panel" style={{ maxHeight: panelLayout.maxHeight }} onKeyDown={panelKeyDown}>
       <div className="travelers-panel-heading"><h3 id="travelers-title">Who’s traveling?</h3><button type="button" aria-label="Close travelers" onClick={() => close(true)}>×</button></div>
       <Counter name="Rooms" value={trip.rooms} minimum={1} maximum={TRAVEL_LIMITS.maxRooms} hint="At least 1 adult per room" onChange={(rooms) => onChange({ rooms })} />
       <Counter name="Adults" value={trip.adults} minimum={1} maximum={TRAVEL_LIMITS.maxAdults} hint="Ages 18 and above" onChange={(adults) => onChange({ adults })} />
@@ -135,8 +179,24 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   return (
     <div className={`trip-control travelers-control ${hasErrors ? 'trip-control-invalid' : ''}`}>
       <label id="travelers-label" htmlFor="travelers-trigger">Travelers</label>
-      <Popover trigger="click" open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) setActiveAgeDropdown(null); }} placement="bottomRight" content={content} overlayClassName="travelers-popup" destroyTooltipOnHide>
-        <button ref={trigger} id="travelers-trigger" type="button" className="travelers-trigger" aria-label={`Travelers, ${summary}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? 'travelers-panel' : undefined} aria-invalid={hasErrors} onKeyDown={(event) => { if (event.key === 'Escape' && open) close(true); }}>
+      <Popover
+        trigger="click"
+        open={open}
+        onOpenChange={changeOpen}
+        placement={panelLayout.placement}
+        autoAdjustOverflow={{ adjustX: 1, adjustY: 0 }}
+        // Ant Design 4.24 forwards this legacy callback to rc-tooltip.
+        afterVisibleChange={(visible) => {
+          if (visible && (focusField.current || (keyboardOpen.current && document.activeElement === trigger.current))) focusPanel();
+        }}
+        content={content}
+        overlayClassName="travelers-popup"
+        destroyTooltipOnHide
+      >
+        <button ref={trigger} id="travelers-trigger" type="button" className="travelers-trigger" aria-label={`Travelers, ${summary}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? 'travelers-panel' : undefined} aria-invalid={hasErrors} onPointerDown={() => { keyboardOpen.current = false; }} onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') keyboardOpen.current = true;
+          if (event.key === 'Escape' && open) close(true);
+        }}>
           <span>{summary}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
         </button>
       </Popover>

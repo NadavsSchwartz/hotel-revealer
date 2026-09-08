@@ -1,0 +1,19 @@
+.search-progress { padding: 68px 20px 76px; min-height: 355px; text-align: center; }
+.search-progress-wordmark { display: inline-block; margin: 0 auto 26px; text-align: left; font: 500 clamp(48px, 6vw, 78px)/1.02 Manrope, sans-serif; letter-spacing: -.065em; opacity: 0; }
+.search-progress-ready .search-progress-wordmark { opacity: 1; transition: opacity 160ms cubic-bezier(.23, 1, .32, 1); }
+.search-progress-wordmark > span { color: #82938a; }
+.search-progress-wordmark > div { position: relative; overflow: hidden; width: max-content; padding-right: 3px; }
+.search-progress-wordmark strong { font-weight: 750; color: var(--ink); }
+.search-progress-wordmark i { position: absolute; inset: 0; background: var(--paper); border-left: 2px solid var(--blue); transform: translateX(0); }
+.search-progress-ready .search-progress-wordmark i { animation: reveal-search 2600ms linear infinite; }
+.search-progress h2 { font: 650 24px/1.25 Manrope, sans-serif; letter-spacing: -.025em; margin: 0 0 10px; }
+.search-progress p { font-size: 13px; color: #52635b; margin: 0; }
+.search-progress-signal { display: flex; justify-content: center; gap: 7px; margin-top: 22px; }
+.search-progress-signal i, .detail-progress-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); animation: search-signal 1200ms linear infinite; }
+.search-progress-signal i:nth-child(2) { animation-delay: 160ms; }
+.search-progress-signal i:nth-child(3) { animation-delay: 320ms; }
+.detail-progress-dot { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; margin-right: 8px; }
+@keyframes reveal-search { 0%, 9% { transform: translateX(0); opacity: 1; } 58%, 82% { transform: translateX(102%); opacity: 1; } 83% { transform: translateX(0); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+@keyframes search-signal { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+@media (max-width: 600px) { .search-progress { padding: 45px 12px 58px; min-height: 325px; } .search-progress h2 { font-size: 21px; } .search-progress p { max-width: 260px; margin-inline: auto; } }
+@media (prefers-reduced-motion: reduce) { .search-progress-wordmark { opacity: 1; transition: none; } .search-progress-wordmark i { display: none; } .search-progress-signal i, .detail-progress-dot { animation: none; opacity: .7; } }
