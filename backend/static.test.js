@@ -16,7 +16,7 @@ test('production static compression preserves representation negotiation and sta
   await mkdir(path.join(directory, 'media'));
   const script = 'console.log("static asset contract");\n'.repeat(100);
   const style = 'body { color: #123; }\n'.repeat(100);
-  const html = '<!doctype html><title>Hotel Revealer</title><link data-home-preload rel="preload" as="image" href="/media/hero.avif"><link rel="stylesheet" href="/assets/app.css">';
+  const html = '<!doctype html><title>Hotel Revealer</title><link data-home-preload rel="preload" as="image" href="/media/hero.avif" media="(width > 700px)"><link rel="stylesheet" href="/assets/app.css">';
   const htmlWithoutHero = '<!doctype html><title>Hotel Revealer</title><link rel="stylesheet" href="/assets/app.css">';
   await Promise.all([
     writeFile(path.join(directory, 'assets', 'app.js'), script),

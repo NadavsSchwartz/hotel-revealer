@@ -81,7 +81,8 @@ export function createApp({ logger = console, service = createProviderService({ 
   if (process.env.NODE_ENV === 'production') {
     // Read the immutable build once; direct results/details loads do not need the hero.
     const html = readFile(path.join(frontendDirectory, 'index.html'), 'utf8').then(
-      (home) => ({ home, other: home.replace(/<link\b[^>]*\bdata-home-preload\b[^>]*>\s*/g, '') }),
+      (home) => ({ home, other: home.replace(/<link\b(?:[^<>"']|"[^"]*"|'[^']*')*>/g,
+        (tag) => /\bdata-home-preload\b/.test(tag) ? '' : tag) }),
       (error) => ({ error }),
     );
     async function sendHtml(req, res, next) {
