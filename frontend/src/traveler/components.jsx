@@ -87,8 +87,8 @@ const amenityLabels = {
   CASINO: 'Casino', HOTTUB: 'Hot tub', NSMKFAC: 'Non-smoking rooms',
   HANDFAC: 'Accessible facilities', FAMFRIEND: 'Family-friendly facilities',
 };
-const numericValue = (value) => typeof value === 'number' && Number.isFinite(value)
-  ? value.toLocaleString('en-US') : 'Not supplied';
+const numericValue = (value, suffix = '') => typeof value === 'number' && Number.isFinite(value)
+  ? `${value.toLocaleString('en-US')}${suffix}` : 'Not supplied';
 function numericClue(clue, suffix = '') {
   if (!clue || clue.kind === 'unknown') return 'Not supplied';
   if (clue.kind === 'range') return `${numericValue(clue.min)}–${numericValue(clue.max)}${suffix}`;
@@ -112,7 +112,7 @@ export function Evidence({ candidate, offer }) {
   if (offer?.clues && comparisons) {
     const rows = [
       ['neighborhood', 'Area', offer.neighborhoodName || 'Not supplied', candidate.neighborhoodName || 'Not supplied'],
-      ['stars', 'Hotel class', `${numericValue(offer.stars)} stars`, `${numericValue(candidate.stars)} stars`],
+      ['stars', 'Hotel class', numericValue(offer.stars, ' stars'), numericValue(candidate.stars, ' stars')],
       ['guestRating', 'Guest score', numericClue(offer.clues.guestRating, ' / 10'), candidate.guestRating == null ? 'Not supplied' : `${numericValue(candidate.guestRating)} / 10`],
       ['reviewCount', 'Reviews', numericClue(offer.clues.reviewCount), numericValue(candidate.reviewCount)],
       ['amenities', 'Features', amenityList(offer.clues.amenities?.codes), amenityList(candidate.amenities)],

@@ -491,11 +491,12 @@ test('previews and property photos lead while the numerical comparison stays ava
     amenities: { codes: ['SPOOL', 'FINTRNT'] },
   };
   const candidate = offer.candidates[0];
+  candidate.stars = null;
   candidate.thumbnailUrl = 'https://mobileimg.priceline.com/browser-fixture/juniper.webp';
   candidate.amenities = ['SPOOL', 'FINTRNT', 'FITSPA'];
   candidate.evidence = {
     supporting: [], missing: ['Feature coverage is incomplete'],
-    comparisons: { neighborhood: 'match', stars: 'match', guestRating: 'match', reviewCount: 'match', amenities: 'unknown' },
+    comparisons: { neighborhood: 'match', stars: 'unknown', guestRating: 'match', reviewCount: 'match', amenities: 'unknown' },
   };
   const photos = ['one', 'two', 'three'].map(name => `https://mobileimg.priceline.com/browser-fixture/${name}.webp`);
   await page.route('https://mobileimg.priceline.com/browser-fixture/**', route => route.fulfill({
@@ -517,6 +518,9 @@ test('previews and property photos lead while the numerical comparison stays ava
   const checkComparison = async () => {
     await expect(comparison).toBeVisible();
     await expect(comparison.getByRole('columnheader')).toHaveText(['Clue', 'Express offer', 'This hotel']);
+    const hotelClass = comparison.getByRole('row', { name: /Hotel class/ });
+    await expect(hotelClass.getByRole('cell').nth(0)).toHaveText('4 stars');
+    await expect(hotelClass.getByRole('cell').nth(1).locator('span').first()).toHaveText('Not supplied');
     const score = comparison.getByRole('row', { name: /Guest score/ });
     await expect(score.getByRole('cell').nth(0)).toHaveText('8+ / 10');
     await expect(score.getByRole('cell').nth(1)).toContainText('8.7 / 10');

@@ -18,7 +18,7 @@ import {
   searchUrl,
   validateContext,
 } from './context.js';
-import { loadSearch, selectSearchCooldown } from './state.js';
+import { loadSearch } from './state.js';
 import {
   ErrorNotice,
   Evidence,
@@ -95,10 +95,11 @@ export default function Results() {
   const loading = request.key === key && request.status === 'loading';
   const error =
     request.key === key && request.status === 'error' ? request.error : null;
-  const cooldownUntil = useSelector((state) => selectSearchCooldown(state, key));
+  const cooldownUntil = useSelector((state) => state.searchCooldowns[key]);
   const cooldownExpired = useExpired(cooldownUntil);
   const coolingDown = Boolean(cooldownUntil) && !cooldownExpired;
-  const visibleError = coolingDown ? { code: 'PROVIDER_COOLDOWN', retryAt: cooldownUntil } : error;
+  const cooldownError = cooldownUntil ? { code: 'PROVIDER_COOLDOWN', retryAt: cooldownUntil } : null;
+  const visibleError = coolingDown ? cooldownError : error || (!data ? cooldownError : null);
   const params = new URLSearchParams(location.search);
   const waitingForFirstResults = valid && !data && (loading || !visibleError);
   const sort = params.get('sort') === 'price' ? 'price' : 'evidence';
@@ -272,7 +273,9 @@ export default function Results() {
         ? 'Updating hotel deals. Previous results remain available.'
         : 'Searching hotel deals.'
       : visibleError
-        ? `Search could not be completed.${data ? ' Previous results remain available.' : ''}`
+        ? `${visibleError.code === 'PROVIDER_COOLDOWN' && !coolingDown
+          ? 'The provider pause has ended. You can try this search again.'
+          : 'Search could not be completed.'}${data ? ' Previous results remain available.' : ''}`
         : data
           ? `${offers.length} Express offers found with ${candidateCount} hotel matches.${data.coverage.status === 'partial' ? ' Results are partial.' : ''} Showing page ${page} of ${pageCount}.`
           : '';

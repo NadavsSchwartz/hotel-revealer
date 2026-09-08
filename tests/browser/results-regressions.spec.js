@@ -67,8 +67,10 @@ test('all same-trip refresh controls honor cooldown and recover at its deadline'
   await expect(page.getByRole('link', { name: /View original Express offer/ })).toBeVisible();
 });
 
-test('returning to a cooling-down trip after another search keeps its notice without a request', async ({ page }) => {
-  const retryAt = new Date(Date.now() + 300000).toISOString();
+test('returning to a cooling-down trip preserves its retry after expiry without an automatic request', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.install({ time: new Date(now) });
+  const retryAt = new Date(now + 300000).toISOString();
   const nextDate = new Date(`${context.checkOut}T12:00:00Z`);
   nextDate.setUTCDate(nextDate.getUTCDate() + 1);
   const tripB = { ...context, checkOut: nextDate.toISOString().slice(0, 10) };
@@ -76,9 +78,9 @@ test('returning to a cooling-down trip after another search keeps its notice wit
   await page.route('**/api/v1/hotelDeals', route => {
     const input = route.request().postDataJSON();
     requests.push(input);
-    return input.checkOut === context.checkOut
+    return requests.length === 1
       ? route.fulfill({ status: 429, json: { error: { code: 'PROVIDER_COOLDOWN', retryAt } } })
-      : route.fulfill({ json: searchResponse({ context: tripB }) });
+      : route.fulfill({ json: searchResponse({ context: input }) });
   });
   await page.goto(searchPath);
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
@@ -92,4 +94,13 @@ test('returning to a cooling-down trip after another search keeps its notice wit
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
   expect(requests).toEqual([context, tripB]);
+  await page.clock.fastForward(301000);
+  await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled();
+  await expect(page.locator('.results-page > [role="status"]')).toHaveText('The provider pause has ended. You can try this search again.');
+  expect(requests).toEqual([context, tripB]);
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toHaveCount(0);
+  expect(requests).toEqual([context, tripB, context]);
 });
