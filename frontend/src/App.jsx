@@ -224,7 +224,7 @@ export default function App() {
   const isHome = location.pathname === '/';
   const homeDraft = useRef(null);
   return (
-    <div className={`unboxed-application ${isHome ? 'room-application' : ''}`}>
+    <div id="page-top" className={`unboxed-application ${isHome ? 'room-application' : ''}`}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -285,7 +285,7 @@ export default function App() {
         </main>
       </ErrorBoundary>
       <footer className="direction-footer">
-        <Brand label="Back to home" to={isHome ? '/#main' : '/'} />
+        <Brand label="Back to home" to={isHome ? '/#page-top' : '/'} />
         <div className="footer-copy"><span>© 2026 Hotel Revealer</span><span>Independent of Priceline.</span></div>
         <nav aria-label="Footer navigation">
           <Link to="/privacy">Privacy</Link>

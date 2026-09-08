@@ -44,11 +44,27 @@ test('invalid travel links reveal the mobile editor and the landing copy uses re
   const sizes = await page.locator('.room-description, .room-reception label').evaluateAll(elements =>
     elements.map(element => parseFloat(getComputedStyle(element).fontSize)));
   expect(sizes.length).toBeGreaterThan(0);
-  expect(sizes.every(size => size >= 12)).toBe(true);
+  expect(sizes.every(size => size >= 14)).toBe(true);
+  const values = await page.locator('.room-reception input, .room-reception .travelers-trigger').evaluateAll(elements =>
+    elements.map(element => parseFloat(getComputedStyle(element).fontSize)));
+  expect(values.length).toBeGreaterThan(0);
+  expect(values.every(size => size >= 16)).toBe(true);
   const start = await page.getByRole('button', { name: 'Find hotel deals', exact: true }).boundingBox();
   expect(start.height).toBeGreaterThanOrEqual(44);
   const hero = await page.locator('.room-scene').boundingBox();
   expect(start.y + start.height).toBeLessThanOrEqual(hero.y + hero.height);
+});
+
+test('the search stays substantial on wide screens and reachable on a short desktop', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 2560, height: 1292 });
+  await page.goto('/');
+  await page.evaluate(() => document.fonts.ready);
+  const form = await page.getByRole('form', { name: 'Search hotels', exact: true }).boundingBox();
+  expect(form.width).toBeGreaterThanOrEqual(600);
+  await page.screenshot({ path: testInfo.outputPath('home-wide.png') });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.getByRole('button', { name: 'Find hotel deals', exact: true })).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('large formatted prices remain within a narrow result card', async ({ page }, testInfo) => {
