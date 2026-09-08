@@ -1,78 +1,89 @@
-import { canonicalCityName, cityNames } from '../../../shared/cities.js';
+import legacyDestinations from '../../../data/destinations-legacy-public.json' with { type: 'json' };
+import {
+  DEFAULT_OCCUPANCY,
+  isCalendarDate,
+  nightCount,
+  validateTripFields,
+} from '../../../shared/travel.js';
 
-export { cityNames };
-export const fixedContext = { rooms: 1, adults: 2, currency: 'USD' };
+const legacyKey = value => value.normalize('NFKD').toLowerCase().replace(/\p{M}/gu, '')
+  .replace(/['’‘ʼ`.]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const legacyByName = new Map(legacyDestinations.map(([name, id, label]) => [legacyKey(name), { id, label }]));
+export const cityNames = legacyDestinations.map(([name]) => name);
+export { DEFAULT_OCCUPANCY, TRAVEL_LIMITS, addCalendarDays, isCalendarDate, localToday } from '../../../shared/travel.js';
+// Kept as a defaults alias for callers that create an empty trip.
+export const fixedContext = DEFAULT_OCCUPANCY;
+
+const integerParameter = (params, key, fallback) => {
+  if (!params.has(key)) return fallback;
+  const value = params.get(key);
+  return /^\d+$/.test(value) ? Number(value) : value;
+};
 
 export function contextFromSearch(search) {
   const params = new URLSearchParams(search);
+  const ageParameter = params.get('childrenAges');
+  const cityName = params.get('cityName') || '';
+  const legacy = !params.has('destinationId') && cityName.length <= 100
+    ? legacyByName.get(legacyKey(cityName)) : null;
   return {
-    cityName: params.get('cityName') || '',
+    ...(params.has('destinationId') ? { destinationId: params.get('destinationId') }
+      : legacy ? { destinationId: legacy.id } : {}),
+    cityName: legacy?.label ?? cityName,
     checkIn: params.get('checkIn') || '',
     checkOut: params.get('checkOut') || '',
-    rooms:
-      !params.has('rooms') || params.get('rooms') === '1'
-        ? 1
-        : params.get('rooms'),
-    adults:
-      !params.has('adults') || params.get('adults') === '2'
-        ? 2
-        : params.get('adults'),
+    rooms: integerParameter(params, 'rooms', DEFAULT_OCCUPANCY.rooms),
+    adults: integerParameter(params, 'adults', DEFAULT_OCCUPANCY.adults),
+    childrenAges: ageParameter === null || ageParameter === ''
+      ? []
+      : ageParameter.split(',', 9).map(age => /^\d+$/.test(age) ? Number(age) : null),
     currency: params.get('currency') ?? 'USD',
   };
 }
 
 export function contextKey(context) {
-  return [
-    context.cityName,
+  return JSON.stringify([
+    context.destinationId ?? context.cityName,
     context.checkIn,
     context.checkOut,
     context.rooms,
     context.adults,
+    context.childrenAges ?? [],
     context.currency,
-  ].join('|');
+  ]);
 }
 
 export function searchUrl(context, path = '/results', extras = {}) {
-  return `${path}?${new URLSearchParams({ ...context, ...fixedContext, ...extras })}`;
-}
-
-export function localToday(now = new Date()) {
-  const date = new Date(now);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-export function isCalendarDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T12:00:00Z`);
-  return (
-    Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
-  );
-}
-
-export function validateContext(input) {
-  const errors = {};
-  const cityName = canonicalCityName(input.cityName);
-  if (!cityName)
-    errors.cityName = 'Choose a supported city from the suggestions.';
-  if (!isCalendarDate(input.checkIn))
-    errors.checkIn = 'Enter a valid check-in date.';
-  else if (input.checkIn < localToday())
-    errors.checkIn = 'Check-in must be today or later.';
-  if (!isCalendarDate(input.checkOut))
-    errors.checkOut = 'Enter a valid check-out date.';
-  else if (isCalendarDate(input.checkIn) && input.checkOut <= input.checkIn) {
-    errors.checkOut = 'Check-out must be after check-in.';
+  const values = { ...DEFAULT_OCCUPANCY, ...context, ...extras };
+  if (Array.isArray(values.childrenAges)) {
+    // A single missing age must not serialize as the empty, child-free trip.
+    values.childrenAges = Array.from(values.childrenAges, age => Number.isInteger(age) ? age : 'missing').join(',');
   }
-  if (input.rooms !== 1 || input.adults !== 2 || input.currency !== 'USD') {
-    errors.context =
-      'This link uses an unsupported trip. Search supports 1 room, 2 adults, and USD only.';
+  return `${path}?${new URLSearchParams(Object.entries(values).filter(([, value]) => value !== undefined))}`;
+}
+
+export function validateContext(input, now = new Date()) {
+  const { errors, context: trip } = validateTripFields(input, now);
+  let cityName = typeof input.cityName === 'string' ? input.cityName.trim() : '';
+  let destinationId = input.destinationId;
+  if (destinationId !== undefined) {
+    if (typeof destinationId !== 'string' || !/^geonames:[1-9]\d{0,9}$/.test(destinationId) || !cityName || cityName.length > 200) {
+      errors.cityName = 'Choose a destination from the suggestions.';
+    }
+  } else {
+    const legacy = cityName.length <= 100 ? legacyByName.get(legacyKey(cityName)) : null;
+    if (!legacy) errors.cityName = 'Choose a destination from the suggestions.';
+    else {
+      cityName = legacy.label;
+      destinationId = legacy.id;
+    }
   }
   return {
     errors,
     context: {
-      ...input,
-      cityName: cityName || input.cityName,
-      ...fixedContext,
+      ...(destinationId !== undefined ? { destinationId } : {}),
+      cityName,
+      ...trip,
     },
   };
 }
@@ -88,11 +99,7 @@ export function displayDate(value, options = {}) {
 }
 
 export function nights(context) {
-  return Math.round(
-    (Date.parse(`${context.checkOut}T12:00:00Z`) -
-      Date.parse(`${context.checkIn}T12:00:00Z`)) /
-      86400000,
-  );
+  return nightCount(context.checkIn, context.checkOut);
 }
 
 export function money(cents) {

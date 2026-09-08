@@ -39,10 +39,11 @@ export default function Results() {
     [location.search],
   );
   const validation = validateContext(input);
-  const context = validation.context;
-  const key = contextKey(context);
+  const requestedContext = validation.context;
+  const key = contextKey(requestedContext);
   const valid = Object.keys(validation.errors).length === 0;
   const data = useSelector((state) => state.searches[key]);
+  const context = data?.context || requestedContext;
   const request = useSelector((state) => state.search);
   const loading = request.key === key && request.status === 'loading';
   const error =
@@ -54,6 +55,13 @@ export default function Results() {
   const restoredKey = useRef(null);
   const searchRevision = location.state?.searchRevision;
   const lastRevision = useRef(null);
+
+  useEffect(() => {
+    if (!data || input.cityName === data.context.cityName) return;
+    const next = new URLSearchParams(location.search);
+    next.set('cityName', data.context.cityName);
+    navigate(`/results?${next}`, { replace: true, state: location.state });
+  }, [data, input.cityName, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!valid) return;
@@ -148,7 +156,7 @@ export default function Results() {
         </h1>
         {valid && <TripSummary context={context} />}
       </header>
-      <SearchForm initial={input} compact />
+      <SearchForm initial={data?.context || input} compact />
       <p className="sr-only" role="status" aria-live="polite">
         {statusText}
       </p>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Button from 'antd/es/button';
 import {
@@ -23,12 +23,13 @@ import {
 
 export default function Details() {
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const input = useMemo(
     () => contextFromSearch(location.search),
     [location.search],
   );
-  const { context, errors } = validateContext(input);
+  const { context: requestedContext, errors } = validateContext(input);
   const params = new URLSearchParams(location.search);
   const offerId = params.get('offerId') || '';
   const hotelId = params.get('hotelId') || '';
@@ -36,10 +37,11 @@ export default function Details() {
     Object.keys(errors).length === 0 &&
     /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(offerId) &&
     /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(hotelId);
-  const key = detailKey(context, offerId, hotelId);
+  const key = detailKey(requestedContext, offerId, hotelId);
   const request = useSelector((state) => state.detail);
-  const search = useSelector((state) => state.searches[contextKey(context)]);
+  const search = useSelector((state) => state.searches[contextKey(requestedContext)]);
   const data = request.key === key ? request.data : null;
+  const context = data?.context || search?.context || requestedContext;
   const error = request.key === key ? request.error : null;
   const [rejectedSelection, setRejectedSelection] = useState(null);
   const bindingError = [
@@ -67,13 +69,23 @@ export default function Details() {
     data?.expiresAt || search?.expiresAt || location.state?.expiresAt;
   const stale = useExpired(expiresAt);
   const proposedReturn = location.state?.resultsUrl;
-  const resultsUrl =
+  const returnUrl =
     typeof proposedReturn === 'string' &&
     proposedReturn.startsWith('/results?') &&
     contextKey(contextFromSearch(proposedReturn.split('?')[1])) ===
       contextKey(context)
       ? proposedReturn
       : searchUrl(context);
+  const returnParams = new URLSearchParams(returnUrl.split('?')[1]);
+  returnParams.set('cityName', context.cityName);
+  const resultsUrl = `/results?${returnParams}`;
+
+  useEffect(() => {
+    if ((!data && !search) || input.cityName === context.cityName) return;
+    const next = new URLSearchParams(location.search);
+    next.set('cityName', context.cityName);
+    navigate(`/deal?${next}`, { replace: true, state: location.state });
+  }, [data, search, input.cityName, context.cityName, location.search, location.state, navigate]);
 
   useEffect(() => {
     // A retry must not briefly restore a relationship the server rejected.

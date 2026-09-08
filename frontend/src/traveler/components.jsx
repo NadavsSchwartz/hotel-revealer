@@ -6,13 +6,16 @@ import { displayDate, money, nights, safeHref } from './context.js';
 
 export function TripSummary({ context }) {
   const count = nights(context);
+  const children = context.childrenAges?.length || 0;
   return (
     <p className="trip-summary">
       {displayDate(context.checkIn)} –{' '}
       {displayDate(context.checkOut, { year: 'numeric' })}
       <span aria-hidden="true"> / </span>
       {count} {count === 1 ? 'night' : 'nights'}
-      <span aria-hidden="true"> / </span>1 room, 2 adults, USD
+      <span aria-hidden="true"> / </span>
+      {context.rooms} {context.rooms === 1 ? 'room' : 'rooms'}, {context.adults} {context.adults === 1 ? 'adult' : 'adults'}
+      {children > 0 && <>, {children} {children === 1 ? 'child' : 'children'}</>}, USD
     </p>
   );
 }
@@ -195,11 +198,43 @@ const errorCopy = {
   ],
   PAST_CHECK_IN: [
     'Check-in is in the past',
-    'Choose today or a later date. Dates are checked using the UTC calendar day.',
+    'Choose today or a later date.',
+  ],
+  CHECK_IN_TOO_FAR: [
+    'Choose an earlier check-in',
+    'Your check-in must be within the next 365 days. Edit your dates and search again.',
+  ],
+  CHECK_OUT_TOO_FAR: [
+    'Choose an earlier check-out',
+    'Your check-out must be within the next 365 days. Edit your dates and search again.',
+  ],
+  STAY_TOO_LONG: [
+    'Choose a shorter stay',
+    'Search stays of up to 30 nights. Edit your dates and search again.',
+  ],
+  INVALID_ROOMS: [
+    'Check the room count',
+    'Choose between 1 and 8 rooms in Travelers.',
+  ],
+  INVALID_ADULTS: [
+    'Check the adult count',
+    'Choose between 1 and 16 adults in Travelers.',
+  ],
+  INSUFFICIENT_ADULTS: [
+    'Check the room and adult counts',
+    'Include at least one adult for each room in Travelers.',
+  ],
+  INVALID_CHILDREN: [
+    'Check the children’s details',
+    'Choose up to 8 children and provide each child’s age in Travelers.',
+  ],
+  INVALID_CHILD_AGE: [
+    'Complete the children’s ages',
+    'Choose an age from 0 to 17 for every child in Travelers. Select “Under 1” for infants.',
   ],
   UNSUPPORTED_CONTEXT: [
     'This trip is not supported',
-    'Search supports one room, two adults, and US dollars.',
+    'Review the travelers and use USD prices.',
   ],
   INVALID_OFFER_ID: [
     'This offer link is incomplete',

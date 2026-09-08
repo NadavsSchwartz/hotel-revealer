@@ -9,10 +9,10 @@ The release remains blocked on authorized live access and external verification.
 | Provider/API | Offline tests passed | Bounded work, coalescing, freshness, errors, partial pages, routine state persistence and default refusal; live adapter absent |
 | Production build | Local passed | Pinned Node24/npm workspace install, lint and Vite/Express production build |
 | Browser journeys | Local engine checks passed | Production-build search/details/recovery/navigation with test-only interception; including the rejected-selection regression |
-| Automated accessibility | Passed on tested states | Axe A/AA on home, expanded results and candidate details in Chromium, Firefox, WebKit and mobile emulation |
+| Automated accessibility | Local checks passed with one reviewed exception | Open/closed destination and traveler controls include one narrowly reviewed combobox rule exception; see below. No blanket AA claim |
 | Manual accessibility | Partial | Keyboard skip-link and 320px reflow checked; CSS2x zoom has no overflow. Manual VoiceOver, true text enlargement and full criterion audit remain unverified |
 | Browser/device support | Partial | Engine tests and installed Chrome152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Local lab only; gate open | LCP2.288–2.524s over3runs, CLS0, sampled events64–128ms. One LCP run slightly above2.5s; fieldINP/p75, live results latency and hosted sizing unverified |
+| Performance | Prior baseline only; gate open | Earlier LCP2.288–2.524s over3runs, CLS0, sampled events64–128ms. These measurements predate the expanded controls and design exploration; repeat on the selected production design. FieldINP/p75, live results latency and hosted sizing remain unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, safe links, sanitized logs/errors; retained Router6 advisories documented in README |
 | Live provider / accuracy | BLOCKED | Specific permission, current API fields and independently known hotel outcomes |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
@@ -76,4 +76,44 @@ portable and do not purchase either product before confirming fit and exact cost
   never a silently truncated shortlist. Cache limits therefore bound response
   storage as well as entry count. These are application defaults, not provider limits.
 
-Final local checkpoint: 76 native tests and 52 browser cases passed; lint and production build passed. The browser count is 13 scenarios across four engine/viewport projects, not 52 different product workflows.
+Previous local checkpoint (`336a3e4`): 76 native tests and 52 browser cases passed;
+lint and production build passed. That browser count represents 13 scenarios across
+four engine/viewport projects.
+
+## Expanded destination and traveler controls
+
+The current update adds the attributable worldwide GeoNames lookup, stable IDs,
+calendar popups, room/adult counts, and required child ages. The skeptical review
+found and corrected duplicate-label selection, city/state country-code ambiguity,
+canonical-label display after edited URLs, and the UTC-ahead date-horizon boundary.
+The application still has no live provider adapter; geographic coverage is not
+hotel coverage. Per-room assignment and multi-room quote semantics remain live
+integration prerequisites.
+
+`npm run check` passed: lint, 96 native tests, and the production build. The full
+browser suite passed 128 cases (32 scenarios in Chromium, mobile Chromium,
+Firefox, and WebKit), without retries or skips. This includes first-input retention,
+same-label geographic selection, canonical labels, and restored calendar focus
+before Escape and after replacement-date selection.
+
+Clean `npm ci` in a separate
+temporary directory followed by a production build also passed using the committed
+workspace manifest/lock structure and the current source. This verifies local
+reproducibility, not fresh Linux/VPS operation. The initial-input race and keyed
+calendar focus loss were reproduced and fixed before this checkpoint.
+
+The isolated cinematic design exploration is in ignored `output/design-options/`.
+Its actual Chrome renders at 1440px and 390px have no horizontal overflow or console
+errors. Those previews are not the selected production design or live search evidence.
+
+### Reviewed combobox check
+
+Axe's `scrollable-region-focusable` rule flags the destination popup's
+`.destination-popup .rc-virtual-list-holder`. The combobox keeps DOM focus on its
+input and exposes the active option through `aria-activedescendant`, following the
+[W3C APG combobox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
+The popup is intentionally outside the page's Tab sequence. A separate browser
+check exercises all eight distinct options, owned active IDs, scrolling into the
+visible popup bounds, Enter selection of the correct geographic ID, and Tab/Escape
+exit. The exception applies only to that single holder and rule; other Axe findings
+still fail the check. Manual VoiceOver/Safari validation remains an open release gate.

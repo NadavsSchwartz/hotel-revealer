@@ -76,8 +76,11 @@ opaque offers, named listings, hotel details, and original-offer links? Please a
 confirm permitted caching durations, attribution/display rules, traffic limits,
 access costs, and launch requirements.
 
-The initial scope is English/USD, one room and two adults, with no bookings or
-payments handled by my application.
+The planned interface supports English/USD, worldwide destination search, room
+and adult counts, and children’s ages, with no bookings or payments handled by my
+application. Please confirm supported destinations, per-room occupancy and age
+requirements, permitted stay lengths, and whether supplied quotes represent one
+room or the entire requested trip.
 
 Thank you,
 Nadav Schwartz

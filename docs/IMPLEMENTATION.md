@@ -1,7 +1,8 @@
 # Hotel Revealer implementation contract
 
 Approved scope: live candidate comparison for a small public portfolio; English,
-USD, one room and two adults. Quality gates precede schedule. No demo substitute.
+USD, with worldwide destination search, room/adult counts and children’s ages
+added at Nadav’s request. Quality gates precede schedule. No demo substitute.
 
 ## Status — 2026-09-07
 
@@ -19,9 +20,23 @@ https://github.com/priceline-partner-network/api-documentation/blob/master/src/g
 
 ## Shared wire contract
 
-- Context: `{cityName, checkIn, checkOut, rooms:1, adults:2, currency:'USD'}`.
-  Dates are ISO calendar dates. Search accepts the first three fields; fixed
-  fields may be supplied only with these values. Cities use `shared/cities.js`.
+- Context: `{destinationId, cityName, checkIn, checkOut, rooms, adults,
+  childrenAges:[], currency:'USD'}`. Dates are ISO calendar dates. Destination IDs
+  use `geonames:<ID>` and the server supplies the authoritative label. Legacy
+  city/state URLs resolve through the attributable geographic bridge. Successful
+  responses reconcile the visible label and URL without changing trip identity.
+- GET `/api/v1/destinations?q=…` searches the server’s GeoNames snapshot and returns
+  at most eight suggestions by default. This endpoint makes no hotel-provider call.
+  See `docs/DATA_SOURCES.md` for coverage, licensing, memory and refresh evidence.
+- Shared limits: 1–8 rooms, 1–16 adults with at least one per room, up to eight
+  children aged 0–17 (0 represents under one). Every child requires an age.
+  Omitted occupancy defaults to one room/two adults/no children; explicit invalid
+  values are rejected. Room allocation is not yet modeled.
+- Both dates must be within 365 days of local today, checkout follows check-in,
+  and stays are at most 30 calendar nights. Server validation permits one day of
+  grace at both UTC boundaries to accommodate the client’s local calendar date.
+  These are application defaults. A permitted adapter must verify provider date,
+  occupancy, destination mapping, and multi-room price semantics before live use.
 - Error response: `{error:{code,message,retryAt?,requestId?}}`.
 - Search: `{context,retrievedAt,expiresAt,coverage,offers}`.
 - Coverage: `{status:'complete'|'partial',reason:null|string,pagesFetched,
@@ -57,7 +72,8 @@ https://github.com/priceline-partner-network/api-documentation/blob/master/src/g
   test injection. Service methods `search(input)` and `detail(input)` return wire
   responses. Default service refuses access with `PROVIDER_NOT_CONFIGURED` (503).
 - Frontend owns `frontend/` except generated lockfiles. Keep React/Redux/antd.
-  Reads this contract; native date inputs are acceptable for keyboard access.
+  The destination combobox, calendar popups, and traveler selector share validation
+  and preserve URL context. Calendar values remain date-only through the adapter boundary.
 - Root owns package installation/lockfiles, CI/deployment, docs and integration.
   Only root runs dependency installation to avoid shared-lock races.
 

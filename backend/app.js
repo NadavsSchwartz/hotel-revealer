@@ -6,6 +6,7 @@ import { createHotelRoutes } from './routes/hotelDealsRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 import { createProviderService } from './provider/service.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
+import { searchDestinations } from './destinations/index.js';
 
 const frontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
 const contentSecurityPolicy = [
@@ -39,6 +40,14 @@ export function createApp({ logger = console, service = createProviderService({ 
     next();
   });
   app.use(express.json({ limit: '16kb', strict: true }));
+  app.get('/api/v1/destinations', (req, res) => {
+    const url = new URL(req.originalUrl, 'http://localhost');
+    const query = url.searchParams.get('q') ?? '';
+    if (query.length > 100 || Array.from(query).some(character => character.codePointAt(0) < 32 || (character.codePointAt(0) >= 127 && character.codePointAt(0) <= 159)) || url.searchParams.getAll('q').length > 1) {
+      return res.status(400).json({ error: { code: 'INVALID_DESTINATION_QUERY', message: 'Enter a city or country name.', requestId: req.requestId } });
+    }
+    res.set('Cache-Control', 'public, max-age=300').json({ destinations: searchDestinations(query, { limit: 8 }) });
+  });
   app.get('/health', async (req, res, next) => {
     try {
       const provider = typeof service.status === 'function' ? await service.status() : { available: false };

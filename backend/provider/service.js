@@ -9,7 +9,7 @@ import { assertJsonSize } from './size.js';
 
 const SEARCH_TTL = 5 * 60_000;
 const DETAIL_TTL = 60_000;
-const contextKey = (context) => JSON.stringify([context.cityName, context.checkIn, context.checkOut, context.rooms, context.adults, context.currency]);
+const contextKey = (context) => JSON.stringify([context.destinationId, context.checkIn, context.checkOut, context.rooms, context.adults, context.childrenAges, context.currency]);
 const iso = (timestamp) => new Date(timestamp).toISOString();
 const text = (value, maximum) => typeof value === 'string' ? value.trim().slice(0, maximum) || null : null;
 

@@ -15,7 +15,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace frontend",
     "start": "node backend/server.js",
-    "test": "node --test backend/domain/*.test.js backend/provider/*.test.js backend/*.test.js",
+    "test": "node --test backend/domain/*.test.js backend/destinations/*.test.js backend/provider/*.test.js backend/*.test.js",
     "test:browser": "playwright test",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
@@ -35,6 +35,7 @@
     "globals": "17.12.0"
   },
   "overrides": {
-    "qs": "6.16.0"
+    "qs": "6.16.0",
+    "rc-select": "14.4.3"
   }
 }

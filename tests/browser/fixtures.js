@@ -1,6 +1,9 @@
 // Synthetic browser fixtures. Never imported by production code or sold as live data.
+import { getDestination } from '../../backend/destinations/index.js';
+
 const dateAfter = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-export const context = { cityName: 'Las Vegas, Nevada', checkIn: dateAfter(30), checkOut: dateAfter(32), rooms: 1, adults: 2, currency: 'USD' };
+const destination = getDestination('geonames:5506956');
+export const context = { destinationId: destination.id, cityName: destination.label, checkIn: dateAfter(30), checkOut: dateAfter(32), rooms: 1, adults: 2, childrenAges: [], currency: 'USD' };
 export const searchPath = `/results?${new URLSearchParams(context)}`;
 
 export function searchResponse(overrides = {}) {

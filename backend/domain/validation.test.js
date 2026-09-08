@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateDetail, validateSearch } from './index.js';
 import { canonicalCityName, cityNames } from '../../shared/cities.js';
+import { getDestination } from '../destinations/index.js';
+import { addCalendarDays } from '../../shared/travel.js';
 
 const now = new Date('2026-09-07T12:00:00Z');
 const input = { cityName: 'New York, New York', checkIn: '2026-09-07', checkOut: '2026-09-08' };
+const canonicalInput = () => ({ ...input, destinationId: 'geonames:5128581', cityName: getDestination('geonames:5128581').label });
 const error = code => value => value.code === code && value.status === 400 && typeof value.message === 'string';
 
 test('canonical cities retain all 1,000 unique original choices', () => {
@@ -18,7 +21,7 @@ test('canonical cities retain all 1,000 unique original choices', () => {
 test('search validates and returns only normalized supported context without mutation', () => {
   const body = { ...input, cityName: '  new York, New York  ' };
   const result = validateSearch(body, now);
-  assert.deepEqual(result, { ...input, rooms: 1, adults: 2, currency: 'USD' });
+  assert.deepEqual(result, { ...canonicalInput(), rooms: 1, adults: 2, childrenAges: [], currency: 'USD' });
   assert.equal(body.cityName, '  new York, New York  ');
   assert.deepEqual(validateSearch(result, now), result);
 });
@@ -28,11 +31,45 @@ test('missing, non-object, unsupported and injected request fields have stable e
   assert.throws(() => validateSearch({ ...input, cityName: 'Elsewhere' }, now), error('INVALID_CITY'));
   assert.throws(() => validateSearch({ ...input, handoffUrl: 'https://evil.example' }, now), error('INVALID_FIELDS'));
   assert.throws(() => validateSearch({ ...input, hotelId: 'hotel' }, now), error('INVALID_FIELDS'));
+  for (const destinationId of [null, '', 5128581, {}, 'geonames:0', 'geonames:5128581<script>']) {
+    assert.throws(() => validateSearch({ ...input, destinationId }, now), error('INVALID_CITY'));
+  }
+  for (const cityName of [null, {}, 'x'.repeat(201)]) {
+    assert.throws(() => validateSearch({ ...input, destinationId: 'geonames:5128581', cityName }, now), error('INVALID_CITY'));
+  }
 });
 
-test('only explicitly supported occupancy and currency values are accepted', () => {
-  for (const extra of [{ rooms: 2 }, { rooms: '1' }, { adults: 1 }, { adults: '2' }, { currency: 'EUR' }, { currency: null }]) {
-    assert.throws(() => validateSearch({ ...input, ...extra }, now), error('UNSUPPORTED_CONTEXT'));
+test('destination IDs determine the canonical location, never the raw display label', () => {
+  const destinationId = 'geonames:293397';
+  const destination = getDestination(destinationId);
+  const result = validateSearch({ ...input, destinationId, cityName: 'Las Vegas, Nevada' }, now);
+  assert.equal(result.destinationId, destinationId);
+  assert.equal(result.cityName, destination.label);
+  assert.equal(validateSearch({ ...input, destinationId, cityName: undefined }, now).cityName, destination.label);
+});
+
+test('occupancy preserves selected rooms, adults, children including infants and enforces application bounds', () => {
+  const body = { ...input, rooms: 8, adults: 16, childrenAges: [0, 1, 3, 5, 8, 10, 15, 17] };
+  const result = validateSearch(body, now);
+  assert.deepEqual(result, { ...canonicalInput(), rooms: 8, adults: 16, childrenAges: body.childrenAges, currency: 'USD' });
+  result.childrenAges[0] = 7;
+  assert.equal(body.childrenAges[0], 0);
+  assert.equal(validateSearch({ ...input, adults: 1 }, now).adults, 1);
+  for (const rooms of [null, '1', 0, -1, 9, 1.5, Infinity]) {
+    assert.throws(() => validateSearch({ ...input, rooms }, now), error('INVALID_ROOMS'));
+  }
+  for (const adults of [null, '2', 0, -1, 17, 2.5, Infinity]) {
+    assert.throws(() => validateSearch({ ...input, adults }, now), error('INVALID_ADULTS'));
+  }
+  assert.throws(() => validateSearch({ ...input, rooms: 3, adults: 2 }, now), error('INSUFFICIENT_ADULTS'));
+  for (const childrenAges of [null, '0,3', 2, Array(9).fill(0)]) {
+    assert.throws(() => validateSearch({ ...input, childrenAges }, now), error('INVALID_CHILDREN'));
+  }
+  for (const childrenAges of [[null], [undefined], ['3'], [-1], [18], [2.5], Array(1)]) {
+    assert.throws(() => validateSearch({ ...input, childrenAges }, now), error('INVALID_CHILD_AGE'));
+  }
+  for (const currency of ['EUR', null]) {
+    assert.throws(() => validateSearch({ ...input, currency }, now), error('UNSUPPORTED_CONTEXT'));
   }
 });
 
@@ -41,7 +78,17 @@ test('invalid and cleared calendar dates never roll into another month', () => {
     assert.throws(() => validateSearch({ ...input, checkIn }, now), error('INVALID_CHECK_IN'));
   }
   assert.throws(() => validateSearch({ ...input, checkOut: 'bad' }, now), error('INVALID_CHECK_OUT'));
-  assert.doesNotThrow(() => validateSearch({ ...input, checkIn: '2028-02-29', checkOut: '2028-03-01' }, now));
+  assert.doesNotThrow(() => validateSearch({ ...input, checkIn: '2028-02-29', checkOut: '2028-03-01' }, '2028-02-01T12:00:00Z'));
+});
+
+test('dates respect the booking horizon with server timezone grace and a 30-night limit', () => {
+  const latest = addCalendarDays(input.checkIn, 365);
+  assert.doesNotThrow(() => validateSearch({ ...input, checkIn: addCalendarDays(latest, -30), checkOut: latest }, now));
+  assert.throws(() => validateSearch({ ...input, checkIn: '2227-05-04', checkOut: '2227-05-05' }, now), error('CHECK_IN_TOO_FAR'));
+  assert.throws(() => validateSearch({ ...input, checkOut: addCalendarDays(latest, 2) }, now), error('CHECK_OUT_TOO_FAR'));
+  assert.throws(() => validateSearch({ ...input, checkOut: '2027-08-01' }, now), error('STAY_TOO_LONG'));
+  assert.doesNotThrow(() => validateSearch({ ...input, checkOut: addCalendarDays(input.checkIn, 30) }, now));
+  assert.throws(() => validateSearch({ ...input, checkOut: addCalendarDays(input.checkIn, 31) }, now), error('STAY_TOO_LONG'));
 });
 
 test('date ordering and midnight grace preserve local same-day searches without shifting dates', () => {
@@ -69,7 +116,7 @@ test('DST and year boundaries keep travel dates as calendar values', () => {
 
 test('detail requires both distinct wire IDs and preserves canonical search context', () => {
   assert.deepEqual(validateDetail({ ...input, offerId: 'offer:12', hotelId: 'hotel_3' }, now), {
-    ...input, rooms: 1, adults: 2, currency: 'USD', offerId: 'offer:12', hotelId: 'hotel_3',
+    ...canonicalInput(), rooms: 1, adults: 2, childrenAges: [], currency: 'USD', offerId: 'offer:12', hotelId: 'hotel_3',
   });
   for (const offerId of [null, '', 12, ' a', '../x', '<script>', 'x'.repeat(201)]) {
     assert.throws(() => validateDetail({ ...input, offerId, hotelId: 'hotel' }, now), error('INVALID_OFFER_ID'));

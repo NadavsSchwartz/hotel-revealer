@@ -150,10 +150,16 @@ function Policy({ privacy }) {
         <>
           <h2>What your search uses</h2>
           <p>
-            Your city, dates, and selected offer and hotel IDs are sent to this
+            Your destination, dates, room and adult counts, children’s ages,
+            and selected offer and hotel IDs are sent to this
             application’s server when you search or open a candidate. Once
             authorized live access is configured, the necessary trip details may
             also be sent to the hotel provider to retrieve offers.
+          </p>
+          <p>
+            Destination suggestions use a GeoNames catalog held on this server.
+            Typing a city or country sends that text to this application, with
+            no request to GeoNames or a hotel provider.
           </p>
           <h2>What stays in your browser</h2>
           <p>
@@ -224,10 +230,16 @@ function Policy({ privacy }) {
           </p>
           <h2>Supported scope</h2>
           <p>
-            The current interface supports listed cities, English, US dollars,
-            one room, and two adults. It does not offer custom occupancy,
-            booking management, or customer support for reservations made
-            elsewhere.
+            The interface supports worldwide destination search, English, US
+            dollars, room and adult counts, and children’s ages. Stays are
+            limited to 30 nights within the next 365 days. Destination coverage
+            does not establish hotel availability. Room assignments and provider
+            occupancy rules require verification before live booking links are
+            enabled. Booking management is handled by the original provider.
+          </p>
+          <p>
+            Destination data: <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>,
+            adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.
           </p>
         </>
       )}

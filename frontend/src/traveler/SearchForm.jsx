@@ -1,143 +1,73 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Button from 'antd/es/button';
 import { useNavigate } from 'react-router-dom';
-import {
-  cityNames,
-  fixedContext,
-  localToday,
-  searchUrl,
-  validateContext,
-} from './context.js';
+import { DEFAULT_OCCUPANCY, searchUrl, validateContext } from './context.js';
+import DestinationSearch from './DestinationSearch.jsx';
+import TravelDates from './TravelDates.jsx';
+import Travelers from './Travelers.jsx';
+import './search-controls.css';
 
-const emptyTrip = { cityName: '', checkIn: '', checkOut: '', ...fixedContext };
+const emptyTrip = { cityName: '', checkIn: '', checkOut: '', ...DEFAULT_OCCUPANCY };
 
 export default function SearchForm({ initial = emptyTrip, compact = false }) {
   const navigate = useNavigate();
-  const [trip, setTrip] = useState(initial);
-  const [errors, setErrors] = useState({});
-  const form = useRef(null);
+  const initialValue = JSON.stringify({ ...emptyTrip, ...initial });
+  const previousInitial = useRef(initialValue);
+  const [trip, setTrip] = useState(() => JSON.parse(initialValue));
+  const [errors, setErrors] = useState(() => {
+    const value = JSON.parse(initialValue);
+    return value.cityName || value.checkIn || value.checkOut ? validateContext(value).errors : {};
+  });
+  const destinationRef = useRef(null);
+  const datesRef = useRef(null);
+  const travelersRef = useRef(null);
+
   useEffect(() => {
-    setTrip({
-      cityName: initial.cityName || '',
-      checkIn: initial.checkIn || '',
-      checkOut: initial.checkOut || '',
-      ...fixedContext,
+    if (previousInitial.current === initialValue) return;
+    previousInitial.current = initialValue;
+    const next = JSON.parse(initialValue);
+    setTrip(next);
+    setErrors(next.cityName || next.checkIn || next.checkOut ? validateContext(next).errors : {});
+  }, [initialValue]);
+
+  function update(values, fieldErrors = {}) {
+    setTrip((current) => ({ ...current, ...values }));
+    setErrors((current) => {
+      const next = { ...current };
+      Object.keys(values).forEach((field) => { delete next[field]; });
+      return { ...next, ...fieldErrors };
     });
-    setErrors({});
-  }, [initial.cityName, initial.checkIn, initial.checkOut]);
+  }
 
   function submit(event) {
     event.preventDefault();
     const validation = validateContext(trip);
     setErrors(validation.errors);
-    const invalidField = Object.keys(validation.errors)[0];
-    if (invalidField) {
-      form.current.elements.namedItem(invalidField)?.focus();
+    const invalid = ['cityName', 'destinationId', 'checkIn', 'checkOut', 'rooms', 'adults', 'childrenAges', 'currency']
+      .find((field) => validation.errors[field]);
+    if (invalid) {
+      if (invalid === 'cityName' || invalid === 'destinationId') destinationRef.current?.focus();
+      else if (invalid === 'checkIn' || invalid === 'checkOut') datesRef.current?.focus(invalid);
+      else if (invalid !== 'currency') travelersRef.current?.focus(invalid);
       return;
     }
-    navigate(searchUrl(validation.context), {
-      state: { searchRevision: Date.now() },
-    });
+    navigate(searchUrl(validation.context), { state: { searchRevision: Date.now() } });
   }
 
-  function change(event) {
-    const { name, value } = event.target;
-    setTrip((current) => ({ ...current, [name]: value }));
-    setErrors((current) => ({ ...current, [name]: undefined }));
-  }
-
+  const validationMessages = Object.values(errors).filter(Boolean);
   return (
-    <form
-      ref={form}
-      className={`trip-form ${compact ? 'trip-form-compact' : ''}`}
-      onSubmit={submit}
-      noValidate
-      aria-label="Search hotels"
-    >
-      <div className="form-fields">
-        <div className="form-field city-field">
-          <label htmlFor="cityName">Where are you going?</label>
-          <input
-            id="cityName"
-            name="cityName"
-            type="text"
-            list="supported-cities"
-            value={trip.cityName}
-            onChange={change}
-            placeholder="Choose a city"
-            autoComplete="off"
-            required
-            aria-invalid={Boolean(errors.cityName)}
-            aria-describedby={errors.cityName ? 'cityName-error' : 'city-hint'}
-          />
-          <datalist id="supported-cities">
-            {cityNames.map((city) => (
-              <option key={city} value={city} />
-            ))}
-          </datalist>
-          <span id="city-hint" className="sr-only">
-            Start typing to see supported cities, then choose one.
-          </span>
-          {errors.cityName && (
-            <span className="field-error" id="cityName-error">
-              {errors.cityName}
-            </span>
-          )}
-        </div>
-        <div className="form-field">
-          <label htmlFor="checkIn">Check-in</label>
-          <input
-            id="checkIn"
-            name="checkIn"
-            type="date"
-            min={localToday()}
-            value={trip.checkIn}
-            onChange={change}
-            required
-            aria-invalid={Boolean(errors.checkIn)}
-            aria-describedby={errors.checkIn ? 'checkIn-error' : undefined}
-          />
-          {errors.checkIn && (
-            <span className="field-error" id="checkIn-error">
-              {errors.checkIn}
-            </span>
-          )}
-        </div>
-        <div className="form-field">
-          <label htmlFor="checkOut">Check-out</label>
-          <input
-            id="checkOut"
-            name="checkOut"
-            type="date"
-            min={trip.checkIn || localToday()}
-            value={trip.checkOut}
-            onChange={change}
-            required
-            aria-invalid={Boolean(errors.checkOut)}
-            aria-describedby={errors.checkOut ? 'checkOut-error' : undefined}
-          />
-          {errors.checkOut && (
-            <span className="field-error" id="checkOut-error">
-              {errors.checkOut}
-            </span>
-          )}
-        </div>
+    <form className={`trip-form ${compact ? 'trip-form-compact' : ''}`} onSubmit={submit} noValidate aria-label="Search hotels">
+      <div className="trip-search-fields">
+        <DestinationSearch ref={destinationRef} trip={trip} error={errors.cityName} onChange={update} />
+        <TravelDates ref={datesRef} trip={trip} errors={errors} onChange={update} />
+        <Travelers ref={travelersRef} trip={trip} errors={errors} onChange={update} />
         <Button type="primary" htmlType="submit" className="search-button">
-          Search offers <span aria-hidden="true">↗</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+          Search
         </Button>
       </div>
-      <div className="form-footnote">
-        <span>
-          1 room <span aria-hidden="true">·</span> 2 adults{' '}
-          <span aria-hidden="true">·</span> USD{' '}
-        </span>
-        <span>Compare candidates. Keep the uncertainty in view.</span>
-      </div>
-      {Object.values(errors).some(Boolean) && (
-        <p className="sr-only" role="alert">
-          Please correct the highlighted trip details.
-        </p>
-      )}
+      {errors.currency && <p className="trip-currency-error">{errors.currency}{' '}<button type="button" onClick={() => update({ currency: 'USD' })}>Use USD</button></p>}
+      {validationMessages.length > 0 && <p className="sr-only" role="alert">{validationMessages.join(' ')}</p>}
     </form>
   );
 }

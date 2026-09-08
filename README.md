@@ -54,7 +54,10 @@ claims and missing release gates.
 
 ## Application boundaries
 
-- `shared/`: supported cities shared by browser and API.
+- `shared/`: shared calendar-date and traveler validation; original city labels
+  retained for legacy links.
+- `backend/destinations/` and `data/`: local GeoNames destination lookup and its
+  attributable snapshot. The worldwide catalog stays on the server.
 - `backend/domain/`: input validation, conservative normalization and pure matching.
 - `backend/provider/`: bounded scheduling, request sharing, fresh caches, control
   state, and the injectable authorized-adapter boundary.
@@ -64,7 +67,14 @@ claims and missing release gates.
 - `deploy/`: optional single-VPS deployment preparation. Hostinger managed hosting
   is a separate deployment candidate; do not run VPS scripts against shared hosting.
 
-The API paths remain POST `/api/v1/hotelDeals` and POST `/api/v1/deal`. The former
+Destination autocomplete uses GET `/api/v1/destinations?q=…`, with city/country
+search and stable geographic IDs. See [data provenance and refresh](docs/DATA_SOURCES.md).
+The form supports rooms, adults, and each child’s age; stays are limited to 30
+nights within the next 365 days. These are application limits, not verified
+provider bookability rules. The live adapter must verify destination mapping,
+room allocation, occupancy, and quote basis before accepting these trips.
+
+The hotel API paths remain POST `/api/v1/hotelDeals` and POST `/api/v1/deal`. The former
 encrypted `q` links are retired. Plain date-only URL context makes refresh and
 back navigation reproducible. Full JSON contracts are in
 [the implementation contract](docs/IMPLEMENTATION.md).
@@ -114,6 +124,11 @@ avoids credentials or trip payloads in routine logs. Search/detailed views must 
 be treated as authoritative booking information.
 
 Express stays on major 4; `qs` is overridden to its patched 6.16.0 release.
+Ant Design 4 keeps its existing components. Its transitive `rc-select` is pinned
+to 14.4.3 for correct nonvirtual option semantics while retaining Ant Design 4's
+icon props and normal Tab navigation. Child popups explicitly control open state.
+Moment was already present through Ant Design; it is pinned directly because the
+date controls import it. Neither change introduces a new UI framework.
 The retained React Router 6 line has two advisory entries: the SSR deserialization
 path is not used by this client-only SPA; internal navigation uses fixed local
 paths with encoded query values, and provider navigation uses allowlisted native

@@ -8,6 +8,7 @@ import { ProviderFailure } from './errors.js';
 import { createMemoryStateStore, createFileStateStore, resetProviderState } from './state.js';
 import { futureContext, listingRows, manualClock, flush } from './test-helpers.js';
 import { MAX_JSON_BYTES } from './size.js';
+import { addCalendarDays } from '../../shared/travel.js';
 
 function setup(overrides = {}) {
   const clock = overrides.clock || manualClock();
@@ -48,6 +49,54 @@ test('identical searches coalesce, cache for five minutes, and return independen
   await clock.advance(1);
   await service.search(futureContext);
   assert.equal(calls.length, 2);
+});
+
+test('search cache and in-flight work bind destination, rooms, adults, and every child age', async () => {
+  const { service, clock, calls } = setup();
+  const infantTrip = { ...futureContext, childrenAges: [0, 7] };
+  const olderTrip = { ...infantTrip, childrenAges: [1, 7] };
+  const first = service.search(infantTrip);
+  const duplicate = service.search({ ...infantTrip, childrenAges: [0, 7] });
+  const changedAge = service.search(olderTrip);
+  await clock.advance(1_000);
+  const [a, b, c] = await Promise.all([first, duplicate, changedAge]);
+  assert.deepEqual(a, b);
+  assert.deepEqual(a.context.childrenAges, [0, 7]);
+  assert.deepEqual(c.context.childrenAges, [1, 7]);
+  assert.equal(calls.length, 2);
+  for (const changed of [{ ...infantTrip, rooms: 2 }, { ...infantTrip, adults: 3 }, { ...infantTrip, destinationId: 'geonames:293397' }]) {
+    const request = service.search(changed);
+    await clock.advance(1_000);
+    await request;
+  }
+  assert.equal(calls.length, 5);
+  assert.deepEqual((await service.search(infantTrip)).context.childrenAges, [0, 7]);
+  assert.deepEqual((await service.search(olderTrip)).context.childrenAges, [1, 7]);
+  assert.equal(calls.length, 5);
+});
+
+test('detail cache and in-flight work retain the selected children and age-specific details', async () => {
+  const { service, clock, calls } = setup({ adapter: {
+    async hotelDetails(request) {
+      calls.push(['detail', request]);
+      return { description: `Age ${request.context.childrenAges[0]}`, images: [], amenities: [] };
+    },
+  } });
+  const infant = { ...selection, childrenAges: [0] };
+  const child = { ...selection, childrenAges: [1] };
+  const infantDetail = service.detail(infant);
+  const duplicate = service.detail(infant);
+  const childDetail = service.detail(child);
+  await clock.advance(4_000);
+  const [a, b, c] = await Promise.all([infantDetail, duplicate, childDetail]);
+  assert.deepEqual(a, b);
+  assert.equal(a.details.description, 'Age 0');
+  assert.equal(c.details.description, 'Age 1');
+  assert.equal(calls.filter(([kind]) => kind === 'search').length, 2);
+  assert.equal(calls.filter(([kind]) => kind === 'detail').length, 2);
+  assert.equal((await service.detail(infant)).details.description, 'Age 0');
+  assert.equal((await service.detail(child)).details.description, 'Age 1');
+  assert.equal(calls.length, 4);
 });
 
 test('pagination is capped at three pages and valid capped coverage is cached without becoming complete', async () => {
@@ -219,7 +268,7 @@ test('fresh cached searches survive cooldown, expired searches do not dispatch, 
   } } });
   const cached = await service.search(futureContext);
   fail = 'rate_limit';
-  const anotherContext = { ...futureContext, checkOut: '2099-10-13' };
+  const anotherContext = { ...futureContext, checkOut: addCalendarDays(futureContext.checkOut, 1) };
   const limited = service.search(anotherContext);
   const rejected = assert.rejects(limited, { code: 'PROVIDER_COOLDOWN' });
   await clock.advance(1_000);

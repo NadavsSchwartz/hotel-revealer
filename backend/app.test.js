@@ -57,7 +57,7 @@ test('canonical JSON inputs reach the injected service, legacy feeds and encrypt
   const app = await serve(t, { service: { search: async (context) => { received.push(context); return { context, offers: [] }; } } });
   const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
   assert.equal(response.status, 200);
-  assert.deepEqual(received, [{ ...futureContext, rooms: 1, adults: 2, currency: 'USD' }]);
+  assert.deepEqual(received, [{ ...futureContext, destinationId: 'geonames:5506956', cityName: 'Las Vegas, Nevada, United States', rooms: 1, adults: 2, childrenAges: [], currency: 'USD' }]);
   const invalid = await app.request('/api/v1/hotelDeals', { method: 'POST', body: { hash: 'old encrypted payload' } });
   assert.equal(invalid.status, 400);
   assert.equal(received.length, 1);
@@ -68,10 +68,31 @@ test('canonical JSON inputs reach the injected service, legacy feeds and encrypt
   }
 });
 
+test('destination API serves bounded geographic suggestions without provider calls and rejects malformed queries', async (t) => {
+  let calls = 0;
+  const app = await serve(t, { service: { search: async () => { calls += 1; } } });
+  const response = await app.request('/api/v1/destinations?q=Israel');
+  assert.equal(response.status, 200);
+  assert.equal(response.body.destinations.length, 8);
+  assert.ok(response.body.destinations.every(place => place.countryCode === 'IL'));
+  assert.ok(response.body.destinations.some(place => place.id === 'geonames:293397'));
+  assert.equal(response.headers['cache-control'], 'public, max-age=300');
+  for (const query of ['q=Tel+Aviv&q=Paris', `q=${'x'.repeat(101)}`, 'q=Paris%00', 'q=Paris%C2%85']) {
+    const invalid = await app.request(`/api/v1/destinations?${query}`);
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.error.code, 'INVALID_DESTINATION_QUERY');
+    assert.equal(invalid.body.error.requestId, invalid.headers['x-request-id']);
+  }
+  const empty = await app.request('/api/v1/destinations?q=x');
+  assert.deepEqual(empty.body, { destinations: [] });
+  assert.equal(calls, 0);
+  assert.equal(JSON.stringify(app.logs).includes('Israel'), false);
+});
+
 test('invalid dates, unsupported context, unknown fields and malformed/oversized JSON never call service', async (t) => {
   let calls = 0;
   const app = await serve(t, { service: { search: async () => { calls += 1; return {}; } } });
-  for (const body of [null, [], {}, { ...futureContext, checkIn: '2099-02-30' }, { ...futureContext, rooms: 2 }, { ...futureContext, fixture: true }]) {
+  for (const body of [null, [], {}, { ...futureContext, checkIn: '2099-02-30' }, { ...futureContext, rooms: 9 }, { ...futureContext, fixture: true }]) {
     const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body });
     assert.equal(response.status, 400);
     assert.ok(response.body.error.requestId);

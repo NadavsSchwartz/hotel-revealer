@@ -1,4 +1,6 @@
-export const futureContext = { cityName: 'Las Vegas, Nevada', checkIn: '2099-10-10', checkOut: '2099-10-12' };
+const testNow = Date.now();
+const dateAfter = days => new Date(testNow + days * 86_400_000).toISOString().slice(0, 10);
+export const futureContext = { cityName: 'Las Vegas, Nevada', checkIn: dateAfter(30), checkOut: dateAfter(32) };
 
 export const listingRows = () => [
   {
@@ -17,7 +19,7 @@ export const listingRows = () => [
 
 export const flush = async () => { for (let i = 0; i < 80; i += 1) await Promise.resolve(); };
 
-export function manualClock(initial = Date.UTC(2026, 0, 1)) {
+export function manualClock(initial = testNow) {
   let current = initial;
   let id = 0;
   const timers = new Map();

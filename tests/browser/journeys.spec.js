@@ -2,11 +2,31 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { context, detailResponse, mockOffers, searchPath, searchResponse } from './fixtures.js';
 
+async function chooseDestination(page, query, region) {
+  await page.getByLabel('Where are you going?').fill(query);
+  const option = page.locator('.destination-popup .ant-select-item-option').filter({ has: page.locator('strong').getByText(query, { exact: true }), hasText: region });
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
+async function chooseDate(page, label, date) {
+  await page.getByLabel(label, { exact: true }).click();
+  const calendar = page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
+  await expect(calendar).toHaveCount(1);
+  await expect(calendar).toBeVisible();
+  const day = calendar.locator(`td[title="${date}"]`);
+  for (let month = 0; month < 13 && await day.count() === 0; month++) {
+    await calendar.locator('.ant-picker-header-next-btn').click();
+  }
+  await expect(day).not.toHaveClass(/ant-picker-cell-disabled/);
+  await day.locator('.ant-picker-cell-inner').click();
+}
+
 test('cleared inputs are validated and focused without an API request', async ({ page }) => {
   let searches = 0;
   page.on('request', (request) => { if (request.url().includes('/api/v1/hotelDeals')) searches++; });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Search offers' }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByLabel('Where are you going?')).toBeFocused();
   await expect(page.getByRole('alert')).toBeVisible();
   expect(searches).toBe(0);
@@ -26,10 +46,10 @@ test('offer ambiguity, retail failure, and original handoff stay separate', asyn
   });
   await page.route('**/api/v1/deal', (route) => route.fulfill({ json: detailResponse() }));
   await page.goto('/');
-  await page.getByLabel('Where are you going?').fill(context.cityName);
-  await page.getByLabel('Check-in', { exact: true }).fill(context.checkIn);
-  await page.getByLabel('Check-out', { exact: true }).fill(context.checkOut);
-  await page.getByRole('button', { name: 'Search offers' }).click();
+  await chooseDestination(page, 'Las Vegas', 'Nevada, United States');
+  await chooseDate(page, 'Check-in', context.checkIn);
+  await chooseDate(page, 'Check-out', context.checkOut);
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('Taxes and fees not confirmed').first()).toBeVisible();
@@ -102,12 +122,12 @@ test('a slower earlier search cannot overwrite the next trip', async ({ page }) 
     await route.fulfill({ json: searchResponse({ context: input }) }).catch(() => {});
   });
   await page.goto(searchPath);
-  await page.getByLabel('Where are you going?').fill('Chicago, Illinois');
-  await page.getByRole('button', { name: 'Search offers' }).click();
+  await chooseDestination(page, 'Chicago', 'Illinois, United States');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'A closer look at Chicago.' })).toBeVisible();
   release();
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
-  await expect(page.getByLabel('Where are you going?')).toHaveValue('Chicago, Illinois');
+  await expect(page.getByLabel('Where are you going?')).toHaveValue('Chicago, United States');
   await expect(page.getByRole('heading', { name: 'A closer look at Las Vegas.' })).toHaveCount(0);
 });
 
@@ -143,24 +163,32 @@ test('upstream labels are plain text and offsite handoff URLs are rejected', asy
 test('unsupported occupancy URLs cannot silently become a different trip', async ({ page }) => {
   let searches = 0;
   page.on('request', (request) => { if (request.url().includes('/api/v1/hotelDeals')) searches++; });
-  await page.goto(searchPath.replace('rooms=1', 'rooms=2'));
+  await page.goto(searchPath.replace('rooms=1', 'rooms=9'));
   await expect(page.getByRole('heading', { name: /Let’s check your trip/ })).toBeVisible();
   expect(searches).toBe(0);
 });
 
+async function auditAccessibility(page) {
+  await page.evaluate(async () => {
+    const finite = document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime));
+    await Promise.all(finite.map(animation => animation.finished.catch(() => {})));
+  });
+  return new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+}
+
 test('landing and result states have no automated WCAG A/AA violations', async ({ page }) => {
   await page.goto('/');
-  let results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  let results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
-  results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
   await page.getByRole('link', { name: /View candidate.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
-  results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
 });
 
@@ -168,7 +196,7 @@ test('320 CSS pixel reflow keeps content and primary controls in the viewport', 
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await expect(page.getByRole('button', { name: 'Search offers' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible();
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();

@@ -8,6 +8,7 @@ COPY frontend/package.json ./frontend/package.json
 RUN npm ci
 COPY frontend ./frontend
 COPY shared ./shared
+COPY data/destinations-legacy-public.json ./data/destinations-legacy-public.json
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS dependencies
@@ -25,6 +26,7 @@ COPY package.json ./package.json
 COPY backend ./backend
 COPY shared ./shared
 COPY --from=build /app/frontend/dist ./frontend/dist
+COPY data ./data
 RUN mkdir -p /app/var && chown node:node /app/var
 USER node
 EXPOSE 5000

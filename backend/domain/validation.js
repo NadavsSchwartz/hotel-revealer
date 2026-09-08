@@ -1,4 +1,7 @@
-import { canonicalCityName } from '../../shared/cities.js';
+import { getDestination, resolveLegacyCity } from '../destinations/index.js';
+import { validateTripFields } from '../../shared/travel.js';
+
+export { isCalendarDate } from '../../shared/travel.js';
 
 export class ValidationError extends Error {
   constructor(code, message) {
@@ -22,40 +25,28 @@ export function normalizedId(value) {
     ? value : null;
 }
 
-export function isCalendarDate(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
 function context(input, now, allowedKeys) {
   if (!isRecord(input)) throw new ValidationError('INVALID_BODY', 'Send a JSON object with a city and travel dates.');
   if (Object.keys(input).some(key => !allowedKeys.includes(key))) {
     throw new ValidationError('INVALID_FIELDS', 'The request contains unsupported fields.');
   }
-  const cityName = canonicalCityName(input.cityName);
-  if (!cityName) throw new ValidationError('INVALID_CITY', 'Choose a city from the supported city list.');
-  if (!isCalendarDate(input.checkIn)) throw new ValidationError('INVALID_CHECK_IN', 'Enter a valid check-in date in YYYY-MM-DD format.');
-  if (!isCalendarDate(input.checkOut)) throw new ValidationError('INVALID_CHECK_OUT', 'Enter a valid check-out date in YYYY-MM-DD format.');
-  if (input.checkOut <= input.checkIn) throw new ValidationError('INVALID_DATE_RANGE', 'Check-out must be after check-in.');
+  if (input.cityName !== undefined && (typeof input.cityName !== 'string' || input.cityName.length > 200)) {
+    throw new ValidationError('INVALID_CITY', 'Choose a destination from the suggestions.');
+  }
+  const destination = input.destinationId !== undefined
+    ? getDestination(input.destinationId)
+    : resolveLegacyCity(input.cityName);
+  if (!destination) throw new ValidationError('INVALID_CITY', 'Choose a destination from the suggestions.');
   // A server's UTC midnight must not reject a valid local same-day search.
   // Permit a one-calendar-day grace; the browser uses its local date and the
   // eventual authorized provider decides destination-specific bookability.
-  const clock = new Date(now);
-  if (!Number.isFinite(clock.getTime())) throw new TypeError('Validation requires a valid current time.');
-  const earliestDay = new Date(clock.getTime() - 86_400_000).toISOString().slice(0, 10);
-  if (input.checkIn < earliestDay) {
-    throw new ValidationError('PAST_CHECK_IN', 'Choose a current or future check-in date.');
-  }
-  if ((input.rooms !== undefined && input.rooms !== 1) ||
-      (input.adults !== undefined && input.adults !== 2) ||
-      (input.currency !== undefined && input.currency !== 'USD')) {
-    throw new ValidationError('UNSUPPORTED_CONTEXT', 'Search supports one room, two adults, and USD prices.');
-  }
-  return { cityName, checkIn: input.checkIn, checkOut: input.checkOut, rooms: 1, adults: 2, currency: 'USD' };
+  const { context: trip, errors, errorCodes } = validateTripFields(input, now, { allowPastGrace: true });
+  const firstError = Object.keys(errors)[0];
+  if (firstError) throw new ValidationError(errorCodes[firstError], errors[firstError]);
+  return { destinationId: destination.id, cityName: destination.label, ...trip };
 }
 
-const searchKeys = ['cityName', 'checkIn', 'checkOut', 'rooms', 'adults', 'currency'];
+const searchKeys = ['destinationId', 'cityName', 'checkIn', 'checkOut', 'rooms', 'adults', 'childrenAges', 'currency'];
 
 export function validateSearch(input, now = new Date()) {
   return context(input, now, searchKeys);
