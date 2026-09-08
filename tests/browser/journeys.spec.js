@@ -265,7 +265,8 @@ test('a 336-character Express offer ID survives candidate URLs, detail requests,
   await expect(handoff).toHaveAttribute('href', search.offers[0].handoffUrl);
   await expect(handoff).toHaveAttribute('target', '_blank');
   await page.getByRole('link', { name: /Back to results/ }).click();
-  expect(new URL(page.url()).searchParams.getAll('expanded')).toContain(offerId);
+  expect(new URL(page.url()).searchParams.has('expanded')).toBe(false);
+  await expect(page.getByRole('button', { name: 'Hide match details', exact: true })).toBeVisible();
   await page.goto(candidateUrl.href);
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await expect.poll(() => detailInputs.length).toBe(2);

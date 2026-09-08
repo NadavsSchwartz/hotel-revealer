@@ -10,7 +10,7 @@ import {
   searchUrl,
   validateContext,
 } from './context.js';
-import { detailKey, loadDetail } from './state.js';
+import { detailKey, loadDetail, selectDetailView, selectSearchCooldown } from './state.js';
 import {
   ErrorNotice,
   Evidence,
@@ -74,36 +74,20 @@ export default function Details() {
   const key = detailKey(requestedContext, offerId, hotelId);
   const request = useSelector((state) => state.detail);
   const search = useSelector((state) => state.searches[contextKey(requestedContext)]);
-  const data = request.key === key ? request.data : null;
+  const cooldown = useSelector((state) => selectSearchCooldown(state, contextKey(requestedContext)));
+  const { data, offer, candidate, expiresAt, bindingRejected } = selectDetailView({
+    detail: request, search, key, offerId, hotelId,
+  });
   const context = data?.context || search?.context || requestedContext;
   const error = request.key === key ? request.error : null;
-  const [rejectedSelection, setRejectedSelection] = useState(null);
-  const bindingError = [
-    'INVALID_SELECTION',
-    'PROVIDER_RESPONSE_INVALID',
-    'PROVIDER_DISABLED',
-    'PROVIDER_NOT_CONFIGURED',
-  ].includes(error?.code);
-  const bindingRejected = !data && (bindingError || rejectedSelection === key);
   const loading =
     valid &&
     (!request.key || request.key !== key || request.status === 'loading');
-  const storedOffer = search?.offers.find((offer) => offer.offerId === offerId);
-  const historyOffer =
-    location.state?.offer?.offerId === offerId ? location.state.offer : null;
-  const offer = data?.offer || storedOffer || historyOffer;
-  const candidate = bindingRejected
-    ? null
-    : data?.candidate ||
-      storedOffer?.candidates.find((hotel) => hotel.hotelId === hotelId) ||
-      (location.state?.candidate?.hotelId === hotelId
-        ? location.state.candidate
-        : null);
-  const expiresAt =
-    data?.offerExpiresAt || data?.expiresAt || search?.expiresAt || location.state?.expiresAt;
   const stale = useExpired(expiresAt);
   const detailsStale = useExpired(data?.expiresAt);
   const priceStale = useExpired(offer?.quoteExpiresAt || expiresAt);
+  const cooldownExpired = useExpired(cooldown);
+  const coolingDown = Boolean(cooldown && !cooldownExpired);
   const proposedReturn = location.state?.resultsUrl;
   const returnUrl =
     typeof proposedReturn === 'string' &&
@@ -124,12 +108,6 @@ export default function Details() {
   }, [data, search, input.cityName, context.cityName, location.search, location.state, navigate]);
 
   useEffect(() => {
-    // A retry must not briefly restore a relationship the server rejected.
-    if (bindingError) setRejectedSelection(key);
-    else if (data) setRejectedSelection(null);
-  }, [bindingError, data, key]);
-
-  useEffect(() => {
     if (valid) dispatch(loadDetail(context, offerId, hotelId));
     // Candidate selection, not incidental history state, owns this request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +122,9 @@ export default function Details() {
   const address = typeof data?.details?.address === 'string'
     ? data.details.address.trim()
     : null;
-  const retry = () => dispatch(loadDetail(context, offerId, hotelId));
+  const retry = () => {
+    if (!loading && !coolingDown) dispatch(loadDetail(context, offerId, hotelId));
+  };
   const refreshOffers = () => navigate(resultsUrl, {
     state: { restore: true, searchRevision: Date.now() },
   });
@@ -230,7 +210,7 @@ export default function Details() {
                     {offer.neighborhoodName && `${offer.neighborhoodName} · `}
                     <Stars value={offer.stars} />
                   </p>
-                  <Quote quote={offer.quote} expired={Boolean(offer.quoteExpiresAt) && priceStale} onRefresh={retry} refreshing={loading} />
+                  <Quote quote={offer.quote} expired={Boolean(offer.quoteExpiresAt) && priceStale} onRefresh={retry} refreshing={loading} refreshDisabled={coolingDown} />
                   <TripSummary context={context} />
                   {!bindingRejected && candidate && (
                     <p className="detail-qualification">
@@ -247,7 +227,7 @@ export default function Details() {
                       Choose a hotel from refreshed results to continue.
                     </p>
                   ) : (
-                    <ProviderLink offer={offer} stale={stale} onRefresh={refreshOffers} />
+                    <ProviderLink offer={offer} stale={stale} onRefresh={refreshOffers} refreshDisabled={coolingDown} />
                   )}
                 </>
               ) : (
@@ -313,7 +293,7 @@ export default function Details() {
                   {detailsStale ? (
                     <>
                       <p role="status">The retail price is out of date.</p>
-                      <Button onClick={retry} disabled={loading}>Refresh retail price</Button>
+                      <Button onClick={retry} disabled={loading || coolingDown}>Refresh retail price</Button>
                     </>
                   ) : data.details?.retailQuote ? (
                     <>

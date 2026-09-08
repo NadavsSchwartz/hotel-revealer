@@ -28,6 +28,7 @@ export function Quote({
   expired = false,
   onRefresh,
   refreshing = false,
+  refreshDisabled = false,
 }) {
   const nightly = money(quote?.nightlyCents);
   const stay = money(quote?.stayCents);
@@ -51,7 +52,7 @@ export function Quote({
       <span className="eyebrow">{title}</span>
       {expired ? <div className="quote-refresh" role="status">
         <p>The quoted price needs a refresh.</p>
-        {onRefresh && <Button onClick={onRefresh} disabled={refreshing}>{refreshing ? 'Updating price…' : 'Refresh total price'}</Button>}
+        {onRefresh && <Button onClick={onRefresh} disabled={refreshing || refreshDisabled}>{refreshing ? 'Updating price…' : 'Refresh total price'}</Button>}
       </div> : <>
         {discount && <span className="quote-discount" title="Priceline's advertised room-rate discount against its comparison rate, which may be estimated. Before taxes and fees.">{discount}% off room rate <span>· Priceline</span></span>}
         <p className="quote-price">
@@ -372,25 +373,25 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
   );
 }
 
-export function StaleNotice({ onRefresh, refreshing = false }) {
+export function StaleNotice({ onRefresh, refreshing = false, disabled = false }) {
   return (
     <div className="stale-notice" role="status">
       <div>
         <strong>{refreshing ? 'Updating your offers…' : 'These quotes need a refresh.'}</strong>
         <p>{refreshing ? 'Your previous comparison stays here while the latest offers load.' : 'Check the latest prices before opening an offer.'}</p>
       </div>
-      <Button onClick={onRefresh} disabled={refreshing}>{refreshing ? 'Updating…' : 'Refresh search'}</Button>
+      <Button onClick={onRefresh} disabled={refreshing || disabled}>{refreshing ? 'Updating…' : 'Refresh search'}</Button>
     </div>
   );
 }
 
-export function ProviderLink({ offer, stale, onRefresh, refreshing = false }) {
+export function ProviderLink({ offer, stale, onRefresh, refreshing = false, refreshDisabled = false }) {
   const href = safeHref(offer?.handoffUrl, true);
   return (
     <div className="provider-handoff">
       {refreshing ? <Button disabled>Updating offer…</Button> : stale ? (
         <>
-          <Button onClick={onRefresh} disabled={!onRefresh}>Refresh Express offers</Button>
+          <Button onClick={onRefresh} disabled={!onRefresh || refreshDisabled}>Refresh Express offers</Button>
           <p>The saved quote has expired. Check the latest offer to continue.</p>
         </>
       ) : href ? (

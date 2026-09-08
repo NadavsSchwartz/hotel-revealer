@@ -18,7 +18,7 @@ import {
   searchUrl,
   validateContext,
 } from './context.js';
-import { loadSearch } from './state.js';
+import { loadSearch, selectSearchCooldown } from './state.js';
 import {
   ErrorNotice,
   Evidence,
@@ -83,8 +83,9 @@ export default function Results() {
   const validation = validateContext(input);
   const requestedContext = validation.context;
   const key = contextKey(requestedContext);
-  const [matchView, setMatchView] = useState(() => ({ key, limits: readView(key).matchLimits || {} }));
-  const matchLimits = matchView.key === key ? matchView.limits : readView(key).matchLimits || {};
+  const [localView, setLocalView] = useState(() => ({ ...readView(key), key }));
+  const view = localView.key === key ? localView : readView(key);
+  const matchLimits = view.matchLimits || {};
   const valid = Object.keys(validation.errors).length === 0;
   const data = useSelector((state) => state.searches[key]);
   const hasData = Boolean(data);
@@ -93,9 +94,14 @@ export default function Results() {
   const loading = request.key === key && request.status === 'loading';
   const error =
     request.key === key && request.status === 'error' ? request.error : null;
+  const cooldownUntil = useSelector((state) => selectSearchCooldown(state, key));
+  const cooldownExpired = useExpired(cooldownUntil);
+  const coolingDown = Boolean(cooldownUntil) && !cooldownExpired;
+  const visibleError = coolingDown ? { code: 'PROVIDER_COOLDOWN', retryAt: cooldownUntil } : error;
   const params = new URLSearchParams(location.search);
   const sort = params.get('sort') === 'price' ? 'price' : 'evidence';
-  const expanded = params.getAll('expanded');
+  const expanded = params.has('expanded') ? params.getAll('expanded')
+    : Array.isArray(view.expanded) ? view.expanded : [];
   const rawPage = Number(params.get('page') || 1);
   const requestedPage = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const stale = useExpired(data?.expiresAt);
@@ -103,6 +109,17 @@ export default function Results() {
   const focusResults = useRef(false);
   const searchRevision = location.state?.searchRevision;
   const lastRevision = useRef(null);
+
+  useEffect(() => {
+    const next = new URLSearchParams(location.search);
+    if (!next.has('expanded')) return;
+    // Accept old links once, but keep growing comparison state out of request URLs.
+    const expanded = next.getAll('expanded');
+    saveView(key, { expanded });
+    setLocalView((current) => ({ ...(current.key === key ? current : readView(key)), key, expanded }));
+    next.delete('expanded');
+    navigate(`/results?${next}`, { replace: true, state: location.state });
+  }, [key, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!data || input.cityName === data.context.cityName) return;
@@ -192,14 +209,15 @@ export default function Results() {
     next.set('sort', nextSort);
     next.set('page', String(nextPage));
     next.delete('expanded');
-    nextExpanded.forEach((id) => next.append('expanded', id));
+    setLocalView({ ...view, key, expanded: nextExpanded });
     saveView(key, {
       sort: nextSort,
       page: nextPage,
       expanded: nextExpanded,
       scrollY: window.scrollY,
     });
-    navigate(`/results?${next}`, { replace: true, state: location.state });
+    if (next.toString() !== location.search.slice(1))
+      navigate(`/results?${next}`, { replace: true, state: location.state });
   }
 
   function changePage(nextPage) {
@@ -208,13 +226,13 @@ export default function Results() {
   }
 
   function refresh() {
-    if (!loading) dispatch(loadSearch(context));
+    if (!loading && !coolingDown) dispatch(loadSearch(context));
   }
 
   function showMoreMatches(offerId, currentLimit) {
     const limits = { ...matchLimits, [offerId]: currentLimit + MATCH_BATCH_SIZE };
     saveView(key, { matchLimits: limits });
-    setMatchView({ key, limits });
+    setLocalView({ ...view, key, matchLimits: limits });
   }
 
   function candidateLink(offer, candidate, focusId) {
@@ -226,9 +244,6 @@ export default function Results() {
       }),
       state: {
         resultsUrl: `/results${location.search}`,
-        offer,
-        candidate,
-        expiresAt: data.expiresAt,
       },
       onClick: () => saveView(key, { focusId, scrollY: window.scrollY }),
     };
@@ -240,7 +255,7 @@ export default function Results() {
       ? data
         ? 'Updating prices and hotel matches. Previous results remain available.'
         : 'Searching Express offers and comparing available hotel clues.'
-      : error
+      : visibleError
         ? `Search could not be completed.${data ? ' Previous results remain available.' : ''}`
         : data
           ? `${offers.length} Express offers found with ${candidateCount} hotel matches.${data.coverage.status === 'partial' ? ' Results are partial.' : ''} Showing page ${page} of ${pageCount}.`
@@ -261,7 +276,7 @@ export default function Results() {
         {valid && <TripSummary context={context} />}
       </header>
       <div className="results-search">
-        <SearchForm initial={data?.context || input} compact />
+        <SearchForm initial={data?.context || input} compact blockedSearchKey={coolingDown ? key : null} />
       </div>
       <p className="sr-only" role="status" aria-live="polite">
         {statusText}
@@ -273,9 +288,9 @@ export default function Results() {
         </div>
       )}
       {valid && loading && !data && <SearchProgress />}
-      {valid && !loading && error && (
+      {valid && !loading && visibleError && (
         <>
-          <ErrorNotice error={error} onRetry={refresh} onEdit={() => {
+          <ErrorNotice error={visibleError} onRetry={refresh} onEdit={() => {
             document.querySelector('.results-search')?.scrollIntoView({ block: 'center' });
             document.getElementById('cityName')?.focus({ preventScroll: true });
           }} />
@@ -290,7 +305,7 @@ export default function Results() {
               <div><strong>Updating prices and hotel matches</strong><p>You can keep comparing while we check this trip again.</p></div>
             </div>
           )}
-          {stale && !loading && <StaleNotice onRefresh={refresh} />}
+          {stale && !loading && <StaleNotice onRefresh={refresh} disabled={coolingDown} />}
           {data.coverage.status === 'partial' && (
             <div className="coverage-notice" role="note">
               <strong>Partial results</strong>
@@ -393,7 +408,7 @@ export default function Results() {
                     </div>
                     <div className="offer-booking">
                       <Quote quote={offer.quote} compact />
-                      <ProviderLink offer={offer} stale={stale} onRefresh={refresh} refreshing={loading} />
+                      <ProviderLink offer={offer} stale={stale} onRefresh={refresh} refreshing={loading} refreshDisabled={coolingDown} />
                     </div>
                   </div>
                   <div className="offer-action">
