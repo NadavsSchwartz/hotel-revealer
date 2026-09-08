@@ -44,9 +44,9 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await expect(page).toHaveURL(/\/#how-it-works$/);
   await expect(page.locator('#method-title')).toBeFocused();
   await expect(page.locator('#how-it-works')).toBeInViewport();
-  await page.getByRole('link', { name: 'Read the full terms', exact: true }).click();
-  await expect(page).toHaveURL(/\/terms#how-it-works$/);
-  await expect(page.getByRole('heading', { name: 'A comparison tool, not a booking service', exact: true })).toBeFocused();
+  await page.getByRole('link', { name: 'Terms', exact: true }).click();
+  await expect(page).toHaveURL(/\/terms$/);
+  await expect(page.locator('h1')).toBeFocused();
   await page.goBack();
   await expect(page.locator('#method-title')).toBeFocused();
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
@@ -54,7 +54,9 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await expect(page.locator('#search-title')).toBeFocused();
   await page.getByRole('link', { name: 'Back to home', exact: true }).click();
   await expect(page.locator('#home-title')).toBeFocused();
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: 'Hotel Revealer home', exact: true })).toBeInViewport();
+  await page.goto('/terms#how-it-works');
+  await expect(page.getByRole('heading', { name: 'A comparison tool, not a booking service', exact: true })).toBeFocused();
 });
 
 test('an unsubmitted Home draft survives Terms and Back without validating the first keystroke', async ({ page }) => {

@@ -22,6 +22,21 @@ permission or exception to the published terms has been established.
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
+## Homepage copy and navigation cleanup
+
+The homepage now leads with “Find the hotel behind the deal.” in one type style.
+Repeated navigation, section search links, inline credits and the second decorative
+photo were removed; credits and legal links remain in the footer. Existing section
+anchors and search behavior are retained. An independent skeptical review inspected
+the code and desktop/mobile renders without blocking findings. `npm run check`
+passed with 207 native tests. The affected journey, navigation, accessibility and
+mobile-layout files passed all 140 browser cases across the four existing projects.
+Development renders at 1440, 1280, 390 and 320px had no horizontal overflow;
+the production wide-screen render and short-desktop action check also passed.
+Screenshots are in `output/verification/home-clarity/` and the browser test output.
+This pass adds no components, dependencies or test suites. Prior performance
+measurements below were not rerun for this copy and navigation cleanup.
+
 ## Rebuilt search hero and loading experience
 
 `1960fab` replaces the fixed-width floating reception with a centered 1360px

@@ -142,7 +142,7 @@ function Credits() {
       <h2>Destinations</h2>
       <p>Destination names come from <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
       <h2>Photography</h2>
-      <p>The homepage terrace is an original generated scene created for Hotel Revealer. The pool photograph is by <a href="https://unsplash.com/photos/vmIWr0NnpCQ" target="_blank" rel="noreferrer">Christian Lambert on Unsplash</a>, used under the <a href="https://unsplash.com/license" target="_blank" rel="noreferrer">Unsplash License</a>. Both images are travel inspiration and do not represent a hotel result or available offer. The homepage reveal example uses a fictional hotel and details.</p>
+      <p>The homepage terrace is an original generated scene created for Hotel Revealer. It is travel inspiration and does not represent a hotel result or available offer. The homepage reveal example uses a fictional hotel and details.</p>
       <h2>Typography</h2>
       <p>Manrope by Mikhail Sharanda and Mirko Velimirovic is distributed under the <a href="/fonts/OFL.txt">SIL Open Font License</a>.</p>
       <p>Bodoni Moda by The Bodoni Moda Project Authors is distributed under the <a href="/fonts/bodoni-LICENSE.txt">SIL Open Font License</a>.</p>
@@ -158,7 +158,7 @@ function PageBehavior() {
     const pathChanged = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
     const titles = {
-      '/': 'A room with fewer unknowns.',
+      '/': 'Find the hotel behind the deal.',
       '/results': 'Your hotel shortlist',
       '/deal': 'Candidate details',
       '/privacy': 'Privacy',
@@ -231,11 +231,13 @@ export default function App() {
       </a>
       <header className="direction-header">
         <Brand />
-        <nav aria-label="Main navigation">
-          {!isHome && <Link to="/">Hotels</Link>}
-          <Link to="/#how-it-works">How it works</Link>
-          {isHome ? <Link to="/#questions">Before you book</Link> : <span className="currency">USD</span>}
-        </nav>
+        {!isHome && (
+          <nav aria-label="Main navigation">
+            <Link to="/">Hotels</Link>
+            <Link to="/#how-it-works">How it works</Link>
+            <span className="currency">USD</span>
+          </nav>
+        )}
       </header>
       <PageBehavior />
       <ErrorBoundary key={location.pathname}>

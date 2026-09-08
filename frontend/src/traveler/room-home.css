@@ -19,7 +19,6 @@
 }
 .room-home :is(h1, h2, h3, p, figure) { margin: 0; }
 .room-home :is(h1, h2) { font-family: Manrope, sans-serif; font-weight: 400; }
-.room-home em { font-family: 'Room Bodoni', Georgia, serif; font-weight: 400; }
 .room-application > .skip-link { color: var(--ink); }
 .room-home a { color: inherit; text-decoration: none; }
 .room-home a:hover { color: var(--brass); }
@@ -35,9 +34,6 @@
   padding: 0;
   background: transparent;
 }
-.room-application .direction-header nav a { display: inline-flex; color: var(--ink); }
-.room-application .direction-header nav a:first-child { display: inline-flex; }
-.room-application .direction-header nav a:hover { color: var(--brass); }
 .room-application > .direction-footer { margin: 0 auto; max-width: 1180px; width: calc(100% - 152px); padding: 33px 0; background: transparent; color: var(--muted); font-size: 12px; }
 .room-application .direction-footer a { min-height: 44px; }
 
@@ -51,16 +47,11 @@
   padding-block: 28px 48px;
 }
 .room-hero-content { min-width: 0; }
-.room-introduction .room-eyebrow { margin-bottom: 12px; font-size: 12px; }
-.room-introduction h1 { font-size: clamp(40px, 4.45vw, 64px); line-height: 1.05; letter-spacing: -.045em; }
-.room-introduction h1 em { color: #e2c497; letter-spacing: -.025em; }
-.room-home .room-description { max-width: 560px; font-size: 18px; line-height: 1.6; margin-top: 16px; color: #d6ddce; }
-.room-description strong { font-weight: 650; color: var(--ink); }
+.room-introduction h1 { font-size: clamp(40px, 4.45vw, 64px); font-weight: 600; line-height: 1.1; letter-spacing: -.045em; }
+.room-home .room-description { max-width: 510px; font-size: 18px; line-height: 1.6; margin-top: 20px; color: #d6ddce; }
 .room-home .room-view { position: relative; min-width: 0; margin: 0; }
-.room-view picture { position: absolute; inset: 0 0 30px; overflow: hidden; border-radius: 2px; }
+.room-view picture { position: absolute; inset: 0; overflow: hidden; border-radius: 2px; }
 .room-view img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 58% center; }
-.room-view figcaption { position: absolute; bottom: 0; left: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
-.room-view figcaption a { display: inline-flex; align-items: center; min-height: 30px; text-decoration: underline; text-underline-offset: 4px; }
 .room-reception {
   --ink: #253023;
   --muted: #626d5a;
@@ -74,7 +65,7 @@
   background: var(--surface);
   border-radius: 3px;
 }
-.room-reception h2 { font-size: 24px; line-height: 1.35; letter-spacing: -.025em; margin-bottom: 12px; }
+.room-reception h2 { font-size: 22px; font-weight: 550; line-height: 1.35; letter-spacing: -.025em; margin-bottom: 8px; }
 .room-reception :focus-visible { outline-color: var(--blue); }
 .room-home .room-reception-note { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .room-reception .trip-form.trip-form { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -94,13 +85,8 @@
 .room-reception .search-button.ant-btn:disabled { background: #e4e7dd; border-color: #bdc6b3; color: #626d5a; }
 .room-reception .search-button svg { display: none; }
 .room-reception .destination-status-panel { width: 100%; max-width: 100%; border-color: #cdd6c6; border-radius: 2px; }
-.room-scene-bottom { grid-column: 1 / -1; font-size: 14px; color: #c5cdbe; }
-.room-scene-bottom a { display: inline-flex; align-items: center; gap: 17px; min-height: 44px; }
-.room-scene-bottom span { width: 40px; height: 1px; background: #a9b695; }
 
 /* The reveal and editorial sections share the Room palette, without app state. */
-.room-home .room-text-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--brass); font-size: 13px; border-bottom: 1px solid #e2c49766; }
-.room-home .room-text-link:hover { color: #f5dfb6; border-color: currentColor; }
 .room-home .room-button { display: inline-flex; justify-content: center; align-items: center; min-height: 49px; padding: 13px 23px; background: var(--brass); color: #23301f; font-size: 13px; font-weight: 650; text-align: center; }
 .room-home .room-button:hover { background: #edcf9f; color: #23301f; }
 .room-example { padding-block: 78px 87px; }
@@ -119,26 +105,15 @@
 .room-example-table tbody th { font-size: 13px; font-weight: 400; color: var(--muted); }
 .room-example-table tr > :last-child { background: #333f2c; }
 .room-home .room-example-note { border-top: 1px solid #59664f; padding: 23px 30px; font-size: 13px; line-height: 1.8; color: #c1cbb7; }
-.room-example-closing { display: flex; justify-content: space-between; align-items: center; gap: 25px; padding-top: 18px; }
-.room-example-closing p { color: var(--muted); font-size: 12px; }
-.room-workflow { display: grid; grid-template-columns: .84fr 1.15fr; gap: 100px; padding-block: 100px 115px; border-top: 1px solid var(--line); align-items: center; }
-.room-home .room-workflow-visual { position: relative; margin: 0 14px 0 0; }
-.room-workflow-visual img { width: 100%; height: 560px; object-fit: cover; object-position: 51% 62%; filter: saturate(.55) brightness(.78); display: block; }
-.room-workflow-visual::before { content: ''; position: absolute; inset: -12px 13px 55px -13px; border: 1px solid #bac4a938; pointer-events: none; }
-.room-workflow-visual::after { content: ''; position: absolute; height: 12px; left: -13px; right: 8px; bottom: 43px; background: linear-gradient(0deg,#35412d,#768465); transform: skewX(-35deg); transform-origin: top; pointer-events: none; }
-.room-workflow-visual figcaption { font-size: 11px; line-height: 1.7; color: #aeb9a3; margin-top: 25px; }
-.room-workflow-copy h2 { margin-top: 20px; font-size: 36px; line-height: 1.23; letter-spacing: -1.2px; }
-.room-workflow-copy h2 em { color: #d6c6a5; font-size: 1.1em; letter-spacing: -.5px; }
-.room-steps { list-style: decimal-leading-zero; padding-left: 38px; margin: 33px 0 0; }
+.room-workflow { display: grid; grid-template-columns: .8fr 1.2fr; gap: 100px; padding-block: 80px; border-top: 1px solid var(--line); }
+.room-workflow h2, .room-questions-intro h2 { font-size: 36px; line-height: 1.2; letter-spacing: -.035em; }
+.room-steps { list-style: decimal-leading-zero; padding-left: 38px; margin: 0; }
 .room-steps li { padding: 21px 0 21px 10px; border-top: 1px solid var(--line); }
 .room-steps li::marker { font-family: 'Room Bodoni', Georgia, serif; font-style: italic; color: var(--brass); font-size: 23px; }
 .room-steps h3 { font-size: 15px; font-weight: 650; }
 .room-steps p { color: var(--muted); font-size: 14px; line-height: 1.85; margin-top: 8px; }
 .room-questions { background: #2b3528; border-block: 1px solid #68795a40; }
 .room-questions-inner { display: grid; grid-template-columns: .8fr 1.2fr; gap: 100px; padding-block: 79px 84px; }
-.room-questions-intro h2 { font-size: 48px; line-height: 1.08; letter-spacing: -1.8px; margin-top: 20px; }
-.room-questions-intro h2 em { color: var(--brass); font-size: 1.17em; letter-spacing: -.9px; }
-.room-questions-intro > p:last-of-type { font-size: 14px; color: #c0cab5; max-width: 268px; line-height: 1.85; margin-top: 27px; }
 .room-question-list details { border-bottom: 1px solid #9caf8640; }
 .room-question-list details:first-child { border-top: 1px solid #9caf8640; }
 .room-question-list summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 22px; cursor: pointer; min-height: 66px; font-size: 14px; line-height: 1.7; font-weight: 550; padding-block: 18px; }
@@ -148,17 +123,14 @@
 .room-question-list details[open] summary { color: #ebd1a9; }
 .room-question-list summary:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
 .room-question-list details > p { font-size: 14px; line-height: 1.85; color: #c0cab5; padding: 0 25px 23px 0; }
-.room-question-list > .room-text-link { margin-top: 20px; }
 .room-closing { display: flex; align-items: center; justify-content: space-between; gap: 45px; padding-block: 75px 71px; }
-.room-closing h2 { margin-top: 16px; font-size: 30px; letter-spacing: -.8px; line-height: 1.25; }
-.room-closing h2 em { font-size: 1.15em; color: #d6c6a5; letter-spacing: -.4px; }
+.room-closing h2 { font-size: 30px; letter-spacing: -.8px; line-height: 1.25; }
 .room-closing > .room-button { min-width: 218px; }
 
 @media (max-width: 900px) {
   .room-example-intro { display: block; }
   .room-example-intro > p { margin-top: 20px; max-width: 500px; }
   .room-workflow { gap: 40px; padding-block: 79px; }
-  .room-workflow-copy h2 { font-size: 28px; }
   .room-questions-inner { gap: 37px; }
   .room-content, .room-application > .direction-footer { width: calc(100% - 64px); }
 }
@@ -170,21 +142,12 @@
   .room-example-table th, .room-example-table td { padding: 17px 10px; }
   .room-example-table thead th, .room-example-table tbody th { font-size: 12px; }
   .room-home .room-example-note { padding: 20px 18px; }
-  .room-example-closing { display: block; }
-  .room-example-closing .room-text-link { margin-top: 10px; }
   .room-workflow { grid-template-columns: minmax(0, 1fr); gap: 42px; padding-block: 53px 64px; }
-  .room-home .room-workflow-visual { margin-left: 9px; }
-  .room-workflow-visual img { height: 345px; object-position: center 76%; }
-  .room-workflow-copy h2 { font-size: 30px; }
+  .room-workflow h2, .room-questions-intro h2 { font-size: 30px; }
   .room-questions-inner { grid-template-columns: minmax(0, 1fr); gap: 35px; padding-block: 55px; }
-  .room-questions-intro h2 { font-size: 42px; }
-  .room-questions-intro h2 br { display: none; }
-  .room-questions-intro > p:last-of-type { max-width: 350px; margin-top: 20px; }
   .room-closing { display: block; padding-block: 55px; }
   .room-closing > .room-button { width: 100%; margin-top: 28px; }
 
-  .room-application .direction-header nav { font-size: 11px; gap: 0; }
-  .room-application .direction-header nav a:last-child { display: none; }
   .room-content, .room-application > .direction-footer { width: calc(100% - 48px); }
   .room-application > .direction-footer { gap: 22px; }
 }
