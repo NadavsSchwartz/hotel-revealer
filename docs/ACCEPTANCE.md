@@ -1,6 +1,6 @@
 # Acceptance evidence
 
-Updated 2026-09-07 Pacific time (2026-09-08 UTC). This records observed evidence,
+Updated 2026-09-08 Pacific time. This records observed evidence,
 not a blanket readiness claim. Local live search, candidate details and provider
 handoff have been exercised. Public release still needs the external verification
 below. Nadav removed the earlier provider-permission implementation gate; no
@@ -11,18 +11,27 @@ permission or exception to the published terms has been established.
 | Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 200 local cases covered and passing | 50 scenarios across Chromium, mobile Chromium, Firefox and WebKit; exact runs below. Production-build intercepted journeys and real app live flow are separate evidence |
+| Browser journeys | 288 local cases covered and passing | 72 scenarios across Chromium, mobile Chromium, Firefox and WebKit; exact audit-fix runs linked below. Production-build intercepted journeys and real app live flow are separate evidence |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Current local mobile LCP/CLS target passed in three runs | LCP 2.352/2.144/2.160s; CLS 0.001181. Field INP/p75, controlled live-search latency and hosted sizing remain unverified |
+| Performance | Current local mobile LCP/CLS target passed in three runs | LCP 2.272/2.088/2.200s; CLS 0.0009533. Field INP/p75, controlled live-search latency and hosted sizing remain unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
-## Comparison and family-pricing milestone (`6954d01`)
+## Rendered audit corrections (`4dd2217`)
+
+The eleven ranked findings from the subsequent browser audit are addressed in
+the existing application modules. [AUDIT_FIXES.md](AUDIT_FIXES.md) records each
+correction, skeptical review decisions, the exact browser runs and the remaining
+calendar tradeoffs. Current verification includes 178 native tests, 288 browser
+combinations covered, the production build, and an actual in-app search/detail
+check. No dependencies or production modules were added.
+
+## Earlier comparison and family-pricing milestone (`6954d01`)
 
 Hotel names, photos, match strength and original-offer pricing lead the comparison.
 Detailed clue values remain available on demand. Results paginate 12 offers;
