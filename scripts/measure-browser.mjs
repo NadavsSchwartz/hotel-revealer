@@ -164,8 +164,8 @@ try {
     assert.equal(await page.locator('.offer-card').first().getAttribute('aria-labelledby'), 'offer-offer-lab-001-title');
     const sort = page.getByLabel('Sort by');
     await sort.focus();
-    // Native select type-ahead chooses "Lowest nightly quote" on installed Chrome.
-    const sorting = await sampleAction(page, 'sort 100 fixture offers by price', () => page.keyboard.press('l'), () => page.waitForFunction(() => document.querySelector('.offer-card')?.getAttribute('aria-labelledby') === 'offer-offer-lab-100-title'));
+    // Native select type-ahead chooses "Nightly price" on installed Chrome.
+    const sorting = await sampleAction(page, 'sort 100 fixture offers by price', () => page.keyboard.press('n'), () => page.waitForFunction(() => document.querySelector('.offer-card')?.getAttribute('aria-labelledby') === 'offer-offer-lab-100-title'));
     const compare = page.getByRole('button', { name: 'Why these matches?', exact: true }).first();
     await compare.scrollIntoViewIfNeeded();
     const expansion = await sampleAction(page, 'expand first fixture comparison', () => compare.click(), () => page.locator('.offer-expanded').waitFor());

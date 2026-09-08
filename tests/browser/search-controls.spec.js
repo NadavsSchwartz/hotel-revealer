@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { context, detailResponse, searchPath, searchResponse } from './fixtures.js';
+import { context, detailResponse, openTripEditor, searchPath, searchResponse } from './fixtures.js';
 
 const destinationOptions = page => page.locator('.destination-popup .ant-select-item-option');
 const calendar = page => page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
@@ -76,6 +76,7 @@ test('the real destination catalog finds Israel by country name, IL, and Tel Avi
 test('keyboard destination selection keeps the canonical city and waits for explicit search', async ({ page }) => {
   const searches = await recordSearches(page);
   await loadResults(page);
+  await openTripEditor(page);
   const input = page.getByLabel('Where are you going?');
   await input.fill('Israel');
   await expect(destinationOptions(page).first()).toContainText('Jerusalem');
@@ -94,6 +95,7 @@ test('keyboard destination selection keeps the canonical city and waits for expl
 test('editing a selected destination cannot reuse its identity for an unknown city', async ({ page }) => {
   const searches = await recordSearches(page);
   await loadResults(page);
+  await openTripEditor(page);
   await page.getByLabel('Where are you going?').fill('NoSuchDestinationzzzz');
   await expect(page.getByText('No destinations found. Try a city or country name.', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -112,6 +114,7 @@ test('children require ages and the full trip survives API requests, URL, detail
     await route.fulfill({ json: { ...detailResponse(), context: searches.at(-1) } });
   });
   await loadResults(page);
+  await openTripEditor(page);
   await page.getByRole('button', { name: /^Travelers,/ }).click();
   await page.getByRole('button', { name: 'Increase rooms', exact: true }).click();
   await page.getByRole('button', { name: 'Increase adults', exact: true }).click();
@@ -143,6 +146,7 @@ test('children require ages and the full trip survives API requests, URL, detail
   await expect.poll(() => detailInputs.length).toBe(1);
   expect(detailInputs[0]).toMatchObject(expected);
   await page.getByRole('link', { name: /Back to results/ }).click();
+  await openTripEditor(page);
   await page.getByRole('button', { name: 'Travelers, 5 guests · 2 rooms', exact: true }).click();
   await expect(page.locator('.child-age-field').filter({ has: page.getByText('Child 1 age', { exact: true }) })).toContainText('Under 1');
   await expect(page.locator('.child-age-field').filter({ has: page.getByText('Child 2 age', { exact: true }) })).toContainText('7');
@@ -152,6 +156,7 @@ test('children require ages and the full trip survives API requests, URL, detail
 test('traveler edits survive Escape and outside-click dismissal without submitting', async ({ page }) => {
   const searches = await recordSearches(page);
   await loadResults(page);
+  await openTripEditor(page);
   const trigger = page.getByRole('button', { name: /^Travelers,/ });
   await trigger.click();
   await page.getByRole('button', { name: 'Increase adults', exact: true }).click();
@@ -161,7 +166,10 @@ test('traveler edits survive Escape and outside-click dismissal without submitti
   await expect(trigger).toHaveAccessibleName('Travelers, 3 guests · 1 room');
   await trigger.click();
   await page.getByRole('button', { name: 'Increase rooms', exact: true }).click();
-  await page.getByRole('heading', { name: 'Hotel matches in Las Vegas' }).click();
+  const panel = await page.getByRole('dialog', { name: 'Who’s traveling?' }).boundingBox();
+  // The responsive popup can cover the page heading; use a visible outside point.
+  expect(2 < panel.x || 2 < panel.y).toBe(true);
+  await page.mouse.click(2, 2);
   await expect(page.getByRole('dialog', { name: 'Who’s traveling?' })).toHaveCount(0);
   await expect(trigger).toHaveAccessibleName('Travelers, 3 guests · 2 rooms');
   expect(searches).toHaveLength(1);
@@ -190,6 +198,7 @@ test('checkout calendar disables reversed dates and night 31 while allowing nigh
   const searches = await recordSearches(page);
   await page.goto(tripPath({ checkIn: dateAfter(30), checkOut: dateAfter(32) }));
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await openTripEditor(page);
   await page.getByLabel('Check-out', { exact: true }).click();
   await expect(await findCalendarDay(page, dateAfter(30))).toHaveClass(/ant-picker-cell-disabled/);
   const lastAllowed = await findCalendarDay(page, dateAfter(60));
@@ -206,6 +215,7 @@ test('both calendars disable days beyond 365 days and can dismiss with Escape', 
   await recordSearches(page);
   await page.goto(tripPath({ checkIn: dateAfter(364), checkOut: dateAfter(365) }));
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await openTripEditor(page);
   for (const label of ['Check-in', 'Check-out']) {
     await page.getByLabel(label, { exact: true }).click();
     await expect(await findCalendarDay(page, dateAfter(365))).not.toHaveClass(/ant-picker-cell-disabled/);
@@ -220,6 +230,7 @@ test('both calendars disable days beyond 365 days and can dismiss with Escape', 
 test('changing check-in clears an incompatible checkout and requires a new date', async ({ page }) => {
   const searches = await recordSearches(page);
   await loadResults(page);
+  await openTripEditor(page);
   await chooseDate(page, 'Check-in', dateAfter(40));
   await expect(page.getByLabel('Check-out', { exact: true })).toHaveValue('');
   await expect(page.getByText('Choose a new check-out date for this check-in.', { exact: true }).first()).toBeVisible();
@@ -268,8 +279,18 @@ test('open destination and traveler controls pass Axe with one reviewed combobox
   await checkAccessibility('Open destination suggestions');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /^Travelers,/ }).click();
-  await page.getByRole('button', { name: 'Increase children', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Who’s traveling?' })).toBeVisible();
+  // The popup DOM can pass visibility/stability checks during its opacity-0 prepare phase.
+  await expect.poll(() => page.locator('.travelers-popup:visible').evaluate(element => getComputedStyle(element).opacity)).toBe('1');
+  const addChild = page.getByRole('button', { name: 'Increase children', exact: true });
+  await expect(addChild).toBeEnabled();
+  await expect(addChild).toBeInViewport({ ratio: 1 });
+  const box = await addChild.boundingBox();
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  expect(await addChild.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), point)).toBe(true);
+  await page.mouse.click(point.x, point.y);
+  await expect(page.getByRole('button', { name: 'Travelers, 3 guests · 1 room', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toBeVisible();
   await checkAccessibility('Open travelers with a required child age');
   await chooseAge(page, 1, 0);
   await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toHaveAttribute('aria-expanded', 'false');
@@ -286,6 +307,7 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   await page.setViewportSize({ width: 320, height: 800 });
   const searches = await recordSearches(page);
   await loadResults(page);
+  await openTripEditor(page);
   const input = page.getByLabel('Where are you going?');
   const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/destinations'
     && new URL(response.url()).searchParams.get('q') === 'Israel');
@@ -329,6 +351,7 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   await expect(page.getByRole('heading', { name: `Hotel matches in ${selected.name}` })).toBeVisible();
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
 
+  await openTripEditor(page);
   await input.fill('Israel');
   await expect(destinationOptions(page).first()).toBeVisible();
   await input.press('Tab');
@@ -356,6 +379,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   });
   await page.goto(tripPath({ cityName: 'Paris, France', sort: 'price' }));
   await expect(page.getByRole('heading', { name: 'Hotel matches in Las Vegas' })).toBeVisible();
+  await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
   await expect.poll(() => new URL(page.url()).searchParams.get('cityName')).toBe(context.cityName);
   await expect(page.getByLabel('Sort by')).toHaveValue('price');
@@ -368,6 +392,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   expect(details[0]).toMatchObject(context);
   expect(new URL(page.url()).searchParams.get('cityName')).toBe(context.cityName);
   await page.getByRole('link', { name: /Back to results/ }).click();
+  await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
   await expect(page.getByLabel('Sort by')).toHaveValue('price');
   expect(searches).toHaveLength(1);
@@ -383,6 +408,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   expect(searches).toHaveLength(1);
   await back.click();
   await expect(page.getByRole('heading', { name: 'Hotel matches in Las Vegas' })).toBeVisible();
+  await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toEqual(context);
@@ -395,6 +421,7 @@ test('same-label Shenzhen suggestions select their own destination IDs', async (
     { id: 'geonames:1795565', coordinates: '22.55°N, 114.07°E' },
     { id: 'geonames:1795566', coordinates: '22.18°N, 111.12°E' },
   ].entries()) {
+    await openTripEditor(page);
     const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/destinations'
       && new URL(response.url()).searchParams.get('q') === 'Shenzhen');
     await page.getByLabel('Where are you going?').fill('Shenzhen');

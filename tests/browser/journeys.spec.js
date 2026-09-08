@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { fileURLToPath } from 'node:url';
-import { context, detailResponse, mockOffers, searchPath, searchResponse } from './fixtures.js';
+import { context, detailResponse, mockOffers, openTripEditor, searchPath, searchResponse } from './fixtures.js';
 
 async function chooseDestination(page, query, region) {
   await page.getByLabel('Where are you going?').fill(query);
@@ -38,6 +38,7 @@ test('the explicitly disabled provider returns a useful recovery state without l
   expect(await health.json()).toMatchObject({ provider: { available: false } });
   await page.goto(searchPath);
   await expect(page.getByRole('heading', { name: 'Live search is not connected yet' })).toBeVisible();
+  await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
 });
 
@@ -150,11 +151,13 @@ test('a slower earlier search cannot overwrite the next trip', async ({ page }) 
     await route.fulfill({ json: searchResponse({ context: input }) }).catch(() => {});
   });
   await page.goto(searchPath);
+  await openTripEditor(page);
   await chooseDestination(page, 'Chicago', 'Illinois, United States');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hotel matches in Chicago' })).toBeVisible();
   release();
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue('Chicago, United States');
   await expect(page.getByRole('heading', { name: 'Hotel matches in Las Vegas' })).toHaveCount(0);
 });
@@ -459,6 +462,7 @@ test('cached comparisons remain visible during a refresh and after an update fai
   await expect(page.getByText('$129', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('region', { name: 'Hotel search results', exact: true })).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('link', { name: /View original Express offer/ })).toBeVisible();
+  await openTripEditor(page);
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'The hotel provider is unavailable', exact: true })).toBeVisible();
   await expect(page.getByText('$129', { exact: false }).first()).toBeVisible();

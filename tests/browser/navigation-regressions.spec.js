@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { getDestination } from '../../backend/destinations/index.js';
-import { context, searchPath, searchResponse } from './fixtures.js';
+import { context, openTripEditor, searchPath, searchResponse } from './fixtures.js';
 
 async function chooseHomeTrip(page) {
   const destination = getDestination(context.destinationId);
@@ -120,6 +120,7 @@ test('cooldown blocks only the unchanged trip and still validates edited drafts'
       : route.fulfill({ json: searchResponse({ context: input }) });
   });
   await page.goto(searchPath);
+  await openTripEditor(page);
   const search = page.getByRole('button', { name: 'Search', exact: true });
   await expect(search).toBeDisabled();
   await page.getByRole('form', { name: 'Search hotels', exact: true }).evaluate(form => form.requestSubmit());
@@ -155,6 +156,7 @@ test('the unchanged search becomes available when its cooldown ends', async ({ p
       : route.fulfill({ json: searchResponse() });
   });
   await page.goto(searchPath);
+  await openTripEditor(page);
   const search = page.getByRole('button', { name: 'Search', exact: true });
   await expect(search).toBeDisabled();
   await page.clock.fastForward(61000);

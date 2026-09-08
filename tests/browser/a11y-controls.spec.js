@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { context, mockOffers, searchPath, searchResponse } from './fixtures.js';
+import { context, mockOffers, openTripEditor, searchPath, searchResponse } from './fixtures.js';
 
 const fullDate = value => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`));
 const dateAfter = (value, days) => new Date(Date.parse(`${value}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
@@ -9,6 +9,7 @@ test('open calendars expose named controls and readable selectable dates', async
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await openTripEditor(page);
   for (const [label, field] of [['Check-in', 'checkIn'], ['Check-out', 'checkOut']]) {
     await page.getByLabel(label, { exact: true }).focus();
     await page.keyboard.press('ArrowDown');
@@ -57,6 +58,7 @@ test('calendar buttons announce selected dates and preserve keyboard and pointer
   });
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await openTripEditor(page);
   const checkIn = page.getByRole('combobox', { name: 'Check-in', exact: true });
   const checkOut = page.getByRole('combobox', { name: 'Check-out', exact: true });
   await expect(checkIn).toHaveAttribute('aria-expanded', 'false');

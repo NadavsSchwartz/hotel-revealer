@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { addCalendarDays, localToday } from '../../shared/travel.js';
-import { mockOffers, searchPath } from './fixtures.js';
+import { mockOffers, openTripEditor, searchPath } from './fixtures.js';
 
 const travelerDialog = page => page.getByRole('dialog', { name: 'Who’s traveling?', exact: true });
 const travelerTrigger = page => page.getByRole('button', { name: /^Travelers,/ });
@@ -22,7 +22,10 @@ async function prepare(page, width, screen) {
   await page.setViewportSize({ width, height: 844 });
   await mockOffers(page);
   await page.goto(screen === 'home' ? '/' : searchPath);
-  if (screen === 'results') await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  if (screen === 'results') {
+    await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+    await openTripEditor(page);
+  }
   await page.evaluate(async () => { await document.fonts.ready; });
   const trigger = travelerTrigger(page);
   await trigger.evaluate(element => window.scrollTo({

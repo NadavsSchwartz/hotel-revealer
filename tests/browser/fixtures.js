@@ -1,4 +1,5 @@
 // Synthetic browser fixtures. Never imported by production code or sold as live data.
+import { expect } from '@playwright/test';
 import { getDestination } from '../../backend/destinations/index.js';
 
 const dateAfter = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
@@ -36,4 +37,13 @@ export function detailResponse() {
 export async function mockOffers(page, response = searchResponse()) {
   await page.route('**/api/v1/hotelDeals', (route) => route.fulfill({ json: response }));
   await page.route('**/api/v1/deal', (route) => route.fulfill({ json: detailResponse() }));
+}
+
+export async function openTripEditor(page) {
+  const form = page.locator('form[aria-label="Search hotels"]');
+  await expect(form).toBeAttached();
+  if (!await form.isVisible()) {
+    await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
+  }
+  await expect(form).toBeVisible();
 }

@@ -96,7 +96,7 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
       >
         <Input ref={input} id="cityName" name="cityName" placeholder="City or country" autoComplete="off" aria-invalid={Boolean(error)} aria-describedby={error ? 'cityName-error' : 'destination-hint'} />
       </AutoComplete>
-      {open && options.length === 0 && (
+      {open && !trip.destinationId && options.length === 0 && (
         <div className="destination-status-panel" onMouseDown={(event) => event.preventDefault()}>
           {status === 'loading' && <Spin size="small" />}
           <span>{message}</span>
