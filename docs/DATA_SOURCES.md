@@ -1,4 +1,6 @@
-# Destination data
+# Data sources
+
+## Geographic destinations
 
 Destination autocomplete uses a checked-in derivative of [GeoNames](https://www.geonames.org/),
 licensed under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
@@ -35,8 +37,14 @@ without a warranty of accuracy, timeliness, or completeness.
 
 These are geographic destinations. Inclusion does **not** establish hotel inventory,
 provider support, current travel availability, rates, or a Priceline destination ID.
-The destination lookup makes no provider request. Any future live adapter must
-resolve and verify its own geographic mapping.
+The destination lookup makes no provider request. The live Priceline adapter
+searches using the selected canonical label and rejects a nonempty page unless a
+named hotel or opaque neighborhood has published coordinates within 100 km of the
+selected GeoNames place. This guard detects distant namesakes; it does not prove
+exact provider city boundaries or inventory support for the entire catalog.
+The provider returned country code `IS` for Tel Aviv, so it is not compared as if
+it were the GeoNames ISO code `IL`. A coordinate-only probe returned provider
+error 498; no supported coordinate-only route was established.
 
 ## Search behavior and storage
 
@@ -125,3 +133,34 @@ Module initialization took 539 ms. With `node --expose-gc` and one explicit coll
 after initialization, the isolated process retained 60.95 MiB of JavaScript heap and
 reported 287.72 MiB RSS (including runtime and startup allocations). These local
 microbenchmarks are not hosted-load or whole-application memory measurements.
+
+## Live hotel information
+
+Hotel listings and selected named-hotel details come from Priceline's public
+website GraphQL endpoint `/pws/v0/pcln-graph/`, checked on 2026-09-07 Pacific time
+(2026-09-08 UTC). Combined listings distinguish retail `RTL` rows from opaque
+`SOPQ` Express offers. The adapter preserves that distinction and uses only
+observed fields; it does not claim a candidate is the hidden hotel.
+
+The provider's rendered offer UI establishes minimum semantics for masked ratings
+and review counts, such as “7+” and “3000+”. Prices use the observed per-room
+nightly/all-room stay basis, retaining provider-supplied stay amounts. Taxes and
+fees remain `unknown` unless separately evidenced. The provider may change a
+quote between retrieval and handoff; the final room and booking total are not
+established by a listing snapshot. In the verified five-night Tel Aviv handoff,
+the app recorded a USD 915 base-stay quote while Priceline displayed USD 183
+nightly and USD 967 total. That observation does not establish the fee composition;
+the app retains unknown inclusion and directs final price checks to the provider.
+
+Details supply named-hotel images, amenities, address and a separate retail quote.
+The current adapter deliberately supplies no description because a current field
+was not verified. Image URLs must pass the local CDN allowlist, including the
+observed `mobileimg.pclncdn.com` host; remote text is rendered as text.
+
+These sources are separate from GeoNames and its CC BY 4.0 license. No Priceline
+partner agreement or data/image redistribution permission has been established.
+Nadav directed public-endpoint implementation despite that unresolved matter;
+see [LIVE_ACCESS.md](LIVE_ACCESS.md) for the historical terms review, current flow
+evidence and remaining risks. Saved raw probes in ignored `output/live-access/`
+are local verification artifacts, not a licensed distributable dataset or a
+production fallback. No production fixture/demo endpoint is exposed.

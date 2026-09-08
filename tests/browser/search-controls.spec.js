@@ -140,6 +140,7 @@ test('children require ages and the full trip survives API requests, URL, detail
   await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
   await page.getByRole('link', { name: /View candidate.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect.poll(() => detailInputs.length).toBe(1);
   expect(detailInputs[0]).toMatchObject(expected);
   await page.getByRole('link', { name: /Back to results/ }).click();
   await page.getByRole('button', { name: 'Travelers, 5 guests · 2 rooms', exact: true }).click();
@@ -363,6 +364,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
   await page.getByRole('link', { name: /View candidate.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect.poll(() => details.length).toBe(1);
   expect(details[0]).toMatchObject(context);
   expect(new URL(page.url()).searchParams.get('cityName')).toBe(context.cityName);
   await page.getByRole('link', { name: /Back to results/ }).click();

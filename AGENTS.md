@@ -10,9 +10,10 @@
   verification gaps honestly. Do not infer seniority from code or test volume.
 - Use Node from `.nvmrc` and the root npm workspace lock. Run `npm run check` and
   relevant production-build browser tests for affected behavior.
-- The current production service has no live provider adapter. Read
-  `docs/LIVE_ACCESS.md` before proposing an integration. No test/demo endpoint may
-  substitute for live functionality or make the release appear complete.
+- The server defaults to the public Priceline adapter. Read `docs/LIVE_ACCESS.md`
+  for verified behavior and remaining limits; CI must set `HOTEL_PROVIDER=disabled`.
+  No test/demo endpoint may substitute for live functionality or make the release
+  appear complete.
 - Keep one application process and bounded work. New infrastructure or abstraction
   needs a concrete problem demonstrated by the existing implementation.
 - Hosted, physical-device, assistive-technology and human usability evidence are

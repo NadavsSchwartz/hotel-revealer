@@ -43,8 +43,9 @@
 .destination-popup .ant-select-item-option-active:not(.ant-select-item-option-disabled) { background: #eef4ff; }
 .destination-option { display: flex; gap: 12px; align-items: center; }
 .destination-option svg { width: 20px; height: 22px; fill: none; stroke: #526176; stroke-width: 1.5; flex-shrink: 0; }
-.destination-option strong { display: block; color: #102031; font-size: 14px; font-weight: 650; line-height: 1.4; }
-.destination-option small { display: block; margin-top: 3px; color: #526176; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+/* Whole-pixel line boxes keep row heights aligned with keyboard scrolling. */
+.destination-option strong { display: block; color: #102031; font-size: 14px; font-weight: 650; line-height: 20px; }
+.destination-option small { display: block; margin-top: 3px; color: #526176; font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
 .destination-status-panel { position: absolute; left: 0; top: calc(100% + 9px); z-index: 1050; display: flex; align-items: center; gap: 10px; padding: 17px; width: max(100%, 270px); max-width: calc(100vw - 40px); border: 1px solid var(--line, #d9e0e7); border-radius: 12px; background: white; box-shadow: 0 16px 48px #10203120; font-size: 12px; line-height: 1.6; color: #526176; }
 .destination-status-panel button { flex-shrink: 0; min-height: 36px; border: 0; color: #2259e7; background: transparent; padding: 3px; font-weight: 650; }
 .travel-calendar-popup { max-width: calc(100vw - 16px); }

@@ -19,7 +19,7 @@ export default defineConfig({
     command: 'node backend/server.js',
     url: 'http://127.0.0.1:4319/health',
     reuseExistingServer: false,
-    env: { NODE_ENV: 'production', PORT: '4319', PROVIDER_STATE_FILE: path.join(tmpdir(), 'hotel-revealer-browser-provider-state.json') },
+    env: { NODE_ENV: 'production', PORT: '4319', HOTEL_PROVIDER: 'disabled', PROVIDER_STATE_FILE: path.join(tmpdir(), 'hotel-revealer-browser-provider-state.json') },
     timeout: 20000,
   },
 });

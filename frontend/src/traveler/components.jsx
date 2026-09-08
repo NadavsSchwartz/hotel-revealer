@@ -41,10 +41,12 @@ export function Quote({
       <span className="eyebrow">{title}</span>
       <p className="quote-price">
         {nightly || 'Rate unavailable'}
-        {nightly && <span> / night</span>}
+        {nightly && <span>{quote.nightlyBasis === 'per-room' ? ' / room / night' : ' / night'}</span>}
       </p>
       <p className="quote-stay">
-        {stay ? `${stay} for the stay` : 'Stay total unavailable'}{' '}
+        {stay ? quote.stayBasis === 'all-rooms' && quote.roomCount > 1
+          ? `${stay} for ${quote.roomCount} rooms, entire stay`
+          : `${stay} for the stay` : 'Stay total unavailable'}{' '}
         <span>· USD</span>
       </p>
       <p className="quote-taxes">{taxes}</p>
@@ -140,13 +142,17 @@ export function useExpired(expiresAt) {
 }
 
 const errorCopy = {
+  PROVIDER_DESTINATION_UNSUPPORTED: [
+    'Try a nearby city',
+    'Priceline could not locate this destination reliably. Choose a nearby city to search the area.',
+  ],
   RESULT_TOO_LARGE: [
     'Too many possible comparisons',
     'This search contains more possible matches than we can assess safely. Try different dates or another city.',
   ],
   PROVIDER_NOT_CONFIGURED: [
     'Live search is not connected yet',
-    'Hotel Revealer does not currently have authorized live provider access. Your trip is ready, but real offers cannot be retrieved yet.',
+    'The hotel connection is disabled in this environment. Your trip is ready, but real offers cannot be retrieved here.',
   ],
   PROVIDER_DISABLED: [
     'Live search is currently paused',

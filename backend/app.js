@@ -8,7 +8,7 @@ import { createProviderService } from './provider/service.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
 import { searchDestinations } from './destinations/index.js';
 
-const frontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
+const defaultFrontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
 const contentSecurityPolicy = [
   "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: ${SAFE_IMAGE_HOSTS.map((host) => `https://${host}`).join(' ')}`,
@@ -16,7 +16,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'", "form-action 'self'",
 ].join('; ');
 
-export function createApp({ logger = console, service = createProviderService({ logger }) } = {}) {
+export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {

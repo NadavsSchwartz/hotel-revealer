@@ -32,7 +32,9 @@ test('cleared inputs are validated and focused without an API request', async ({
   expect(searches).toBe(0);
 });
 
-test('production refuses unconfigured live access with a useful recovery state', async ({ page }) => {
+test('the explicitly disabled provider returns a useful recovery state without live access', async ({ page }) => {
+  const health = await page.request.get('/health');
+  expect(await health.json()).toMatchObject({ provider: { available: false } });
   await page.goto(searchPath);
   await expect(page.getByRole('heading', { name: 'Live search is not connected yet' })).toBeVisible();
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
@@ -201,4 +203,106 @@ test('320 CSS pixel reflow keeps content and primary controls in the viewport', 
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+
+test('a 336-character Express offer ID survives candidate URLs, detail requests, and the original handoff', async ({ page }) => {
+  const offerId = 'a1b2c3d4'.repeat(42);
+  expect(offerId).toHaveLength(336);
+  const search = searchResponse();
+  search.offers[0].offerId = offerId;
+  search.offers[0].handoffUrl = search.offers[0].handoffUrl.replace('/offer-one/', `/${offerId}/`);
+  const detail = {
+    ...detailResponse(),
+    offer: search.offers[0],
+    detailStatus: 'available',
+    details: { ...detailResponse().details, description: null, address: '123 Synthetic Avenue, Las Vegas' },
+  };
+  const detailInputs = [];
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: search }));
+  await page.route('**/api/v1/deal', async route => {
+    detailInputs.push(route.request().postDataJSON());
+    await route.fulfill({ json: detail });
+  });
+  await page.goto(searchPath);
+  await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
+  const candidate = page.getByRole('link', { name: /View candidate.*Juniper House/ });
+  const candidateUrl = new URL(await candidate.getAttribute('href'), page.url());
+  expect(candidateUrl.searchParams.get('offerId')).toBe(offerId);
+  await candidate.click();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect(page.getByText('123 Synthetic Avenue, Las Vegas', { exact: true })).toBeVisible();
+  await expect.poll(() => detailInputs.length).toBe(1);
+  expect(detailInputs).toEqual([{ ...context, offerId, hotelId: 'hotel-one' }]);
+  expect(new URL(page.url()).searchParams.get('offerId')).toBe(offerId);
+  const handoff = page.getByRole('link', { name: /View original Express offer/ });
+  await expect(handoff).toHaveAttribute('href', search.offers[0].handoffUrl);
+  await expect(handoff).toHaveAttribute('target', '_blank');
+  await page.getByRole('link', { name: /Back to results/ }).click();
+  expect(new URL(page.url()).searchParams.getAll('expanded')).toContain(offerId);
+  await page.goto(candidateUrl.href);
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect.poll(() => detailInputs.length).toBe(2);
+  expect(detailInputs[1]).toEqual({ ...context, offerId, hotelId: 'hotel-one' });
+  await expect(page.getByText('123 Synthetic Avenue, Las Vegas', { exact: true })).toBeVisible();
+  await expect(handoff).toHaveAttribute('href', search.offers[0].handoffUrl);
+});
+
+test('expired candidate metadata preserves a fresh offer until the offer itself expires', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.install({ time: new Date(now) });
+  const detail = {
+    ...detailResponse(),
+    expiresAt: new Date(now - 1000).toISOString(),
+    offerExpiresAt: new Date(now + 60000).toISOString(),
+    detailStatus: 'available',
+    details: {
+      ...detailResponse().details,
+      retailQuote: { nightlyCents: 15900, stayCents: 31800, currency: 'USD', taxesFees: 'included' },
+    },
+  };
+  await page.route('**/api/v1/deal', route => route.fulfill({ json: detail }));
+  await page.goto(`/deal?${new URLSearchParams({ ...context, offerId: detail.offer.offerId, hotelId: detail.candidate.hotelId })}`);
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  const handoff = page.getByRole('link', { name: /View original Express offer/ });
+  await expect(handoff).toBeVisible();
+  await expect(handoff).toHaveAttribute('href', detail.offer.handoffUrl);
+  await expect(page.getByText('The retail price is out of date.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refresh retail price', exact: true })).toBeEnabled();
+  await expect(page.getByRole('region', { name: 'Separate retail quote', exact: true })).toHaveCount(0);
+  await expect(page.getByText('$159', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Original Express quote', exact: true })).toContainText('$119');
+  await expect(page.getByText('This quote is out of date.', { exact: true })).toHaveCount(0);
+  await page.clock.fastForward(61000);
+  await expect(page.getByText('This quote is out of date.', { exact: true })).toBeVisible();
+  await expect(handoff).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Original offer unavailable', exact: true })).toBeDisabled();
+});
+
+test('multiroom quotes distinguish a per-room nightly rate from the entire stay total', async ({ page }) => {
+  const trip = { ...context, rooms: 2, adults: 4 };
+  const search = searchResponse({ context: trip });
+  search.offers[0].quote = {
+    ...search.offers[0].quote,
+    nightlyCents: 11900,
+    stayCents: 47600,
+    roomCount: 2,
+    nightlyBasis: 'per-room',
+    stayBasis: 'all-rooms',
+  };
+  search.offers[0].handoffUrl = search.offers[0].handoffUrl.replace('/rooms/1/adults/2', '/rooms/2/adults/4');
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: search }));
+  await page.route('**/api/v1/deal', route => route.fulfill({ json: { ...detailResponse(), context: trip, offer: search.offers[0] } }));
+  const checkQuote = async () => {
+    const quote = page.getByRole('region', { name: 'Original Express quote', exact: true });
+    await expect(quote).toContainText('$119 / room / night');
+    await expect(quote).toContainText('$476 for 2 rooms, entire stay');
+    await expect(quote).toContainText('Taxes and fees not confirmed');
+  };
+  await page.goto(`/results?${new URLSearchParams(trip)}`);
+  await checkQuote();
+  await page.getByRole('button', { name: /Compare 2 candidates/ }).click();
+  await page.getByRole('link', { name: /View candidate.*Juniper House/ }).click();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await checkQuote();
 });

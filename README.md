@@ -4,10 +4,12 @@ A small traveler application for comparing an unnamed Express offer with possibl
 named hotels. It keeps the original offer, candidate evidence, and retail hotel
 information separate. A candidate is never presented as a verified identity.
 
-**Current status:** local application and offline verification are implemented.
-There is no live provider adapter. Production search fails closed with a clear
-unavailable state. This is not a live release or a sample-data demo. Read
-[the live-access prerequisite](docs/LIVE_ACCESS.md) before connecting a provider.
+**Current status:** local search and candidate details use live Priceline responses.
+The cinematic homepage is the actual application entry, not a separate demo.
+The adapter uses the public website's GraphQL interface; no API key was required
+in the verified flow. Its compatibility and public-release limitations are recorded
+in [live integration evidence](docs/LIVE_ACCESS.md). Hosted portfolio signoff remains
+subject to the outstanding [acceptance gates](docs/ACCEPTANCE.md).
 
 ## Run locally
 
@@ -22,6 +24,8 @@ npm run dev
 
 The frontend runs at `http://127.0.0.1:5173`; `/api` is proxied to Express on port
 5000. No database, map key, browser secret, or live-provider credential is needed.
+Set `HOTEL_PROVIDER=disabled` for offline development. Normal startup defaults to
+the live public Priceline adapter; CI explicitly disables it.
 
 For the actual production build:
 
@@ -33,6 +37,11 @@ NODE_ENV=production npm start
 Open `http://127.0.0.1:5000`. `/health` checks the application without querying a
 hotel provider. HTTP 200 from this endpoint proves the app is responding, not that
 live search is configured. Copy `.env.example` if configuration is needed.
+
+For a local live session that must stay usable while QA rebuilds `frontend/dist`,
+set `FRONTEND_DIST_DIR` to a separate copied build directory and retain its existing
+hashed assets. The verified session used `output/live-access/frontend-snapshot`.
+Normal startup and the container continue to use `frontend/dist` by default.
 
 ## Verify
 
@@ -50,7 +59,9 @@ Safari, physical mobile-device, or assistive-technology signoff.
 
 Generated evidence lives in ignored `output/`, `test-results/`, and
 `playwright-report/`. See [acceptance evidence](docs/ACCEPTANCE.md) for the current
-claims and missing release gates.
+claims and missing release gates. The current integration passed lint, 129 native
+tests, the production build, and 140 browser cases without retries or skips; its
+real homepage-to-search-to-details-to-Priceline flow was also checked locally.
 
 ## Application boundaries
 
@@ -59,8 +70,8 @@ claims and missing release gates.
 - `backend/destinations/` and `data/`: local GeoNames destination lookup and its
   attributable snapshot. The worldwide catalog stays on the server.
 - `backend/domain/`: input validation, conservative normalization and pure matching.
-- `backend/provider/`: bounded scheduling, request sharing, fresh caches, control
-  state, and the injectable authorized-adapter boundary.
+- `backend/provider/`: public Priceline adapter, bounded scheduling, request sharing,
+  fresh caches, durable control state, and a test-injection boundary.
 - `backend/app.js`: JSON contracts, safe errors, security headers, static SPA and
   app-only health route. `backend/server.js` owns startup and shutdown.
 - `frontend/src/traveler/`: React/Redux search, comparison, detail, and recovery UI.
@@ -70,9 +81,9 @@ claims and missing release gates.
 Destination autocomplete uses GET `/api/v1/destinations?q=…`, with city/country
 search and stable geographic IDs. See [data provenance and refresh](docs/DATA_SOURCES.md).
 The form supports rooms, adults, and each child’s age; stays are limited to 30
-nights within the next 365 days. These are application limits, not verified
-provider bookability rules. The live adapter must verify destination mapping,
-room allocation, occupancy, and quote basis before accepting these trips.
+nights within the next 365 days. These are application limits. Provider-supported
+aggregate occupancy and child-age handoff were checked through the real provider UI.
+Provider quotes remain distinct from the final room choice and booking total.
 
 The hotel API paths remain POST `/api/v1/hotelDeals` and POST `/api/v1/deal`. The former
 encrypted `q` links are retired. Plain date-only URL context makes refresh and
@@ -88,9 +99,10 @@ Contradictions require comparable known facts. Price orders candidates only
 within a tier and cannot establish identity. Duplicate observations are merged
 conservatively, without reconstructing stronger evidence from conflicting rows.
 
-Raw legacy website fields do not establish masked numeric semantics. An authorized
-adapter must supply documented clue semantics and an original-offer handoff bound
-to the same trip. Normalization never synthesizes a booking URL.
+Raw legacy website fields do not establish masked numeric semantics. The public
+adapter supplies minimum rating/review clues verified against the provider UI and
+an original-offer handoff bound to the same trip. Normalization never invents a
+booking URL. Hotel identity remains unverified until independently established.
 
 Retrieved pagination completeness is not exhaustive provider coverage. Offline
 fixtures test behavior; they do not measure live identification accuracy.
@@ -98,23 +110,26 @@ fixtures test behavior; they do not measure live identification accuracy.
 ## Operating limits
 
 One process coordinates all provider work: one active call, a one-second start
-gap, at most four waiting requests, at most three search pages, and admission-to-
-response deadlines of 20 seconds for searches and 10 seconds for details.
-Search/detail cache limits are 25/100 entries with five-minute/one-minute freshness,
-subject to provider permissions. No automatic retry is used. A detail request must
-revalidate its offer/candidate relationship; a missing retail rate does not imply
-that an Express offer is unavailable.
+gap, at most four waiting requests, and at most three combined search pages of
+500 rows each. Admission-to-response deadlines are 20 seconds for searches and
+10 seconds for details. Provider and public JSON payloads are capped at 2 MiB.
+Search/detail caches hold at most 25/100 entries with five-minute/one-minute
+freshness. These are application limits, not verified provider allowances.
+No automatic retry is used. Details revalidate the offer/candidate relationship.
+An expired retail quote is hidden and can be refreshed without disabling a still
+fresh original offer; missing retail inventory does not imply Express unavailability.
 
 Only provider cooldown/block control state is persisted in `var/`. Search results
 remain process-local and are lost on restart. The block must survive restart.
-After reviewing and resolving its cause, the operator can reset control state:
+Stop the application and review the cause of a block or interrupted upstream call
+before resetting control state:
 
 ```sh
 npm run provider:reset -- --after-review
 ```
 
-Then restart the app. Resetting control state does not authorize or configure live
-access. Never reset state to bypass provider restrictions.
+Then restart the app. A process killed during an upstream call leaves a conservative
+block for review. Never reset state to bypass provider restrictions.
 
 ## Security and remaining dependency advisories
 
@@ -140,11 +155,15 @@ when the plugin supports the next major.
 
 ## Release prerequisites
 
-Written provider permission and current authorized integration documentation,
-known-outcome matching evidence, manual VoiceOver and real mobile checks,
-3–5 first-time-user sessions, host sizing, verified deployment/rollback/reboot,
-and the public live flow remain required. No provider messages, bookings, hosting
-purchases, domain registrations, or external deployments have been performed.
+The remaining delivery gates are known-outcome matching evidence, manual
+VoiceOver and real mobile checks, 3–5 first-time-user sessions, performance of the
+selected design, host sizing, verified deployment/rollback/reboot, and the actual
+public live journey. Nadav removed the earlier provider-permission implementation
+gate after confirming there is no partner agreement. This does not establish
+provider permission or an exception to the published terms; see
+[live access and remaining risks](docs/LIVE_ACCESS.md). No provider messages,
+bookings, hosting purchases, domain registrations, or external deployments have
+been performed.
 
 ## Development checkpoints
 

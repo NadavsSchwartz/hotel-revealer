@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Button from 'antd/es/button';
+import { MAX_OFFER_ID_LENGTH, validIdentifier } from '../../../shared/identifiers.js';
 import {
   contextFromSearch,
   contextKey,
@@ -35,8 +36,8 @@ export default function Details() {
   const hotelId = params.get('hotelId') || '';
   const valid =
     Object.keys(errors).length === 0 &&
-    /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(offerId) &&
-    /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(hotelId);
+    validIdentifier(offerId, MAX_OFFER_ID_LENGTH) &&
+    validIdentifier(hotelId);
   const key = detailKey(requestedContext, offerId, hotelId);
   const request = useSelector((state) => state.detail);
   const search = useSelector((state) => state.searches[contextKey(requestedContext)]);
@@ -66,8 +67,9 @@ export default function Details() {
         ? location.state.candidate
         : null);
   const expiresAt =
-    data?.expiresAt || search?.expiresAt || location.state?.expiresAt;
+    data?.offerExpiresAt || data?.expiresAt || search?.expiresAt || location.state?.expiresAt;
   const stale = useExpired(expiresAt);
+  const detailsStale = useExpired(data?.expiresAt);
   const proposedReturn = location.state?.resultsUrl;
   const returnUrl =
     typeof proposedReturn === 'string' &&
@@ -102,7 +104,7 @@ export default function Details() {
   const images = (data?.details?.images || [])
     .map((image) => safeHref(typeof image === 'string' ? image : image?.url))
     .filter(Boolean);
-  const amenities = data?.details?.amenities || candidate?.amenities || [];
+  const amenities = data?.details?.amenities || [];
   const retry = () => dispatch(loadDetail(context, offerId, hotelId));
 
   return (
@@ -178,13 +180,13 @@ export default function Details() {
                   </p>
                 </div>
               )}
-              {data?.details?.description && (
+              {(data?.details?.description || data?.details?.address) && (
                 <section className="detail-section">
                   <div className="section-heading">
                     <span className="eyebrow">02 / The named hotel</span>
                     <h2>A little more about the stay</h2>
                   </div>
-                  <p>{data.details.description}</p>
+                  {data.details.description && <p>{data.details.description}</p>}
                   {data.details.address && (
                     <p className="hotel-address">
                       {typeof data.details.address === 'string'
@@ -234,7 +236,12 @@ export default function Details() {
               {data && (
                 <section className="detail-section retail-section">
                   <h2>Named hotel retail price</h2>
-                  {data.details?.retailQuote ? (
+                  {detailsStale ? (
+                    <>
+                      <p role="status">The retail price is out of date.</p>
+                      <Button onClick={retry} disabled={loading}>Refresh retail price</Button>
+                    </>
+                  ) : data.details?.retailQuote ? (
                     <>
                       <Quote
                         quote={data.details.retailQuote}
