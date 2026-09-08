@@ -116,13 +116,22 @@ test('safe public display facts and input ownership survive the raw matcher', ()
   assert.deepEqual(matchListings(null, undefined), { offers: [], unassessedHotels: 0, invalidRows: 0 });
 });
 
-test('raw duplicate observations count toward comparisons before deduplication', () => {
+test('raw duplicate observations in the same bucket count toward the actual comparison limit', () => {
   const offers = Array.from({ length: 100 }, () => offer());
-  const hotels = Array.from({ length: 1000 }, () => hotel({ starRating: 5 }));
+  const hotels = Array.from({ length: 1000 }, () => hotel({ overallGuestRating: 1 }));
   assert.equal(matchObservations(offers, hotels).comparisons, MAX_MATCH_COMPARISONS);
   assert.deepEqual(resolved(offers, hotels).resolution, { status: 'unresolved', reason: 'no_match' });
   assert.throws(() => matchListings([...offers, offer()], hotels), error =>
     error instanceof MatchLimitError && error.status === 503 && error.code === 'RESULT_TOO_LARGE');
+});
+
+test('large inventories with contradictory neighborhoods and stars do not exhaust comparison work', () => {
+  const offers = Array.from({ length: 200 }, (_, index) => offer({ pclnId: `offer-${index}` }));
+  const hotels = Array.from({ length: 800 }, (_, index) => hotel({ hotelId: `hotel-${index}`,
+    ...(index % 2 ? { starRating: 5 } : { location: { neighborhoodID: 'other-area' } }) }));
+  assert.ok(offers.length * hotels.length > MAX_MATCH_COMPARISONS);
+  assert.deepEqual(matchObservations(offers, hotels), { pairs: [], comparisons: 0, rejectedOffers: 0, rejectedHotels: 0 });
+  assert.ok(matchListings(offers, hotels).offers.every(item => item.resolution.reason === 'no_match'));
 });
 
 test('retained raw matches are bounded before distinct identity grouping', () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { originalMatches, matchOriginal } from './original.mjs';
-import { isValidOffer, isValidHotel, matchObservations as matchRefactored } from '../../backend/domain/matching.js';
+import { isValidOffer, isValidHotel, matchObservations as matchRefactored, MAX_MATCH_COMPARISONS } from '../../backend/domain/matching.js';
 import { matchListings } from '../../backend/domain/matching.js';
 
 const hotel = (fields = {}) => ({
@@ -179,7 +179,7 @@ test('incomplete required facts are rejected instead of matching equal absences'
   assert.deepEqual(matchRefactored([offer(absent)], [hotel(absent)]).pairs, []);
 });
 
-test('comparison counts describe valid observation pairs and inputs remain unchanged', () => {
+test('comparison counts describe visited raw buckets and inputs remain unchanged', () => {
   const offers = [offer(), offer({ location: { neighborhoodID: 'area-b' } })];
   const hotels = [hotel(), hotel({ location: { neighborhoodID: 'area-b' } }),
     hotel({ starRating: 5 }), hotel({ starRating: '4' }),
@@ -187,7 +187,39 @@ test('comparison counts describe valid observation pairs and inputs remain uncha
   const before = structuredClone({ offers, hotels });
   const result = matchRefactored(offers, hotels);
   assert.deepEqual(result.pairs, matchOriginal(offers, hotels));
-  assert.equal(result.comparisons, offers.length * hotels.length);
+  assert.equal(result.comparisons, 3);
+  assert.deepEqual({ offers, hotels }, before);
+});
+
+test('sparse inventories above the all-pairs limit retain ordered parity across raw keys and repeated observations', () => {
+  const keys = [
+    { starRating: 4, location: { neighborhoodID: 12 } },
+    { starRating: '4', location: { neighborhoodID: 12 } },
+    { starRating: 4, location: { neighborhoodID: '12' } },
+    { starRating: -0, location: { neighborhoodID: -0 } },
+    { starRating: 0, location: { neighborhoodID: 0 } },
+    { starRating: '0', location: { neighborhoodID: '0' } },
+    ...Array.from({ length: 194 }, (_, index) => ({ starRating: index % 2 ? 4 : '4',
+      location: { neighborhoodID: `area-${index}` } })),
+  ];
+  const offers = keys.map((key, index) => offer({ ...key, pclnId: `offer-${index}` }));
+  offers.splice(101, 0, offers[3], offers[0]);
+  // Each pass interleaves all buckets; later passes repeat earlier hotel IDs.
+  const hotels = Array.from({ length: 800 }, (_, index) => hotel({ ...keys[index % keys.length],
+    hotelId: `hotel-${index % keys.length}-${Math.floor(index / keys.length) % 2}` }));
+  const before = structuredClone({ offers, hotels });
+  assert.ok(offers.length * hotels.length > MAX_MATCH_COMPARISONS);
+  assert.ok(offers.every(isValidOffer));
+  assert.ok(hotels.every(isValidHotel));
+  for (const [rawOffers, rawHotels] of [[offers, hotels], [offers.toReversed(), hotels.toReversed()]]) {
+    const expected = matchOriginal(rawOffers, rawHotels);
+    const result = matchRefactored(rawOffers, rawHotels);
+    assert.deepEqual(result.pairs, expected);
+    assert.equal(result.comparisons, 820);
+    assert.equal(result.pairs.length, 820);
+    assert.equal(result.rejectedOffers, 0);
+    assert.equal(result.rejectedHotels, 0);
+  }
   assert.deepEqual({ offers, hotels }, before);
 });
 

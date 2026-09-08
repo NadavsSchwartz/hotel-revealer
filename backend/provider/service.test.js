@@ -9,6 +9,7 @@ import { ProviderFailure, ServiceError } from './errors.js';
 import { createMemoryStateStore, createFileStateStore, resetProviderState } from './state.js';
 import { futureContext, listingRows, manualClock, flush } from './test-helpers.js';
 import { MAX_JSON_BYTES } from './size.js';
+import { MAX_MATCH_COMPARISONS } from '../domain/matching.js';
 import { addCalendarDays } from '../../shared/travel.js';
 
 function setup(overrides = {}) {
@@ -687,24 +688,36 @@ function comparisonRows(offerCount, hotelCount) {
   ];
 }
 
-test('large city inventories match across pages and cache the full result', async () => {
+for (const uniqueMatch of [false, true]) test(`large city inventories preserve ${uniqueMatch ? 'unique matches' : 'ambiguity'} across pages and cache the full result`, async () => {
   const [offer, hotel] = listingRows();
+  const offerCount = 200;
+  const hotelCount = 800;
+  assert.ok(offerCount * hotelCount > MAX_MATCH_COMPARISONS);
+  const context = { ...futureContext, destinationId: 'geonames:5368361', cityName: 'Los Angeles, United States',
+    rooms: 1, adults: 2, childrenAges: [], currency: 'USD' };
   const rows = [
-    ...Array.from({ length: 100 }, (_, index) => ({ ...offer, pclnId: `offer-${index}`, location: { ...offer.location, neighborhoodID: `area-${index}` } })),
-    ...Array.from({ length: 800 }, (_, index) => ({ ...hotel, hotelId: `hotel-${index}`, location: { ...hotel.location, neighborhoodID: `area-${index % 100}` } })),
+    ...Array.from({ length: offerCount }, (_, index) => ({ ...offer, pclnId: `offer-${index}`, location: { ...offer.location, neighborhoodID: `area-${index}` } })),
+    ...Array.from({ length: hotelCount }, (_, index) => ({ ...hotel, hotelId: `hotel-${index}`,
+      location: { ...hotel.location, neighborhoodID: `area-${index % offerCount}` },
+      ratesSummary: { ...hotel.ratesSummary, minPrice: uniqueMatch && index >= offerCount ? 141 : 140 },
+    })),
   ];
-  const { service, clock, calls } = setup({ adapter: { async listingsPage({ cursor }) {
-    calls.push(cursor);
+  const { service, clock, calls } = setup({ adapter: { async listingsPage({ cursor, context: requestContext }) {
+    calls.push({ cursor, context: requestContext });
     return { listings: rows.slice(cursor ? 500 : 0, cursor ? 1000 : 500), nextCursor: cursor ? null : 'next' };
   } } });
-  const pending = service.search(futureContext);
+  const pending = service.search(context);
   await clock.advance(1_000);
   const result = await pending;
-  assert.deepEqual(result.coverage, { status: 'complete', reason: null, pagesFetched: 2, offersFound: 100, namedHotelsChecked: 800, unassessedHotels: 0 });
-  assert.equal(result.offers.length, 100);
-  assert.ok(result.offers.every(item => item.resolution.reason === 'ambiguous' && item.candidates.length === 0));
-  assert.deepEqual(await service.search(futureContext), result);
-  assert.deepEqual(calls, [null, 'next']);
+  assert.deepEqual(result.context, context);
+  assert.deepEqual(result.coverage, { status: 'complete', reason: null, pagesFetched: 2, offersFound: 200, namedHotelsChecked: 800, unassessedHotels: 0 });
+  assert.equal(result.offers.length, offerCount);
+  for (const item of result.offers) {
+    assert.deepEqual(item.resolution, uniqueMatch ? { status: 'matched' } : { status: 'unresolved', reason: 'ambiguous' });
+    assert.deepEqual(item.candidates.map(candidate => candidate.hotelId), uniqueMatch ? [item.offerId.replace('offer-', 'hotel-')] : []);
+  }
+  assert.deepEqual(await service.search({ ...context, childrenAges: [] }), result);
+  assert.deepEqual(calls, [{ cursor: null, context }, { cursor: 'next', context }]);
 });
 
 test('dense candidate limits return the stable error without caching or truncating results', async () => {

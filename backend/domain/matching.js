@@ -57,11 +57,22 @@ function matches(offer, hotel) {
 export function matchObservations(offers, hotels) {
   const validOffers = offers.filter(isValidOffer);
   const validHotels = hotels.filter(isValidHotel);
-  const comparisons = validOffers.length * validHotels.length;
-  if (comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
+  const neighborhoods = new Map();
+  for (const hotel of validHotels) {
+    const neighborhood = hotel.location.neighborhoodID;
+    if (!neighborhoods.has(neighborhood)) neighborhoods.set(neighborhood, new Map());
+    const byStars = neighborhoods.get(neighborhood);
+    if (!byStars.has(hotel.starRating)) byStars.set(hotel.starRating, []);
+    byStars.get(hotel.starRating).push(hotel);
+  }
+  let comparisons = 0;
   const pairs = [];
   for (const offer of validOffers) {
-    for (const hotel of validHotels) {
+    // Raw keys preserve strict equality. Buckets keep every observation in
+    // arrival order; only pairs with known star/neighborhood conflicts are skipped.
+    const comparable = neighborhoods.get(offer.location.neighborhoodID)?.get(offer.starRating) ?? [];
+    for (const hotel of comparable) {
+      if (++comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
       if (!matches(offer, hotel)) continue;
       if (pairs.length >= MAX_MATCH_CANDIDATES) throw new MatchLimitError();
       pairs.push([offer.pclnId, hotel.hotelId]);

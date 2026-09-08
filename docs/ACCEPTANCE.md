@@ -22,6 +22,36 @@ permission or exception to the published terms has been established.
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
+## Large-city matcher regression repair
+
+Verified 2026-09-08 at 16:09–16:10 Pacific, against base `4b33340` plus the
+raw neighborhood/star index repair. The tested matcher SHA-256 is
+`f09c388c73f66c0b3a21c10572c6a5c4d942bc40e177978bf510d96d577baafb`.
+The later `429fa50` rewrite had restored the Cartesian-product rejection and
+reduced the large-city fixture below its threshold. Regression fixtures now
+explicitly exceed 100,000 theoretical pairs while testing actual bounded work,
+both unique and ambiguous results, raw ordered parity, two pages and cache reuse.
+
+- Node 24.20.0: `npm run check` passed (lint, 216 tests, production build).
+- Twenty focused production browser cases passed across Chromium, mobile
+  Chromium, Firefox and WebKit. Independent scoped review found no defects.
+- Offline saved-provider replay preserved all 60 ordered matching pairs while
+  reducing comparisons from 27,270 to 394; this is parity, not identity proof.
+- The existing production backend on port 5001 was restarted with the same
+  provider mode and durable state. The exact Los Angeles September 8–9 trip
+  returned HTTP 200: 153 API offers, 782 named hotels across two pages, 111 matched
+  deals, 40 no-match offers and two offers with missing facts. The browser showed
+  “111 hotel deals” and 12 cards on the first page; unresolved offers stayed hidden.
+- Fresh retrieval and cached reload succeeded; cache-hit logs recorded zero
+  upstream calls. Desktop/mobile screenshots had no horizontal overflow. Garvey
+  Inn details and quote were available, its original-offer link preserved dates,
+  one room, two adults and USD, and return-to-results passed with no page errors.
+
+Artifacts: `output/verification/large-city-regression/` contains check/browser
+logs, offline replay, live response and summary, source hash, and desktop/mobile
+screenshots. Concurrent frontend style edits are outside this matcher repair.
+No booking or hosted verification was performed; the release gates above remain.
+
 ## Matched results and control cleanup
 
 Verified code: `a63bd9c86cd1394f4a393504d7f331dfb94842e8` (results implementation

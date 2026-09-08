@@ -66,12 +66,12 @@ three pages. An ordinary later-page failure returns successful earlier pages wit
 explicit partial coverage. Provider disablement, shutdown, and size limits remain
 errors. Identical in-flight work is shared without extending budgets.
 
-Matching indexes hotels by neighborhood and star rating, skipping only known
-contradictions and retaining unknown evidence for assessment. The 100,000 comparison
-budget counts pairs visited after this filtering, not every theoretical offer/hotel
-combination. Matching also permits at most 5,000 candidate objects across the result.
-Exceeding those limits or the payload limit returns
-`RESULT_TOO_LARGE` (503); candidates are never silently truncated. These are
+Matching indexes eligible raw hotel observations by neighborhood and star rating,
+preserving strict number/string types, arrival order and duplicate rates. The
+100,000 comparison budget counts pairs visited within matching buckets, not every
+theoretical offer/hotel combination. At most 5,000 matching raw pairs are retained
+before grouping by identity. Exceeding either budget or the payload limit returns
+`RESULT_TOO_LARGE` (503); matches are never truncated into a unique hotel. These are
 conservative application defaults, not a claim of measured production capacity.
 
 Fresh search results use a 25-entry LRU cache for five minutes. Detail results use

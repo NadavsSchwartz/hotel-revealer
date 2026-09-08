@@ -21,8 +21,11 @@ program name; the predicate excludes exactly `Express_Deal`. Empty amenity array
 remain eligible. The independent legacy predicate can throw or match equal absent
 values on incomplete rows, so parity assertions cover eligible observations.
 
-Production rejects more than 100,000 eligible raw observation pairs or more than
-5,000 retained matching pairs with `RESULT_TOO_LARGE`. Duplicate rates count
+Production indexes eligible raw hotel observations by neighborhood and star rating,
+preserving strict number/string types and arrival order. Only pairs within the
+corresponding bucket count toward the 100,000 comparison budget; the theoretical
+cross-product is not a rejection condition. More than 100,000 visited pairs or
+5,000 retained matching pairs returns `RESULT_TOO_LARGE`. Duplicate rates count
 before grouping hotel IDs; a response never truncates matches into a unique hotel.
 
 After matching, production normalizes safe display fields and returns one likely

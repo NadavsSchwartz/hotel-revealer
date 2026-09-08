@@ -129,8 +129,11 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   remain different. The listing query includes `minStrikePrice` and
   `amenitiesIcons`. The independent original study implementation is the test
   oracle; the study imports the production matcher.
-- Work is bounded before public result construction: at most 100,000 comparison
-  attempts and 5,000 retained matching pairs, counting repeated raw observations.
+- Work is bounded before public result construction: raw neighborhood/star buckets
+  exclude known contradictions without normalizing keys or reordering observations.
+  At most 100,000 pairs within those buckets are compared and 5,000 matching pairs
+  retained, counting repeated raw observations. The theoretical cross-product
+  does not consume the comparison budget.
   Exceeding either returns `RESULT_TOO_LARGE` (503), never a truncated unique
   match. Existing page, row and payload bounds also apply. Display normalization
   and grouping by distinct hotel ID happen after matching; conflicting rows must
