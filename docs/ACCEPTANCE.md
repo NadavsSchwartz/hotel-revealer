@@ -11,16 +11,49 @@ permission or exception to the published terms has been established.
 | Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 291/292 passed initially; remaining case passed 3/3 reruns | 73 scenarios across Chromium, mobile Chromium, Firefox and WebKit. One intermittent Results traveler-focus failure remains unexplained; see Room verification below |
+| Browser journeys | 292/292 passed in the latest full run | 73 existing scenarios across Chromium, mobile Chromium, Firefox and WebKit; final footer/navigation and reduced-motion changes also passed targeted checks below |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Room local mobile LCP/CLS target passed in three runs | LCP 2.216/2.032/2.016s; CLS 0.000695. Initial AVIF-first batch missed once; both reports retained below. Field INP/p75 and hosted performance remain unverified |
+| Performance | Earlier Room build met the local mobile target | LCP 2.216/2.032/2.016s; CLS 0.000695. These are the earlier homepage measurements below; the subsequent shared-style pass was not remeasured. Field/hosted performance remains unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Room visual completion across the search journey
+
+Following the review of both the homepage and results/details, `c07af48` completes
+the shared Room logo, footer, favicon, olive controls and warm ivory reading
+surfaces across the actual flow. Results, property details, prices, evidence,
+loading/recovery screens and popups now use the same visual identity. The footer
+also reaches the viewport bottom on short pages and returns keyboard focus to
+the homepage entrance. Existing layout and search/data behavior are preserved.
+
+- Pinned Node 24.20.0: lint, all 189 native tests and production build passed.
+- The complete four-project browser run passed 292/292. After the short-page
+  footer fix, all 16 affected status/navigation/reflow cases passed.
+- Existing calendar and destination/traveler accessibility cases now exercise
+  reduced motion and explicitly verify popup opacity. Both initially reproduced
+  invisible popups; the final fix passed all 8 cases across the four browser projects.
+  No new test scenarios, dependencies or data abstractions were added.
+- Independent senior review checked populated results/details, photographs,
+  quote/evidence panels, statuses, footer, calendar and travelers at 1440, 832,
+  390 and 320px. No page overflow or clipped controls remained in those checks.
+  These are local synthetic-fixture and browser observations, not provider,
+  physical-device, VoiceOver or user-usability certification.
+
+The reduced-motion repair retains effectively instantaneous animation completion
+so Ant popup classes clear. Transitions remain disabled: enabling even tiny
+coordinate transitions caused WebKit to measure stale dropdown positions and
+leave child-age options offscreen. No focus or placement code was rewritten.
+
+Evidence is under `output/verification/room-completion/`, including review
+screenshots marked `test-only`, full and focused test logs, and the retained
+WebKit failure trace. Current visual completion does not change the candidate
+API or establish hotel identity; single-hotel selection and consistent product
+claims remain a separate functional release dependency.
 
 ## Room homepage — local verification
 

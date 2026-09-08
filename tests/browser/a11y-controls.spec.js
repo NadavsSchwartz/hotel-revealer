@@ -6,6 +6,7 @@ const fullDate = value => new Intl.DateTimeFormat('en-US', { weekday: 'long', mo
 const dateAfter = (value, days) => new Date(Date.parse(`${value}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 
 test('open calendars expose named controls and readable selectable dates', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
@@ -16,6 +17,7 @@ test('open calendars expose named controls and readable selectable dates', async
     const calendar = page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
     await expect(calendar).toHaveCount(1);
     await expect(calendar).toBeVisible();
+    await expect(calendar).toHaveCSS('opacity', '1');
     const dialog = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
     await expect(dialog).toBeVisible();
     await expect(page.getByRole('combobox', { name: label, exact: true })).toHaveAttribute('aria-controls', `${field}-calendar`);

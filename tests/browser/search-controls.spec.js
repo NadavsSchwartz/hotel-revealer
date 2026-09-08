@@ -293,10 +293,12 @@ test('changing check-in clears an incompatible checkout and requires a new date'
 
 
 test('open destination and traveler controls pass Axe with one reviewed combobox exception', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/');
   await page.getByLabel('Where are you going?').fill('Tel Aviv');
   await expect(destinationOptions(page).first()).toBeVisible();
+  await expect(page.locator('.destination-popup:visible')).toHaveCSS('opacity', '1');
   const checkAccessibility = async stage => {
     await page.evaluate(async () => {
       const finite = document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime));

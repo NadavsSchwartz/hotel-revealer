@@ -1625,7 +1625,10 @@ img {
   *,
   *::before,
   *::after {
-    animation: none !important;
+    /* Keep completion events so popup enter/leave classes can be cleared. */
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
     transition: none !important;
     scroll-behavior: auto !important;
   }
