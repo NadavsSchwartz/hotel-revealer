@@ -197,7 +197,7 @@ for (const width of [390, 1440]) {
       await expect(childAge).toBeAttached();
       await page.getByRole('button', { name: dismissal, exact: true }).click();
       await expect(travelerDialog(page)).toHaveCount(0);
-      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
       await expectPanelInViewport(page);
       await expect(childAge).toBeFocused();
       await expect(childAge).toBeInViewport();

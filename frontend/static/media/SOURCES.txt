@@ -11,3 +11,12 @@ Sharp is an asset-preparation tool and is not an application dependency.
 
 Manrope: Mikhail Sharanda / Mirko Velimirovic; SIL Open Font License1.1. See ../fonts/OFL.txt and FONTLOG.txt.
 Font source: https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap
+
+2026-09-08 Room homepage: room-terrace.avif/webp use the fictional 1536x1024
+Afterlight terrace generated for this project. The original image and generation
+prompt remain in sketches/afterlight/README.md and assets/afterlight-terrace.png.
+Mobile derivatives crop the source at left=496, top=0, width=684, height=1024
+and resize to 720px wide. Encoded with existing Sharp 0.35.4 tooling:
+AVIF quality 48/effort 6, WebP quality 76/effort 6. No runtime image dependency.
+Bodoni Moda italic: The Bodoni Moda Project Authors; SIL Open Font License,
+retained at ../fonts/bodoni-LICENSE.txt. Imagery is inspiration, not a real offer.

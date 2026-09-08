@@ -142,7 +142,7 @@ try {
     await afterPaint(page);
     const home = await readMetrics(page);
     if (run === 1) await page.screenshot({ path: `${output}/home-mobile-current.png`, fullPage: true });
-    const searchButton = page.getByRole('button', { name: 'Search', exact: true });
+    const searchButton = page.getByRole('button', { name: 'Find hotel deals', exact: true });
     await searchButton.scrollIntoViewIfNeeded();
     const validation = await sampleAction(page, 'empty search validation', () => searchButton.click(), () => page.locator('#cityName[aria-invalid="true"]').waitFor());
     assert.equal(requests.search, 0, 'Invalid form must not request inventory');

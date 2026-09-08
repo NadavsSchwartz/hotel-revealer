@@ -9,7 +9,7 @@ import './search-controls.css';
 
 const emptyTrip = { cityName: '', checkIn: '', checkOut: '', ...DEFAULT_OCCUPANCY };
 
-export default function SearchForm({ initial = emptyTrip, compact = false, draftRef, blockedSearchKey = null }) {
+export default function SearchForm({ initial = emptyTrip, compact = false, draftRef, blockedSearchKey = null, submitLabel = 'Search' }) {
   const navigate = useNavigate();
   const initialValue = JSON.stringify({ ...emptyTrip, ...initial });
   const previousInitial = useRef(initialValue);
@@ -76,7 +76,7 @@ export default function SearchForm({ initial = emptyTrip, compact = false, draft
         <Travelers ref={travelersRef} trip={trip} errors={errors} onChange={update} />
         <Button type="primary" htmlType="submit" className="search-button" disabled={blocked}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
-          Search
+          {submitLabel}
         </Button>
       </div>
       {errors.currency && <p className="trip-currency-error">{errors.currency}{' '}<button type="button" onClick={() => update({ currency: 'USD' })}>Use USD</button></p>}

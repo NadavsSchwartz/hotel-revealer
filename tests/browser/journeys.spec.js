@@ -27,7 +27,7 @@ test('cleared inputs are validated and focused without an API request', async ({
   let searches = 0;
   page.on('request', (request) => { if (request.url().includes('/api/v1/hotelDeals')) searches++; });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
   await expect(page.getByLabel('Where are you going?')).toBeFocused();
   await expect(page.getByRole('alert')).toBeVisible();
   expect(searches).toBe(0);
@@ -53,7 +53,7 @@ test('offer ambiguity, retail failure, and original handoff stay separate', asyn
   await chooseDestination(page, 'Las Vegas', 'Nevada, United States');
   await chooseDate(page, 'Check-in', context.checkIn);
   await chooseDate(page, 'Check-out', context.checkOut);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('Additional taxes and fees may apply').first()).toBeVisible();
@@ -209,6 +209,7 @@ async function auditAccessibility(page) {
 
 test('landing and result states have no automated WCAG A/AA violations', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('link', { name: 'Skip to content', exact: true }).focus();
   let results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
   await mockOffers(page);
@@ -227,7 +228,7 @@ test('320 CSS pixel reflow keeps content and primary controls in the viewport', 
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Find hotel deals', exact: true })).toBeVisible();
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();

@@ -156,7 +156,7 @@ function PageBehavior() {
     const pathChanged = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
     const titles = {
-      '/': 'A great deal. A clearer picture.',
+      '/': 'A room with fewer unknowns.',
       '/results': 'Your hotel shortlist',
       '/deal': 'Candidate details',
       '/privacy': 'Privacy',
@@ -223,16 +223,16 @@ export default function App() {
   const isHome = location.pathname === '/';
   const homeDraft = useRef(null);
   return (
-    <div className={`unboxed-application ${isHome ? 'unboxed-application-home' : ''}`}>
+    <div className={`unboxed-application ${isHome ? 'room-application' : ''}`}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className={`direction-header ${isHome ? 'direction-header-overlay' : ''}`}>
-        <Brand />
+      <header className="direction-header">
+        <Brand variant={isHome ? 'room' : undefined} />
         <nav aria-label="Main navigation">
-          <Link to="/">Hotels</Link>
+          {!isHome && <Link to="/">Hotels</Link>}
           <Link to="/#how-it-works">How it works</Link>
-          <span className="currency">USD</span>
+          {isHome ? <Link to="/terms">Before you book</Link> : <span className="currency">USD</span>}
         </nav>
       </header>
       <PageBehavior />

@@ -40,12 +40,13 @@ test('invalid travel links reveal the mobile editor and the landing copy uses re
   expect(searches).toBe(0);
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath('mobile-home.png'), fullPage: true });
-  const sizes = await page.locator('.unboxed-copy > p, .unboxed-start, .unboxed-search label').evaluateAll(elements =>
+  const sizes = await page.locator('.room-description, .room-reception label').evaluateAll(elements =>
     elements.map(element => parseFloat(getComputedStyle(element).fontSize)));
+  expect(sizes.length).toBeGreaterThan(0);
   expect(sizes.every(size => size >= 12)).toBe(true);
-  const start = await page.getByRole('link', { name: /Start your search/ }).boundingBox();
+  const start = await page.getByRole('button', { name: 'Find hotel deals', exact: true }).boundingBox();
   expect(start.height).toBeGreaterThanOrEqual(44);
-  const hero = await page.locator('.unboxed-hero').boundingBox();
+  const hero = await page.locator('.room-scene').boundingBox();
   expect(start.y + start.height).toBeLessThanOrEqual(hero.y + hero.height);
 });
 

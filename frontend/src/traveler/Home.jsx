@@ -1,41 +1,40 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SearchForm from './SearchForm.jsx';
+import './room-home.css';
 
 export default function Home({ draftRef }) {
   return (
-    <div className="unboxed-direction">
-      <section className="unboxed-hero" aria-labelledby="home-title">
-        <picture className="unboxed-photo">
-          <source media="(max-width: 700px)" srcSet="/media/stay-hero-mobile.avif" type="image/avif" />
-          <source media="(max-width: 700px)" srcSet="/media/stay-hero-mobile.webp" type="image/webp" />
-          <source srcSet="/media/stay-hero.avif" type="image/avif" />
-          <img src="/media/stay-hero.webp" alt="Palm-lined hotel pool" width="1600" height="950" />
-        </picture>
-        <div className="unboxed-shade" />
-        <div className="unboxed-side-label" aria-hidden="true">SEE THE STAY / KEEP THE DEAL</div>
-        <div className="unboxed-copy">
-          <p className="overline">PRICELINE EXPRESS DEALS, IN FOCUS.</p>
-          <h1 id="home-title" tabIndex="-1">A great deal.<br /><span>A clearer picture.</span></h1>
-          <p>Compare hotel matches for your Express Deal.<br />See the clues. Book the original offer.</p>
-          <a href="#unboxed-search" className="unboxed-start">Start your search <span aria-hidden="true">↘</span></a>
+    <div className="room-home">
+      <section className="room-scene" aria-labelledby="home-title">
+        <div className="room-view" aria-hidden="true">
+          <picture>
+            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.avif" type="image/avif" />
+            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.webp" type="image/webp" />
+            <source srcSet="/media/room-terrace.avif" type="image/avif" />
+            <img src="/media/room-terrace.webp" alt="" width="1536" height="1024" />
+          </picture>
         </div>
-        <div className="unboxed-edge" aria-hidden="true"><span>HR</span><i /></div>
+        <div className="room-introduction">
+          <p className="room-eyebrow">Before you book</p>
+          <h1 id="home-title" tabIndex="-1">A room with<br /><em>fewer unknowns.</em></h1>
+          <p className="room-description">Find the hotel behind a <strong>Priceline Express Deal</strong> before you book.</p>
+        </div>
+        <section className="room-reception" id="unboxed-search" aria-labelledby="search-title">
+          <h2 id="search-title" tabIndex="-1">Where are you<br /> checking in?</h2>
+          <SearchForm draftRef={draftRef} submitLabel="Find hotel deals" />
+          <p className="room-reception-note">If we can’t identify a deal, we’ll say so.</p>
+        </section>
+        <div className="room-scene-bottom">
+          <Link to="/#how-it-works">How the reveal works <span aria-hidden="true" /></Link>
+          <Link to="/credits">Imagined hotel scene · Credits</Link>
+        </div>
       </section>
-      <section className="unboxed-search" id="unboxed-search" aria-labelledby="search-title">
-        <div className="unboxed-search-intro">
-          <strong id="search-title" tabIndex="-1">Your next stay starts here.</strong>
-          <span>City, dates, travelers. We’ll connect the clues.</span>
-        </div>
-        <SearchForm draftRef={draftRef} />
-      </section>
-      <section className="unboxed-story" id="how-it-works" aria-labelledby="method-title">
-        <h2 id="method-title" tabIndex="-1">The price is only<br />half the story.</h2>
-        <div>
-          <p>See possible hotels alongside the location, ratings and amenities that connect them to an Express Deal. Compare the clues, then book the original unnamed offer on Priceline.</p>
-          <Link to="/terms#how-it-works">See how it works <span aria-hidden="true">↗</span></Link>
-        </div>
-        <span className="story-mark" aria-hidden="true">↗</span>
+      <section className="room-summary room-content" id="how-it-works" aria-labelledby="method-title">
+        <h2 id="method-title" tabIndex="-1">The hotel behind the deal.</h2>
+        <p>Choose your trip, see the identified hotel, and review the original offer on Priceline before booking.</p>
+        <Link to="/terms#how-it-works">See how it works</Link>
+        <Link to="/#unboxed-search">Start your search</Link>
       </section>
     </div>
   );

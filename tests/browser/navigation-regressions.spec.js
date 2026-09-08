@@ -96,7 +96,7 @@ test('New trip clears the Home draft once and later edits still survive Back', a
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: searchResponse() }));
   await page.goto('/');
   await chooseHomeTrip(page);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await page.getByRole('link', { name: /New trip/ }).click();
