@@ -8,10 +8,10 @@ permission or exception to the published terms has been established.
 
 | Gate | Current status | Required evidence / remaining limit |
 | --- | --- | --- |
-| Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
+| Domain correctness | Original-rule parity and resolution tests passed | Raw types, ordered amenities/icons, duplicate limits, partial coverage and conflicting identities; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 296/296 passed in the isolated hero/loading snapshot | 74 scenarios across Chromium, mobile Chromium, Firefox and WebKit; snapshot excludes concurrent uncommitted backend/configuration work, as recorded below |
+| Browser journeys | 316/316 passed at `2e53c01` | 79 scenarios across Chromium, mobile Chromium, Firefox and WebKit; isolated committed source excludes concurrent homepage design work. Earlier intermittent WebKit focus failure recorded below |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
@@ -21,6 +21,57 @@ permission or exception to the published terms has been established.
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Single-hotel resolution and on-demand totals
+
+Verified code: `2e53c010bb09d87d75b012b8de57628df803e14a`. This local milestone
+preserves the original raw matching rules and returns one candidate or explicit
+`resolution` (`no_match`, `ambiguous`, `missing_facts`, `incomplete_search`).
+Multi-candidate expansion, comparison batches and ranking are retired. `/deal`
+accepts an optional strictly validated hotel ID; offer-only responses have null
+candidate/details, `detailStatus:not_requested`, and explicit `quoteStatus`.
+Both views retain the safe original-offer handoff when local prices expire.
+Unavailable totals retry upstream; successful quotes retain caching/coalescing.
+
+- **Local gates:** `HOTEL_PROVIDER=disabled npm run check` passed (lint, 213 native
+  tests, production build), then all 316 browser cases passed without retries or
+  skips. Verification used an isolated archive of the committed source and the
+  existing Node 24.20.0/npm 11.19.0 workspace dependencies. Concurrent homepage
+  design/assets were preserved and excluded. Initial browser run: 315/316; one
+  WebKit child-age focus failure did not reproduce in 14 targeted runs or the
+  final full matrix. Its cause remains unverified; no assertion was weakened.
+- **Independent reviews:** fixed a stale offer-only hotel hint after newer search
+  results, a nameless duplicate hiding conflicting hotel facts, and an ineffective
+  unavailable-total retry. Final reviews found no consequential open code issue.
+  Redux singleton state and search snapshot identity remain intact.
+- **Matching/capacity:** saved-data replay retained exactly 60 original ordered
+  pairs, with no provider request. Final stub capacity run at `2e53c01` had no dirty
+  measured source: 321.16 MiB peak RSS, 91.49 ms maximum health latency; fresh and
+  cached named/offer-only requests, concurrent searches, and both raw-work limits
+  passed. The accepted fixture used 4,000 comparisons and a 21,779-byte search
+  response. This is a macOS sample, not worst-case memory or hosted sizing proof.
+- **Bounded live check:** two invented Las Vegas trips, September 21–24: one
+  room/two adults, then two rooms/four adults/child age 7. Searches returned 100
+  offers (65 matched) and 70 offers (33 matched); live matching exercised the added
+  strike-price/icon fields. Both named and offer-only paths returned complete
+  quotes for both trips, with correct null fields on offer-only responses.
+  The family original-offer URL opened with the correct dates/occupants. Its
+  $79 × 3 nights × 2 rooms base agreed at $474, but Priceline displayed $760.32
+  total versus the API quote's $781.98. The difference is unexplained. No booking,
+  purchase, provider reset, deployment or push occurred.
+
+Evidence: `output/verification/single-hotel-local/` (final and initial logs, unique
+live response captures and supplier observation),
+`output/verification/capacity-2026-09-08T22-01-46-946Z/capacity.json`, and
+`output/original-matching/production-resolution-20260908.json`.
+
+The current exact-cent, currency, fee-inclusion and rate/breakdown corroboration
+gates remain; plausible totals may still be withheld. Resolution counts are
+diagnostic only, with no match-rate anomaly detection. Public HTTPS, old-tab
+recovery after deployment, rollback/reboot, notification delivery, physical devices,
+manual accessibility and first-time-user sessions remain open release gates.
+Neither these checks nor a unique match establish measured identity accuracy or
+website/checkout price parity.
 
 ## Homepage copy and navigation cleanup
 
