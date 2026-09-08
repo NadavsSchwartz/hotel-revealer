@@ -443,6 +443,18 @@ test('response byte limit is enforced from Content-Length before reading', async
   assert.equal(cancelled, true);
 });
 
+test('transport failures preserve causes while response-processing bugs propagate unchanged', async () => {
+  const network = new TypeError('private transport information');
+  const failedFetch = setup(() => { throw network; });
+  await assert.rejects(failedFetch.search(), error => error instanceof ProviderFailure && error.kind === 'unavailable' && error.cause === network);
+  const failedStream = setup(() => new Response(new ReadableStream({ start(controller) { controller.error(network); } }),
+    { headers: { 'Content-Type': 'application/json' } }));
+  await assert.rejects(failedStream.search(), error => error instanceof ProviderFailure && error.cause === network);
+  const bug = new TypeError('private processing information');
+  const failedProcessing = setup(() => ({ get status() { throw bug; } }));
+  await assert.rejects(failedProcessing.search(), error => error === bug);
+});
+
 test('response byte limit is enforced across streamed chunks without trusting Content-Length', async () => {
   let cancelled = false;
   let reads = 0;

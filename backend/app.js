@@ -9,6 +9,7 @@ import { createProviderService } from './provider/service.js';
 import { ServiceError } from './provider/errors.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
 import { searchDestinations } from './destinations/index.js';
+import { requestRoute } from './diagnostics.js';
 
 const defaultFrontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
 const contentSecurityPolicy = [
@@ -38,6 +39,13 @@ export function createApp({ logger = console, service = createProviderService({ 
       try {
         logger?.info?.({ event: 'request_completed', requestId: req.requestId, status: res.statusCode,
           ...(res.locals.errorCode ? { code: res.locals.errorCode } : {}), durationMs: Date.now() - startedAt });
+      } catch { /* Logging must not affect the response. */ }
+    });
+    res.once('close', () => {
+      if (res.writableFinished) return;
+      try {
+        logger?.info?.({ event: 'request_aborted', requestId: req.requestId, method: req.method,
+          route: requestRoute(req), durationMs: Date.now() - startedAt });
       } catch { /* Logging must not affect the response. */ }
     });
     next();
@@ -126,6 +134,6 @@ export function createApp({ logger = console, service = createProviderService({ 
     });
   }
   app.use(notFound);
-  app.use(errorHandler);
+  app.use(errorHandler(logger));
   return app;
 }

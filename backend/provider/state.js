@@ -22,7 +22,7 @@ export function createFileStateStore(filePath = process.env.PROVIDER_STATE_FILE 
       } catch (error) {
         if (error.code === 'ENOENT') return cleanState();
         // A corrupt/unreadable state file cannot silently remove a block.
-        throw new Error('Provider state could not be read');
+        throw new Error('Provider state could not be read', { cause: error });
       }
     },
     async write(value) {

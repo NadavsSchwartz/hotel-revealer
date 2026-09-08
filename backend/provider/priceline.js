@@ -112,7 +112,13 @@ async function readJson(response, signal, allowPartialDetails = false) {
   try {
     while (true) {
       throwIfAborted(signal);
-      const { done, value } = await reader.read();
+      let chunk;
+      try { chunk = await reader.read(); }
+      catch (cause) {
+        throwIfAborted(signal);
+        throw new ProviderFailure('unavailable', { cause });
+      }
+      const { done, value } = chunk;
       throwIfAborted(signal);
       if (done) break;
       bytes += value.byteLength;
@@ -277,33 +283,34 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
 
   async function request(operationName, query, variables, signal, allowPartialDetails = false) {
     throwIfAborted(signal);
+    const options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      credentials: 'omit', redirect: 'error',
+      body: JSON.stringify({ operationName, query, variables }), signal,
+    };
+    let response;
     try {
-      const response = await fetchImpl(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        credentials: 'omit', redirect: 'error',
-        body: JSON.stringify({ operationName, query, variables }), signal,
-      });
+      response = await fetchImpl(ENDPOINT, options);
+    } catch (cause) {
       throwIfAborted(signal);
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        await cancelBody(response);
-        throw new ProviderFailure('rate_limit', { retryAfter });
-      }
-      if ([401, 403].includes(response.status) || /text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type') || '')) {
-        await cancelBody(response);
-        throw new ProviderFailure('challenge');
-      }
-      if (!response.ok) {
-        await cancelBody(response);
-        throw new ProviderFailure('unavailable');
-      }
-      return await readJson(response, signal, allowPartialDetails);
-    } catch (error) {
-      throwIfAborted(signal);
-      if (error instanceof ProviderFailure || error instanceof ServiceError) throw error;
+      throw new ProviderFailure('unavailable', { cause });
+    }
+    throwIfAborted(signal);
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('retry-after');
+      await cancelBody(response);
+      throw new ProviderFailure('rate_limit', { retryAfter });
+    }
+    if ([401, 403].includes(response.status) || /text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type') || '')) {
+      await cancelBody(response);
+      throw new ProviderFailure('challenge');
+    }
+    if (!response.ok) {
+      await cancelBody(response);
       throw new ProviderFailure('unavailable');
     }
+    return readJson(response, signal, allowPartialDetails);
   }
 
   return {

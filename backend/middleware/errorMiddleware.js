@@ -1,11 +1,12 @@
 import { ServiceError } from '../provider/errors.js';
 import { MatchLimitError, ValidationError } from '../domain/index.js';
+import { diagnostic, requestRoute } from '../diagnostics.js';
 
 export function notFound(req, res, next) {
   next(new ServiceError('NOT_FOUND'));
 }
 
-export function errorHandler(error, req, res, next) {
+export const errorHandler = logger => (error, req, res, next) => {
   if (res.headersSent) return next(error);
   let safeError;
   if (error instanceof ServiceError || error instanceof ValidationError) safeError = error;
@@ -20,5 +21,11 @@ export function errorHandler(error, req, res, next) {
     res.set('Retry-After', new Date(safeError.retryAt).toUTCString());
   }
   res.locals.errorCode = safeError.code;
+  if (safeError.status >= 500) {
+    try {
+      logger?.error?.({ event: 'request_failed', requestId: req.requestId, method: req.method,
+        route: requestRoute(req), code: safeError.code, diagnostic: diagnostic(error) });
+    } catch { /* Logging must not affect the response. */ }
+  }
   res.set('Cache-Control', 'no-store').status(safeError.status).json({ error: payload });
-}
+};

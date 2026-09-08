@@ -14,5 +14,5 @@ test('serialized size guard stops amplified shared objects and rejects non-JSON 
   assert.throws(() => assertJsonSize(Array(1_000).fill(candidate)), { code: 'RESULT_TOO_LARGE' });
   const circular = {};
   circular.self = circular;
-  assert.throws(() => assertJsonSize(circular), { code: 'PROVIDER_RESPONSE_INVALID' });
+  assert.throws(() => assertJsonSize(circular), TypeError);
 });

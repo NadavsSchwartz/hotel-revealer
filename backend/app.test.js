@@ -10,7 +10,7 @@ import { MAX_JSON_BYTES } from './provider/size.js';
 
 async function serve(t, options = {}) {
   const logs = [];
-  const server = createApp({ logger: { info: (entry) => logs.push(entry) }, ...options }).listen(0, '127.0.0.1');
+  const server = createApp({ logger: { info: (entry) => logs.push(entry), error: (entry) => logs.push(entry) }, ...options }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   return {
@@ -54,10 +54,12 @@ test('default API health performs no provider calls and both operations fail clo
 
 test('canonical JSON inputs reach the injected service, legacy feeds and encrypted bodies are rejected', async (t) => {
   const received = [];
-  const app = await serve(t, { service: { search: async (context) => { received.push(context); return { context, offers: [] }; } } });
+  let metadata;
+  const app = await serve(t, { service: { search: async (context, options) => { metadata = options; received.push(context); return { context, offers: [] }; } } });
   const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
   assert.equal(response.status, 200);
   assert.deepEqual(received, [{ ...futureContext, destinationId: 'geonames:5506956', cityName: 'Las Vegas, Nevada, United States', rooms: 1, adults: 2, childrenAges: [], currency: 'USD' }]);
+  assert.equal(metadata.requestId, response.headers['x-request-id']);
   const invalid = await app.request('/api/v1/hotelDeals', { method: 'POST', body: { hash: 'old encrypted payload' } });
   assert.equal(invalid.status, 400);
   assert.equal(received.length, 1);
@@ -119,7 +121,39 @@ test('unknown service errors and request metadata are not reflected or logged', 
   assert.equal(response.headers['x-content-type-options'], 'nosniff');
   assert.match(response.headers['content-security-policy'], /script-src 'self'/);
   assert.match(response.headers['content-security-policy'], /frame-ancestors 'none'/);
+  const failure = app.logs.find(entry => entry.event === 'request_failed');
+  assert.equal(failure.requestId, response.headers['x-request-id']);
+  assert.equal(failure.method, 'POST');
+  assert.equal(failure.route, '/api/v1/hoteldeals');
+  assert.equal(failure.diagnostic.name, 'Error');
+  assert.ok(failure.diagnostic.locations.some(location => location.file === 'backend/controllers/hotelController.js'));
   assert.equal(response.headers['referrer-policy'], 'no-referrer');
+});
+
+test('non-Error failures and logging failures cannot hide or change the HTTP 500 response', async t => {
+  const app = await serve(t, { service: { search: async () => { throw null; } },
+    logger: { info() { throw new Error('logger failed'); }, error() { throw new Error('logger failed'); } } });
+  const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
+  assert.equal(response.status, 500);
+  assert.equal(response.body.error.code, 'INTERNAL_ERROR');
+});
+
+test('aborted requests emit one abort record instead of a successful completion', async t => {
+  const logs = [];
+  let finish;
+  const server = createApp({ service: { search: () => new Promise(resolve => { finish = resolve; }) },
+    logger: { info: entry => logs.push(entry) } }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => { finish?.({}); server.closeAllConnections(); server.close(); });
+  const req = http.request({ hostname: '127.0.0.1', port: server.address().port, method: 'POST', path: '/api/v1/hotelDeals',
+    headers: { 'Content-Type': 'application/json' } });
+  req.on('error', () => {});
+  req.end(JSON.stringify(futureContext));
+  while (!finish) await new Promise(resolve => setTimeout(resolve, 5));
+  req.destroy();
+  while (!logs.length) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.deepEqual(logs.map(entry => entry.event), ['request_aborted']);
+  assert.equal(logs[0].status, undefined);
 });
 
 test('cooldown has a controlled retryAt and Retry-After response', async (t) => {

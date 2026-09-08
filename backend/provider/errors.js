@@ -17,9 +17,9 @@ const errors = {
 };
 
 export class ServiceError extends Error {
-  constructor(code, { retryAt } = {}) {
+  constructor(code, { retryAt, cause } = {}) {
     const [status, message] = errors[code] || errors.INTERNAL_ERROR;
-    super(message);
+    super(message, { cause });
     this.name = 'ServiceError';
     this.code = errors[code] ? code : 'INTERNAL_ERROR';
     this.status = status;
@@ -29,8 +29,8 @@ export class ServiceError extends Error {
 
 // An authorized adapter classifies failures without exposing upstream content.
 export class ProviderFailure extends Error {
-  constructor(kind, { retryAfter } = {}) {
-    super('Provider request failed');
+  constructor(kind, { retryAfter, cause } = {}) {
+    super('Provider request failed', { cause });
     this.name = 'ProviderFailure';
     this.kind = kind;
     this.retryAfter = retryAfter;

@@ -129,7 +129,7 @@ test('later page errors preserve successful results, first-page errors do not fa
   let count = 0;
   const { service, clock } = setup({ adapter: { async listingsPage() {
     count += 1;
-    if (count > 1) throw new Error('private upstream token');
+    if (count > 1) throw new ProviderFailure('unavailable', { cause: new Error('private upstream token') });
     return { listings: listingRows(), nextCursor: 'next' };
   } } });
   const request = service.search(futureContext);
@@ -143,6 +143,37 @@ test('later page errors preserve successful results, first-page errors do not fa
   await clock.advance(1_000);
   await rejection;
   assert.equal(count, 3);
+});
+
+test('programmer errors on later pages and in details never become usable partial responses', async () => {
+  for (const [operation, bug] of [
+    ['search', new TypeError('private programmer failure')], ['detail', new TypeError('private programmer failure')],
+    ['search', null], ['detail', false],
+  ]) {
+    let pages = 0;
+    const { service, clock } = setup({ adapter: {
+      async listingsPage() {
+        if (pages++) throw bug;
+        return { listings: listingRows(), nextCursor: operation === 'search' ? 'next' : null };
+      },
+      async hotelDetails() { throw bug; },
+    } });
+    if (operation === 'detail') await service.search(futureContext);
+    const rejected = assert.rejects(service[operation](operation === 'search' ? futureContext : selection),
+      error => error instanceof Error && (error === bug || error.cause === bug));
+    await clock.advance(1000);
+    await rejected;
+  }
+});
+
+test('coalesced provider summaries retain each caller request ID outside cached data', async () => {
+  const logs = [];
+  const { service, calls } = setup({ logger: { info: entry => logs.push(entry) } });
+  const results = await Promise.all(['request-a', 'request-b'].map(requestId => service.search(futureContext, { requestId })));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(logs.map(entry => entry.requestId).sort(), ['request-a', 'request-b']);
+  assert.equal(logs.filter(entry => entry.shared).length, 1);
+  assert.ok(results.every(result => !JSON.stringify(result).includes('request-')));
 });
 
 test('a later-page timeout returns partial results at the admission deadline', async () => {
@@ -354,6 +385,22 @@ test('invalid response, persistence failure, and graceful drain fail closed', as
   await assert.rejects(normal.service.search(futureContext), { code: 'SERVICE_DRAINING' });
 });
 
+test('state failures identify read/write causes without exposing paths or clearing the block', async () => {
+  for (const operation of ['read', 'write']) {
+    const logs = [];
+    const cause = Object.assign(new Error('/private/secret/provider.json'), { code: 'EACCES' });
+    const store = createMemoryStateStore();
+    store[operation] = async () => { throw cause; };
+    const { service, calls } = setup({ stateStore: store, logger: { error: entry => logs.push(entry), info() {} } });
+    await assert.rejects(service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+    assert.equal(calls.length, 0);
+    assert.equal((await service.status()).available, false);
+    assert.equal(logs[0].operation, operation);
+    assert.equal(logs[0].diagnostic.code, 'EACCES');
+    assert.doesNotMatch(JSON.stringify(logs), /private|secret/);
+  }
+});
+
 test('failed pre-dispatch persistence never calls the provider, including after restart', async () => {
   const store = createMemoryStateStore();
   const unavailableStore = { read: () => store.read(), write: async () => { throw new Error('Disk full'); } };
@@ -493,7 +540,7 @@ test('fresh cached searches survive cooldown, expired searches do not dispatch, 
 
 test('optional detail failures preserve the usable offer, do not cache errors, and coalesce identical work', async () => {
   let count = 0;
-  const { service, clock } = setup({ adapter: { async hotelDetails() { count += 1; throw new Error('private details failure'); } } });
+  const { service, clock } = setup({ adapter: { async hotelDetails() { count += 1; throw new ProviderFailure('unavailable', { cause: new Error('private details failure') }); } } });
   await service.search(futureContext);
   const first = service.detail(selection);
   const second = service.detail(selection);
@@ -527,7 +574,7 @@ test('summary metrics identify cache reuse and upstream work without input or pr
   await service.search(futureContext);
   assert.equal(logs[0].upstreamCalls, 1);
   assert.equal(logs[0].pagesFetched, 1);
-  assert.equal(logs[1].cache, 'hit');
+  assert.equal(logs[1].searchCache, 'hit');
   assert.equal(logs[1].upstreamCalls, 0);
   assert.equal(typeof logs[0].queueDepth, 'number');
   assert.equal(typeof logs[0].durationMs, 'number');

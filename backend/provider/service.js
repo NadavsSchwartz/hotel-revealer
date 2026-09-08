@@ -6,9 +6,11 @@ import { ProviderFailure, ServiceError } from './errors.js';
 import { ProviderScheduler, realClock } from './scheduler.js';
 import { cleanState, createFileStateStore, retryAfterDeadline } from './state.js';
 import { assertJsonSize } from './size.js';
+import { diagnostic } from '../diagnostics.js';
 
 const SEARCH_TTL = 5 * 60_000;
 const DETAIL_TTL = 60_000;
+const partialFailures = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED']);
 const contextKey = (context) => JSON.stringify([context.destinationId, context.checkIn, context.checkOut, context.rooms, context.adults, context.childrenAges, context.currency]);
 const iso = (timestamp) => new Date(timestamp).toISOString();
 const text = (value, maximum) => typeof value === 'string' ? value.trim().slice(0, maximum) || null : null;
@@ -54,11 +56,18 @@ export function createProviderService({ adapter = null, clock = realClock, state
   let loaded;
   let draining = false;
 
+  function log(level, entry) {
+    try { logger?.[level]?.(entry); } catch { /* Logging cannot change availability. */ }
+  }
+
   async function loadState() {
     loaded ||= Promise.resolve().then(() => stateStore.read()).then((saved) => {
       if (saved?.version !== 1 || typeof saved.disabled !== 'boolean' || !Number.isFinite(saved.cooldownUntil) || saved.cooldownUntil < 0 || saved.cooldownUntil > 8_640_000_000_000_000) throw new Error('Invalid state');
       state = saved;
-    }).catch(() => { state = { ...cleanState(), disabled: true }; });
+    }).catch(error => {
+      state = { ...cleanState(), disabled: true };
+      log('error', { event: 'provider_state_failed', operation: 'read', diagnostic: diagnostic(error) });
+    });
     await loaded;
   }
 
@@ -72,11 +81,12 @@ export function createProviderService({ adapter = null, clock = realClock, state
   async function persistState(value = state) {
     try {
       await stateStore.write(value);
-    } catch {
+    } catch (cause) {
       state.disabled = true;
       searches.clear();
       details.clear();
-      throw new ServiceError('PROVIDER_DISABLED');
+      log('error', { event: 'provider_state_failed', operation: 'write', diagnostic: diagnostic(cause) });
+      throw new ServiceError('PROVIDER_DISABLED', { cause });
     }
   }
 
@@ -101,15 +111,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
           state.disabled = true;
           searches.clear();
           details.clear();
-          throw new ServiceError('PROVIDER_DISABLED');
+          log('error', { event: 'provider_paused', reason: 'challenge' });
+          throw new ServiceError('PROVIDER_DISABLED', { cause: error });
         }
         if (error instanceof ProviderFailure && error.kind === 'rate_limit') {
           state.cooldownUntil = retryAfterDeadline(error.retryAfter, clock.now());
-          throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil) });
+          log('info', { event: 'provider_paused', reason: 'cooldown', retryAt: iso(state.cooldownUntil) });
+          throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil), cause: error });
         }
         if (signal.aborted) throw new ServiceError('DEADLINE_EXCEEDED');
-        if (error instanceof ServiceError && ['PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'RESULT_TOO_LARGE'].includes(error.code)) throw error;
-        throw new ServiceError('PROVIDER_UNAVAILABLE');
+        if (error instanceof ProviderFailure && error.kind === 'unavailable') throw new ServiceError('PROVIDER_UNAVAILABLE', { cause: error });
+        throw error instanceof Error ? error : new Error('Non-Error provider failure', { cause: error });
       }
     }, { deadline });
   }
@@ -118,7 +130,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
     await withDeadline(available({ allowCooldown: true }), deadline, clock);
     const key = contextKey(context);
     const cached = searches.get(key);
-    if (cached) { metrics.cache = 'hit'; return cached; }
+    metrics.searchCache = cached ? 'hit' : 'miss';
+    if (cached) return cached;
     const offers = [];
     const hotels = [];
     const seenCursors = new Set();
@@ -155,7 +168,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
         }
         if (cursor !== null) seenCursors.add(cursor);
       } catch (error) {
-        if (pagesFetched === 0 || ['PROVIDER_DISABLED', 'SERVICE_DRAINING', 'RESULT_TOO_LARGE'].includes(error.code)) throw error;
+        if (pagesFetched === 0 || !(error instanceof ServiceError) || !partialFailures.has(error.code)) throw error;
+        metrics.failureCode = error.code;
         cacheable = false;
         reason = 'A later provider page could not be retrieved. Coverage is incomplete.';
         break;
@@ -200,10 +214,10 @@ export function createProviderService({ adapter = null, clock = realClock, state
     return operation.then((value) => structuredClone(value));
   }
 
-  function observe(kind, operation, admittedAt, metrics) {
+  function observe(kind, operation, admittedAt, metrics, requestId) {
     const report = (outcome) => {
       try {
-        logger?.info?.({ event: 'provider_request', kind, ...metrics, outcome, durationMs: clock.now() - admittedAt });
+        logger?.info?.({ event: 'provider_request', kind, ...(requestId ? { requestId } : {}), ...metrics, outcome, durationMs: clock.now() - admittedAt });
       } catch { /* Logging is best effort and never contains upstream content. */ }
     };
     return operation.then((value) => { report(value.detailStatus || value.coverage?.status || 'success'); return value; }, (error) => {
@@ -212,10 +226,10 @@ export function createProviderService({ adapter = null, clock = realClock, state
     });
   }
 
-  const newMetrics = () => ({ cache: 'miss', shared: false, upstreamCalls: 0, pagesFetched: 0, queueDepth: scheduler.queue.length });
+  const newMetrics = () => ({ searchCache: 'not_checked', detailCache: 'not_checked', shared: false, upstreamCalls: 0, pagesFetched: 0, queueDepth: scheduler.queue.length });
 
   return {
-    search(input) {
+    search(input, { requestId } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const context = validateSearch(input, new Date(admittedAt));
@@ -223,9 +237,9 @@ export function createProviderService({ adapter = null, clock = realClock, state
       const metrics = newMetrics();
       metrics.shared = searchFlights.has(contextKey(context));
       const request = coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics));
-      return observe('search', request, admittedAt, metrics);
+      return observe('search', request, admittedAt, metrics, requestId);
     },
-    detail(input) {
+    detail(input, { requestId } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const { offerId, hotelId, ...context } = validateDetail(input, new Date(admittedAt));
@@ -241,7 +255,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         if (!candidate) throw new ServiceError('INVALID_SELECTION');
         const cached = details.get(key);
         if (cached) {
-          metrics.cache = 'hit';
+          metrics.detailCache = 'hit';
           const cachedQuoteFresh = Date.parse(cached.offer?.quoteExpiresAt) > clock.now();
           const refreshedOffer = cachedQuoteFresh
             ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
@@ -250,7 +264,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
           assertJsonSize(result);
           return result;
         }
-        metrics.cache = 'miss';
+        metrics.detailCache = 'miss';
         let normalizedDetails;
         let originalQuote = null;
         let detailStatus = 'available';
@@ -263,6 +277,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
           if (rawDetails.available === false) detailStatus = 'unavailable';
         } catch (error) {
           if (!(error instanceof ServiceError) || !['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED'].includes(error.code)) throw error;
+          metrics.failureCode = error.code;
           detailStatus = 'unavailable';
           cacheable = false;
           normalizedDetails = { description: null, images: [], amenities: [], address: null, retailQuote: null };
@@ -279,7 +294,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         if (cacheable && deadline > clock.now()) details.set(key, result, retrievedAt + DETAIL_TTL);
         return result;
       });
-      return observe('detail', request, admittedAt, metrics);
+      return observe('detail', request, admittedAt, metrics, requestId);
     },
     async status() {
       if (!configured || draining) return { available: false };
