@@ -66,8 +66,11 @@ three pages. An ordinary later-page failure returns successful earlier pages wit
 explicit partial coverage. Provider disablement, shutdown, and size limits remain
 errors. Identical in-flight work is shared without extending budgets.
 
-Matching permits at most 100,000 offer/hotel comparisons and 5,000 candidate
-objects across the result. Exceeding those limits or the payload limit returns
+Matching indexes hotels by neighborhood and star rating, skipping only known
+contradictions and retaining unknown evidence for assessment. The 100,000 comparison
+budget counts pairs visited after this filtering, not every theoretical offer/hotel
+combination. Matching also permits at most 5,000 candidate objects across the result.
+Exceeding those limits or the payload limit returns
 `RESULT_TOO_LARGE` (503); candidates are never silently truncated. These are
 conservative application defaults, not a claim of measured production capacity.
 

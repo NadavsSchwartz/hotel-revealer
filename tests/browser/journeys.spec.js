@@ -171,13 +171,30 @@ test('successful empty results are an empty state, not endless loading', async (
   await expect(page.getByRole('heading', { name: /no .*offers/i })).toBeVisible();
 });
 
-test('oversized comparisons explain recovery without returning a misleading shortlist', async ({ page }) => {
-  await page.route('**/api/v1/hotelDeals', (route) => route.fulfill({ status: 503, json: { error: { code: 'RESULT_TOO_LARGE', message: 'internal text is not reflected' } } }));
+test('a search capacity failure preserves the trip and recovers only when the traveler retries', async ({ page }) => {
+  const searches = [];
+  await page.clock.install({ time: Date.now() });
+  await page.route('**/api/v1/hotelDeals', (route) => {
+    searches.push(route.request().postDataJSON());
+    return searches.length === 1
+      ? route.fulfill({ status: 503, json: { error: { code: 'RESULT_TOO_LARGE', message: 'internal text is not reflected' } } })
+      : route.fulfill({ json: searchResponse() });
+  });
   await page.goto(searchPath);
-  await expect(page.getByRole('heading', { name: 'Too many possible comparisons' })).toBeVisible();
+  const notice = page.getByRole('region', { name: 'Search status' });
+  await expect(notice.getByRole('heading', { name: 'We couldn’t finish this search' })).toBeVisible();
+  await expect(notice).toContainText('Your trip details are saved. Please try again.');
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
   await expect(page.getByText('internal text is not reflected')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0);
+  await expect(notice).not.toContainText(/comparisons|assess safely|different dates|another city/);
+  await expect(notice.getByRole('button', { name: 'Edit search', exact: true })).toHaveCount(0);
+  await page.clock.fastForward(5000);
+  expect(searches).toEqual([context]);
+  await notice.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  expect(searches).toEqual([context, context]);
 });
 
 test('upstream labels are plain text and offsite handoff URLs are rejected', async ({ page }) => {

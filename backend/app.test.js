@@ -210,7 +210,7 @@ test('comparison-limit and oversized injected results are sanitized into stable 
     const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
     assert.equal(response.status, 503);
     assert.equal(response.body.error.code, 'RESULT_TOO_LARGE');
-    assert.equal(response.body.error.message, 'Too many possible comparisons to display safely. Try different dates or another city.');
+    assert.equal(response.body.error.message, 'We could not load all the hotel results for this trip. Please try again.');
     assert.ok(response.body.error.requestId);
     assert.equal(response.text.includes('private'), false);
     oversized = true;

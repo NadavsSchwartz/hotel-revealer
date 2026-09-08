@@ -655,7 +655,30 @@ function comparisonRows(offerCount, hotelCount) {
   ];
 }
 
-test('comparison limits return the stable error without caching or truncating candidate results', async () => {
+test('large city inventories match across pages and cache the full result', async () => {
+  const [offer, hotel] = listingRows();
+  const rows = [
+    ...Array.from({ length: 200 }, (_, index) => ({ ...offer, pclnId: `offer-${index}`, location: { ...offer.location, neighborhoodID: `area-${index}` } })),
+    ...Array.from({ length: 800 }, (_, index) => ({ ...hotel, hotelId: `hotel-${index}`, location: { ...hotel.location, neighborhoodID: `area-${index % 200}` } })),
+  ];
+  const { service, clock, calls } = setup({ adapter: { async listingsPage({ cursor }) {
+    calls.push(cursor);
+    return { listings: rows.slice(cursor ? 500 : 0, cursor ? 1000 : 500), nextCursor: cursor ? null : 'next' };
+  } } });
+  const pending = service.search(futureContext);
+  await clock.advance(1_000);
+  const result = await pending;
+  assert.deepEqual(result.coverage, { status: 'complete', reason: null, pagesFetched: 2, offersFound: 200, namedHotelsChecked: 800, unassessedHotels: 0 });
+  assert.equal(result.offers.length, 200);
+  for (const item of result.offers) {
+    const index = Number(item.offerId.split('-')[1]);
+    assert.deepEqual(new Set(item.candidates.map(candidate => candidate.hotelId)), new Set([0, 200, 400, 600].map(offset => `hotel-${index + offset}`)));
+  }
+  assert.deepEqual(await service.search(futureContext), result);
+  assert.deepEqual(calls, [null, 'next']);
+});
+
+test('dense candidate limits return the stable error without caching or truncating results', async () => {
   let calls = 0;
   const { service, clock } = setup({ adapter: { async listingsPage() {
     calls += 1;
@@ -663,7 +686,7 @@ test('comparison limits return the stable error without caching or truncating ca
   } } });
   await assert.rejects(service.search(futureContext), {
     code: 'RESULT_TOO_LARGE', status: 503,
-    message: 'Too many possible comparisons to display safely. Try different dates or another city.',
+    message: 'We could not load all the hotel results for this trip. Please try again.',
   });
   const again = service.search(futureContext);
   const rejected = assert.rejects(again, { code: 'RESULT_TOO_LARGE' });

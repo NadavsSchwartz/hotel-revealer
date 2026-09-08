@@ -10,7 +10,7 @@ export const MAX_MATCH_CANDIDATES = 5_000;
 
 export class MatchLimitError extends Error {
   constructor() {
-    super('This search returned too many possible matches to compare safely. Try another city or dates.');
+    super('The hotel results exceeded the search processing limit.');
     this.name = 'MatchLimitError';
     this.code = 'RESULT_TOO_LARGE';
     this.status = 503;
@@ -77,23 +77,50 @@ function candidateFrom(hotel, families) {
 function prepareListings(offers, hotels) {
   const named = deduplicateHotels(Array.isArray(hotels) ? hotels : []);
   const normalizedOffers = deduplicateOffers(Array.isArray(offers) ? offers : []);
-  // Reject before pair comparisons or public candidate construction starts.
-  if (normalizedOffers.length * named.length > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
   // Deduplication returns copies. Prepare membership once without changing the
   // amenity arrays retained in public evidence.
   for (const offer of normalizedOffers) offer.amenityCodes = normalizeAmenityCodes(offer.clues?.amenities?.codes);
+  const neighborhoods = new Map();
   for (const hotel of named) {
     const codes = normalizeAmenityCodes(hotel.amenities);
     hotel.amenitySet = codes === null ? null : new Set(codes);
+    const neighborhood = normalizedId(hotel.neighborhoodId);
+    const stars = numberOrNull(hotel.stars, { min: 0.5, max: 5 });
+    if (!neighborhoods.has(neighborhood)) neighborhoods.set(neighborhood, new Map());
+    const byStars = neighborhoods.get(neighborhood);
+    if (!byStars.has(stars)) byStars.set(stars, []);
+    byStars.get(stars).push(hotel);
   }
-  return { named, normalizedOffers };
+  return { named, normalizedOffers, neighborhoods };
+}
+
+function compatibleGroups(groups, key) {
+  // Unknown evidence must still be assessed; only known contradictions can be skipped.
+  return key === null ? groups.values() : [groups.get(key), groups.get(null)].filter(Boolean);
+}
+
+function* comparableHotels(offer, neighborhoods) {
+  const neighborhood = normalizedId(offer.neighborhoodId);
+  const stars = numberOrNull(offer.stars, { min: 0.5, max: 5 });
+  for (const byStars of compatibleGroups(neighborhoods, neighborhood)) {
+    for (const hotels of compatibleGroups(byStars, stars)) yield* hotels;
+  }
 }
 
 export function countUnassessedHotels(offers, hotels) {
-  const { named, normalizedOffers } = prepareListings(offers, hotels);
+  const { normalizedOffers, neighborhoods } = prepareListings(offers, hotels);
   // Standalone coverage queries do not construct public candidates. The service
   // uses matchListings to gather this count during its existing comparison pass.
-  return named.filter(hotel => normalizedOffers.some(offer => compareHotel(offer, hotel) === 'unassessed')).length;
+  const unassessed = new Set();
+  let comparisons = 0;
+  for (const offer of normalizedOffers) {
+    for (const hotel of comparableHotels(offer, neighborhoods)) {
+      if (unassessed.has(hotel.hotelId)) continue;
+      if (++comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
+      if (compareHotel(offer, hotel) === 'unassessed') unassessed.add(hotel.hotelId);
+    }
+  }
+  return unassessed.size;
 }
 
 function comparablePrices(offer, candidates, hotels) {
@@ -107,14 +134,16 @@ function comparablePrices(offer, candidates, hotels) {
 }
 
 export function matchListings(offers, hotels) {
-  const { named, normalizedOffers } = prepareListings(offers, hotels);
+  const { named, normalizedOffers, neighborhoods } = prepareListings(offers, hotels);
   const byId = new Map(named.map(hotel => [hotel.hotelId, hotel]));
   const unassessedHotels = new Set();
   let candidateCount = 0;
+  let comparisons = 0;
   const publicOffers = normalizedOffers.map(offer => {
     let unassessedCount = 0;
     const tiers = { supported: [], partial: [] };
-    for (const hotel of named) {
+    for (const hotel of comparableHotels(offer, neighborhoods)) {
+      if (++comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
       const result = compareHotel(offer, hotel);
       if (result === 'unassessed') {
         unassessedCount += 1;

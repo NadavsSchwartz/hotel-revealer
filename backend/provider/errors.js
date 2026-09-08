@@ -4,7 +4,7 @@ const errors = {
   PROVIDER_COOLDOWN: [429, 'The hotel provider asked us to wait. Please try again later.'],
   PROVIDER_BUSY: [503, 'Hotel comparison is busy. Please try again shortly.'],
   DESTINATIONS_BUSY: [503, 'Destination suggestions are busy. Please try again shortly.'],
-  RESULT_TOO_LARGE: [503, 'Too many possible comparisons to display safely. Try different dates or another city.'],
+  RESULT_TOO_LARGE: [503, 'We could not load all the hotel results for this trip. Please try again.'],
   DEADLINE_EXCEEDED: [504, 'The hotel request took too long. Please try again.'],
   PROVIDER_UNAVAILABLE: [502, 'The hotel provider is temporarily unavailable.'],
   PROVIDER_RESPONSE_INVALID: [502, 'The hotel provider returned an unsupported response.'],

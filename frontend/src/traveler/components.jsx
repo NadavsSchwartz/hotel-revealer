@@ -212,8 +212,8 @@ const errorCopy = {
     'Priceline could not locate this destination reliably. Choose a nearby city to search the area.',
   ],
   RESULT_TOO_LARGE: [
-    'Too many possible comparisons',
-    'This search contains more possible matches than we can assess safely. Try different dates or another city.',
+    'We couldn’t finish this search',
+    'We couldn’t load all the hotel results for this trip. Your trip details are saved. Please try again.',
   ],
   PROVIDER_NOT_CONFIGURED: [
     'Live search is not connected yet',
@@ -339,7 +339,7 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
     error?.code === 'PROVIDER_NOT_CONFIGURED' ||
     error?.code === 'PROVIDER_DISABLED';
   const returnToResults = ['INVALID_SELECTION', 'INVALID_OFFER_ID', 'INVALID_HOTEL_ID', 'PROVIDER_RESPONSE_INVALID'].includes(error?.code);
-  const editSearch = error?.code?.startsWith('INVALID_') || ['RESULT_TOO_LARGE', 'PROVIDER_DESTINATION_UNSUPPORTED', 'PAST_CHECK_IN', 'CHECK_IN_TOO_FAR', 'CHECK_OUT_TOO_FAR', 'STAY_TOO_LONG', 'UNSUPPORTED_CONTEXT', 'INSUFFICIENT_ADULTS'].includes(error?.code);
+  const editSearch = error?.code?.startsWith('INVALID_') || ['PROVIDER_DESTINATION_UNSUPPORTED', 'PAST_CHECK_IN', 'CHECK_IN_TOO_FAR', 'CHECK_OUT_TOO_FAR', 'STAY_TOO_LONG', 'UNSUPPORTED_CONTEXT', 'INSUFFICIENT_ADULTS'].includes(error?.code);
   const action = returnToResults ? onReturn || onRetry : editSearch ? onEdit : !unavailable ? onRetry : null;
   const actionLabel = returnToResults ? (onReturn ? 'Return to results' : 'Refresh search') : editSearch ? 'Edit search' : remaining > 0 ? `Try again in ${remaining}s` : 'Try again';
   return (

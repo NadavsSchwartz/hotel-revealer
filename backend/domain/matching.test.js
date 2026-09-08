@@ -183,9 +183,44 @@ test('dense searches fail explicitly at the total candidate limit rather than tr
   assert.throws(() => matchListings(offers, hotels), error => error instanceof MatchLimitError && error.code === 'RESULT_TOO_LARGE' && error.status === 503);
 });
 
-test('comparison limit is checked before scanning pairs even for an inventory with no candidates', () => {
+test('large cities skip contradictory neighborhoods and stars without rejecting valid results', () => {
+  const offers = Array.from({ length: 200 }, (_, index) => offer({ offerId: `offer-${index}`, neighborhoodId: `area-${index}` }));
+  const hotels = Array.from({ length: 800 }, (_, index) => hotel(`hotel-${index}`, { neighborhoodId: `area-${index % 200}`, stars: index < 400 ? 4 : 5 }));
+  assert.ok(offers.length * hotels.length > MAX_MATCH_COMPARISONS);
+  const result = matchListings(offers, hotels);
+  assert.equal(result.offers.length, 200);
+  for (const item of result.offers) {
+    const index = Number(item.offerId.split('-')[1]);
+    assert.deepEqual(new Set(item.candidates.map(candidate => candidate.hotelId)), new Set([`hotel-${index}`, `hotel-${index + 200}`]));
+    assert.equal(item.unassessedCount, 0);
+  }
+  assert.equal(countUnassessedHotels(offers, hotels), 0);
+});
+
+test('indexed matching preserves missing and normalized baseline evidence', () => {
+  const offers = [offer({ neighborhoodId: '123', stars: '4' }), offer({ offerId: 'unknown-area', neighborhoodId: null }),
+    offer({ offerId: 'unknown-stars', neighborhoodId: 123, stars: null })];
+  const hotels = [hotel('match', { neighborhoodId: 123, stars: '4' }), hotel('other-area', { neighborhoodId: 'elsewhere' }),
+    hotel('other-stars', { neighborhoodId: '123', stars: 5 }), hotel('unknown-area', { neighborhoodId: null }),
+    hotel('unknown-stars', { neighborhoodId: 123, stars: null }), hotel('unknown-both', { neighborhoodId: null, stars: null }),
+    hotel('contradiction', { neighborhoodId: null, stars: null, guestRating: 1 })];
+  const result = matchListings(offers, hotels);
+  // One-offer/one-hotel queries give an exhaustive oracle without depending on index layout.
+  for (const item of result.offers) {
+    const input = offers.find(value => value.offerId === item.offerId);
+    const exhaustive = hotels.map(value => matchOffers([input], [value])[0]);
+    assert.deepEqual(item.candidates.map(value => value.hotelId).sort(), exhaustive.flatMap(value => value.candidates.map(candidate => candidate.hotelId)).sort());
+    assert.equal(item.unassessedCount, exhaustive.reduce((sum, value) => sum + value.unassessedCount, 0));
+  }
+  assert.equal(result.offers.find(value => value.offerId === 'offer1').candidates[0].hotelId, 'match');
+  assert.deepEqual(result.offers.map(value => value.unassessedCount), [3, 5, 5]);
+  assert.equal(result.unassessedHotels, 6);
+  assert.equal(countUnassessedHotels(offers, hotels), 6);
+});
+
+test('actual clue comparisons remain bounded even when every pair contradicts a guest rating', () => {
   const offers = Array.from({ length: 100 }, (_, index) => offer({ offerId: `offer-${index}` }));
-  const hotels = Array.from({ length: 1000 }, (_, index) => hotel(`hotel-${index}`, { stars: 5 }));
+  const hotels = Array.from({ length: 1000 }, (_, index) => hotel(`hotel-${index}`, { guestRating: 1 }));
   assert.equal(offers.length * hotels.length, MAX_MATCH_COMPARISONS);
   assert.equal(matchListings(offers, hotels).offers.every(item => item.candidates.length === 0), true);
   const overLimit = [...offers, offer({ offerId: 'last-offer' })];
