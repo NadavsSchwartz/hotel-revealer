@@ -11,27 +11,28 @@
   </style>
 </head>
 <body>
-  <iframe id="study" title="Hotel Revealer — Departure design study" src="departure.html"></iframe>
+  <iframe id="study" title="Hotel Revealer — Room expanded homepage" src="../room/"></iframe>
   <nav class="exploration-bar" aria-label="Design exploration">
     <div class="exploration-label">Hotel Revealer <span>Design studies</span></div>
     <div class="directions" role="group" aria-label="Choose a direction">
-      <button type="button" data-study="room" aria-pressed="false"><small>1</small> Room</button>
+      <button type="button" data-study="room" aria-pressed="true"><small>1</small> Room</button>
       <button type="button" data-study="atlas" aria-pressed="false"><small>2</small> Atlas</button>
-      <button type="button" data-study="departure" aria-pressed="true"><small>3</small> Departure</button>
+      <button type="button" data-study="departure" aria-pressed="false"><small>3</small> Departure</button>
     </div>
-    <a class="full-link" id="full-link" href="departure.html" target="_blank" rel="noopener">Open full size</a>
+    <a class="full-link" id="full-link" href="../room/" target="_blank" rel="noopener">Open full size</a>
   </nav>
   <script>
     const directions={room:'Room',atlas:'Atlas',departure:'Departure'};
     const frame=document.querySelector('#study');
-    let active='departure';
+    let active='room';
     function select(name){
       if(!Object.hasOwn(directions,name))return;
       document.querySelectorAll('[data-study]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.study===name)));
-      document.querySelector('#full-link').href=name+'.html';
+      const path=name==='room'?'../room/':name+'.html';
+      document.querySelector('#full-link').href=path;
       frame.title='Hotel Revealer — '+directions[name]+' design study';
       document.title='Hotel Revealer — '+directions[name];
-      if(name!==active){frame.src=name+'.html';active=name;}
+      if(name!==active){frame.src=path;active=name;}
       history.replaceState(null,'','#'+name);
     }
     function shortcuts(event){
@@ -41,7 +42,7 @@
     }
     document.querySelectorAll('[data-study]').forEach(button=>button.addEventListener('click',()=>select(button.dataset.study)));
     document.querySelector('.directions').addEventListener('keydown',shortcuts);
-    select(Object.hasOwn(directions,location.hash.slice(1))?location.hash.slice(1):'departure');
+    select(Object.hasOwn(directions,location.hash.slice(1))?location.hash.slice(1):'room');
   </script>
 </body>
 </html>

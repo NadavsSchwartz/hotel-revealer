@@ -21,7 +21,9 @@ Open http://127.0.0.1:4343/exploration/.
 
 The bottom controls switch between studies. Keys 1, 2, and 3 work while a
 direction control has focus; they do not intercept keys inside a study. “Open full size” opens the selected study without the selector.
-The initial direction is Departure; a URL hash selects another direction.
+Room is the selected direction and now opens the expanded homepage in `../room/`.
+A URL hash selects another direction. The original first-screen Room study remains
+available at `room.html`.
 
 Each page is self-contained HTML/CSS/JavaScript and can also be viewed at its direct
 HTTP URL. No dependencies, production routes, or application styles were added.
