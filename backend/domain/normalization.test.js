@@ -29,6 +29,21 @@ test('multi-room price basis survives normalization without synthesizing a total
   assert.equal(normalizeQuote({ minPrice: '190.00', minCurrencyCode: 'USD', roomCount: 2, nightlyBasis: 'per-room' }).stayCents, null);
 });
 
+test('legacy USD amounts round decimal half cents upward without floating-point drift', () => {
+  for (const [amount, expected] of [
+    [10.075, 1008], ['10.075', 1008], [4.015, 402], [8.115, 812], [' 129.95 ', 12995],
+    [0, 0], ['0', 0], [1e-7, 0], [0.0049, 0], ['0.005', 1], ['9.999', 1000],
+    ['90071992547409.91', Number.MAX_SAFE_INTEGER], ['90071992547409.915', null],
+    [Number.MAX_SAFE_INTEGER, null], [-1, null], [Infinity, null], ['1e-7', null], ['no price', null],
+  ]) {
+    const quote = normalizeQuote({ minPrice: amount, displayPricePerStay: amount, minCurrencyCode: 'USD' });
+    assert.equal(quote.nightlyCents, expected, `nightly ${amount}`);
+    assert.equal(quote.stayCents, expected, `stay ${amount}`);
+  }
+  assert.equal(normalizeQuote({ nightlyCents: 1007, currency: 'USD' }).nightlyCents, 1007);
+  assert.equal(normalizeQuote({ nightlyCents: 1007.5, currency: 'USD' }).nightlyCents, null);
+});
+
 test('explicit provider totals preserve base prices and separately identify included taxes and fees', () => {
   const raw = { minPrice: '66.00', displayPricePerStay: 198, grandTotal: 439.02, minCurrencyCode: 'USD',
     taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1, nightlyBasis: 'per-room', stayBasis: 'all-rooms' };

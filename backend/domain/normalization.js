@@ -42,7 +42,10 @@ export function safeHandoffUrl(value) {
 function cents(value) {
   const amount = numberOrNull(value, { max: Number.MAX_SAFE_INTEGER / 100 });
   if (amount === null) return null;
-  const result = Math.round((amount + Number.EPSILON) * 100);
+  // Also handles small numeric inputs written in exponent notation by String().
+  if (amount < 0.005) return 0;
+  const [whole, fraction = ''] = (typeof value === 'string' ? value.trim() : String(amount)).split('.');
+  const result = Number(whole) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2)) + (fraction[2] >= '5' ? 1 : 0);
   return Number.isSafeInteger(result) ? result : null;
 }
 
