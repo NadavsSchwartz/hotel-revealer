@@ -30,5 +30,7 @@ export function assertJsonSize(value, limitBytes = MAX_JSON_BYTES) {
     return item;
   });
   if (serialized === undefined) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
-  if (Buffer.byteLength(serialized, 'utf8') > limitBytes) throw new ServiceError('RESULT_TOO_LARGE');
+  const measuredBytes = Buffer.byteLength(serialized, 'utf8');
+  if (measuredBytes > limitBytes) throw new ServiceError('RESULT_TOO_LARGE');
+  return measuredBytes;
 }

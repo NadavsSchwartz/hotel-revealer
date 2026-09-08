@@ -3,6 +3,7 @@ const errors = {
   PROVIDER_DISABLED: [503, 'Hotel comparison is paused pending operator review.'],
   PROVIDER_COOLDOWN: [429, 'The hotel provider asked us to wait. Please try again later.'],
   PROVIDER_BUSY: [503, 'Hotel comparison is busy. Please try again shortly.'],
+  DESTINATIONS_BUSY: [503, 'Destination suggestions are busy. Please try again shortly.'],
   RESULT_TOO_LARGE: [503, 'Too many possible comparisons to display safely. Try different dates or another city.'],
   DEADLINE_EXCEEDED: [504, 'The hotel request took too long. Please try again.'],
   PROVIDER_UNAVAILABLE: [502, 'The hotel provider is temporarily unavailable.'],

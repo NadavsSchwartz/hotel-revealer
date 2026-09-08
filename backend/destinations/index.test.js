@@ -29,6 +29,17 @@ test('accents and source aliases resolve the same stable destination', () => {
   assert.equal(searchDestinations('São Paulo')[0].id, searchDestinations('Sao Paulo')[0].id);
   assert.equal(searchDestinations('Munich')[0].id, searchDestinations('München')[0].id);
   assert.equal(searchDestinations('Tel-Aviv')[0].id, 'geonames:293397');
+  assert.equal(searchDestinations('Walla Walla')[0].name, 'Walla Walla');
+  assert.equal(searchDestinations('Baden-Baden')[0].name, 'Baden-Baden');
+});
+
+test('scan admission runs only for catalog searches, not short, invalid or exact-country queries', () => {
+  let scans = 0;
+  const options = { beforeScan: () => { scans++; } };
+  for (const query of ['', 'x', null, 'a'.repeat(101), 'Israel']) searchDestinations(query, options);
+  assert.equal(scans, 0);
+  searchDestinations('san', options);
+  assert.equal(scans, 1);
 });
 
 test('country qualifiers and regions distinguish similarly named cities', () => {

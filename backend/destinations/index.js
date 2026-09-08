@@ -5,7 +5,7 @@ function normalize(value) {
     .replace(/['’‘ʼ`.]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
-function validQuery(query) {
+export function validQuery(query) {
   if (typeof query !== 'string' || query.length > 100) return false;
   for (const character of query) {
     const code = character.charCodeAt(0);
@@ -70,7 +70,7 @@ export function resolveLegacyCity(cityName) {
 }
 
 function rankDestinations(candidates, cityKey, count, partialCountries = new Set()) {
-  const tokens = cityKey.split(' ').map(token => ` ${token}`);
+  const tokens = [...new Set(cityKey.split(' '))].map(token => ` ${token}`);
   const aliasPrefix = `\n ${cityKey}`;
   const aliasExact = `${aliasPrefix}\n`;
   const buckets = Array.from({ length: 7 }, () => []);
@@ -100,13 +100,14 @@ function rankDestinations(candidates, cityKey, count, partialCountries = new Set
   return buckets.flat().slice(0, count);
 }
 
-export function searchDestinations(query, { limit = 8 } = {}) {
+export function searchDestinations(query, { limit = 8, beforeScan } = {}) {
   if (!validQuery(query)) return [];
   const key = normalize(query);
   if (key.length < 2) return [];
   const count = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 10)) : 8;
   const exactCountry = countryIds.get(key);
   if (exactCountry) return (byCountry.get(exactCountry) ?? []).slice(0, count).map(e => e.destination);
+  beforeScan?.();
 
   // A country suffix qualifies the city. Country-first queries use context tokens:
   // treating every country prefix as a filter breaks "Panama City, Florida".

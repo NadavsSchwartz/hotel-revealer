@@ -8,7 +8,7 @@ import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 import { createProviderService } from './provider/service.js';
 import { ServiceError } from './provider/errors.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
-import { searchDestinations } from './destinations/index.js';
+import { searchDestinations, validQuery } from './destinations/index.js';
 import { requestRoute } from './diagnostics.js';
 
 const defaultFrontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
@@ -19,9 +19,13 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'", "form-action 'self'",
 ].join('; ');
 
-export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory } = {}) {
+export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now() } = {}) {
   const app = express();
   let hotelOperations = 0;
+  // One process, ten catalog scans per second, with a burst of ten. Refill on
+  // demand; malformed, short and exact-country lookups don't spend this budget.
+  let destinationTokens = 10;
+  let destinationRefill = destinationNow();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     req.requestId = randomUUID();
@@ -73,10 +77,20 @@ export function createApp({ logger = console, service = createProviderService({ 
   app.get('/api/v1/destinations', (req, res) => {
     const url = new URL(req.originalUrl, 'http://localhost');
     const query = url.searchParams.get('q') ?? '';
-    if (query.length > 100 || Array.from(query).some(character => character.codePointAt(0) < 32 || (character.codePointAt(0) >= 127 && character.codePointAt(0) <= 159)) || url.searchParams.getAll('q').length > 1) {
+    if (!validQuery(query) || url.searchParams.getAll('q').length > 1) {
       return res.status(400).json({ error: { code: 'INVALID_DESTINATION_QUERY', message: 'Enter a city or country name.', requestId: req.requestId } });
     }
-    res.set('Cache-Control', 'public, max-age=300').json({ destinations: searchDestinations(query, { limit: 8 }) });
+    const destinations = searchDestinations(query, { limit: 8, beforeScan() {
+      const now = destinationNow();
+      destinationTokens = Math.min(10, destinationTokens + Math.max(0, now - destinationRefill) / 100);
+      destinationRefill = now;
+      if (destinationTokens < 1) {
+        res.set('Retry-After', '1');
+        throw new ServiceError('DESTINATIONS_BUSY');
+      }
+      destinationTokens -= 1;
+    } });
+    res.set('Cache-Control', 'public, max-age=300').json({ destinations });
   });
   app.get('/health', async (req, res, next) => {
     try {
@@ -87,6 +101,12 @@ export function createApp({ logger = console, service = createProviderService({ 
   app.use('/api/v1', createHotelRoutes(service));
   app.use('/api', notFound);
   if (process.env.NODE_ENV === 'production') {
+    const staticHeaders = (res, file) => {
+      if (path.extname(file) === '.html') res.set('Cache-Control', 'no-store');
+      else if (/^\/assets\/[^/]+-[\w-]{8}\.(?:js|css)$/.test(res.req.path)) {
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    };
     // Read the immutable build once; direct results/details loads do not need the hero.
     const html = readFile(path.join(frontendDirectory, 'index.html'), 'utf8').then(
       (home) => ({ home, other: home.replace(/<link\b(?:[^<>"']|"[^"]*"|'[^']*')*>/g,
@@ -103,7 +123,7 @@ export function createApp({ logger = console, service = createProviderService({ 
     const encoded = Object.fromEntries(['br', 'gzip'].map((encoding) => [encoding,
       express.static(path.join(frontendDirectory, '.encoded', encoding), {
         dotfiles: 'deny', index: false, redirect: false,
-        setHeaders: (res) => res.set('Content-Encoding', encoding),
+        setHeaders: (res, file) => { res.set('Content-Encoding', encoding); staticHeaders(res, file); },
       }),
     ]));
     app.use((req, res, next) => {
@@ -126,7 +146,7 @@ export function createApp({ logger = console, service = createProviderService({ 
     app.get('/index.html', sendHtml);
     app.use(express.static(frontendDirectory, {
       dotfiles: 'deny', index: false,
-      setHeaders: (res, file) => { if (path.extname(file) === '.html') res.set('Cache-Control', 'no-store'); },
+      setHeaders: staticHeaders,
     }));
     app.get('*', (req, res, next) => {
       if (path.extname(req.path) || !req.accepts('html')) return next();

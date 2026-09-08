@@ -91,6 +91,26 @@ test('destination API serves bounded geographic suggestions without provider cal
   assert.equal(JSON.stringify(app.logs).includes('Israel'), false);
 });
 
+test('destination scan budget rejects bursts and refills without charging cheap or invalid queries', async t => {
+  let now = 0;
+  const app = await serve(t, { destinationNow: () => now });
+  for (let index = 0; index < 10; index++) assert.equal((await app.request('/api/v1/destinations?q=san')).status, 200);
+  const busy = await app.request('/api/v1/destinations?q=san');
+  assert.equal(busy.status, 503);
+  assert.equal(busy.body.error.code, 'DESTINATIONS_BUSY');
+  assert.equal(busy.headers['retry-after'], '1');
+  assert.equal(busy.headers['cache-control'], 'no-store');
+  assert.equal((await app.request('/api/v1/destinations?q=x')).status, 200);
+  assert.equal((await app.request('/api/v1/destinations?q=Israel')).status, 200);
+  assert.equal((await app.request('/api/v1/destinations?q=san&q=Paris')).status, 400);
+  now += 100;
+  assert.equal((await app.request('/api/v1/destinations?q=san')).status, 200);
+  assert.equal((await app.request('/api/v1/destinations?q=san')).status, 503);
+  now += 5000;
+  for (let index = 0; index < 10; index++) assert.equal((await app.request('/api/v1/destinations?q=san')).status, 200);
+  assert.equal((await app.request('/api/v1/destinations?q=san')).status, 503);
+});
+
 test('invalid dates, unsupported context, unknown fields and malformed/oversized JSON never call service', async (t) => {
   let calls = 0;
   const app = await serve(t, { service: { search: async () => { calls += 1; return {}; } } });

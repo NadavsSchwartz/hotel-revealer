@@ -10,6 +10,7 @@ import { diagnostic } from '../diagnostics.js';
 
 const SEARCH_TTL = 5 * 60_000;
 const DETAIL_TTL = 60_000;
+const CACHE_BYTES = 16 * 1024 * 1024; // Serialized payload weight per cache, not a heap limit.
 const partialFailures = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED']);
 const contextKey = (context) => JSON.stringify([context.destinationId, context.checkIn, context.checkOut, context.rooms, context.adults, context.childrenAges, context.currency]);
 const iso = (timestamp) => new Date(timestamp).toISOString();
@@ -48,8 +49,8 @@ function withDeadline(operation, deadline, clock) {
  */
 export function createProviderService({ adapter = null, clock = realClock, stateStore = createFileStateStore(), logger = console } = {}) {
   const configured = Boolean(adapter && typeof adapter.listingsPage === 'function' && typeof adapter.hotelDetails === 'function');
-  const searches = new FreshCache({ capacity: 25, ttlMs: SEARCH_TTL, now: clock.now });
-  const details = new FreshCache({ capacity: 100, ttlMs: DETAIL_TTL, now: clock.now });
+  const searches = new FreshCache({ capacity: 25, maxBytes: CACHE_BYTES, ttlMs: SEARCH_TTL, now: clock.now });
+  const details = new FreshCache({ capacity: 100, maxBytes: CACHE_BYTES, ttlMs: DETAIL_TTL, now: clock.now });
   const searchFlights = new Map();
   const detailFlights = new Map();
   let state = cleanState();
@@ -196,8 +197,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
       offers: matched.offers,
     };
     metrics.pagesFetched = pagesFetched;
-    assertJsonSize(result);
-    if (cacheable && deadline > clock.now()) searches.set(key, result, Date.parse(result.expiresAt));
+    const bytes = assertJsonSize(result);
+    if (cacheable && deadline > clock.now()) searches.set(key, result, { bytes, expiresAt: Date.parse(result.expiresAt) });
     return result;
   }
 
@@ -290,8 +291,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
           offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
         };
         // Missing retailQuote does not imply Express unavailability.
-        assertJsonSize(result);
-        if (cacheable && deadline > clock.now()) details.set(key, result, retrievedAt + DETAIL_TTL);
+        const bytes = assertJsonSize(result);
+        if (cacheable && deadline > clock.now()) details.set(key, result, { bytes, expiresAt: retrievedAt + DETAIL_TTL });
         return result;
       });
       return observe('detail', request, admittedAt, metrics, requestId);

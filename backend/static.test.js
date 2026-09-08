@@ -21,12 +21,13 @@ test('production static compression preserves representation negotiation and sta
   await Promise.all([
     writeFile(path.join(directory, 'assets', 'app.js'), script),
     writeFile(path.join(directory, 'assets', 'app.css'), style),
+    writeFile(path.join(directory, 'assets', 'app-abc12345.js'), script),
     writeFile(path.join(directory, 'assets', 'app.js.map'), 'source map'),
     writeFile(path.join(directory, 'index.html'), html),
     writeFile(path.join(directory, 'media', 'hero.avif'), 'already compressed media'),
   ]);
   const firstBuild = await compressBuild(directory);
-  assert.equal(firstBuild.files, 2);
+  assert.equal(firstBuild.files, 3);
   assert.ok(firstBuild.bytes.br < firstBuild.bytes.identity);
   await writeFile(path.join(directory, '.encoded', 'stale.js'), 'obsolete variant');
   assert.deepEqual(await compressBuild(directory), firstBuild);
@@ -75,6 +76,16 @@ test('production static compression preserves representation negotiation and sta
     const css = await request('/assets/app.css', { 'Accept-Encoding': 'gzip' });
     assert.match(css.headers['content-type'], /^text\/css/);
     assert.equal(gunzipSync(css.body).toString(), style);
+  });
+
+  await t.test('only hashed assets use immutable caching for all encodings', async () => {
+    for (const encoding of ['identity', 'br', 'gzip']) {
+      const response = await request('/assets/app-abc12345.js', { 'Accept-Encoding': encoding });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers['cache-control'], 'public, max-age=31536000, immutable');
+      const unversioned = await request('/assets/app.js', { 'Accept-Encoding': encoding });
+      assert.equal(unversioned.headers['cache-control'], 'public, max-age=0');
+    }
   });
 
   await t.test('quality weights, q=0, wildcard and missing variant fallback are respected', async () => {
