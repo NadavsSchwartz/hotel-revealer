@@ -12,5 +12,12 @@ export default defineConfig({
     fs: { allow: [fileURLToPath(new URL('..', import.meta.url))] },
     proxy: { '/api': { target: 'http://127.0.0.1:5000', changeOrigin: false } },
   },
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: {
+    outDir: 'dist', emptyOutDir: true,
+    modulePreload: {
+      // WebKit caches failed dynamic module preloads across reloads (bug 270357).
+      // Keep initial HTML preloads; Vite still loads lazy-route CSS dependencies.
+      resolveDependencies: (_filename, dependencies, { hostType }) => hostType === 'js' ? [] : dependencies,
+    },
+  },
 });

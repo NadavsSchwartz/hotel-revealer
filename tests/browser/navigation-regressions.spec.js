@@ -19,7 +19,8 @@ async function chooseHomeTrip(page) {
 }
 
 for (const destination of ['home', 'privacy']) {
-  test(`a failed Results chunk does not trap navigation to ${destination}`, async ({ page }) => {
+  test(`a failed Results chunk allows navigation to ${destination} and recovers on reload`, async ({ page }) => {
+    await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: searchResponse() }));
     await page.route('**/assets/Results-*.js', route => route.abort());
     await page.goto(searchPath);
     await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toBeVisible();
@@ -27,6 +28,12 @@ for (const destination of ['home', 'privacy']) {
     await page.getByRole('link', { name: destination === 'home' ? 'Hotel Revealer home' : 'Privacy', exact: true }).click();
     if (destination === 'home') await expect(page.locator('#home-title')).toBeVisible();
     else await expect(page.getByRole('heading', { name: 'Privacy, plainly.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toHaveCount(0);
+    await page.unroute('**/assets/Results-*.js');
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Reload page', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'We couldn’t display this page', exact: true })).toHaveCount(0);
   });
 }
