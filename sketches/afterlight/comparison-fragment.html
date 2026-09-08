@@ -1,0 +1,78 @@
+<section class="comparison-study" id="comparison" aria-labelledby="comparison-title">
+  <div class="comparison-intro">
+    <div>
+      <p class="comparison-eyebrow">An illustrative comparison</p>
+      <h2 id="comparison-title" tabindex="-1">A few clues.<br>A clearer picture.</h2>
+    </div>
+    <p class="comparison-intro-copy">An area, a star rating, a familiar amenity. See where the details line up—and where a little uncertainty remains.</p>
+  </div>
+
+  <div class="comparison-table-instructions">
+    <p id="comparison-interaction-hint">Choose a clue to look a little closer.</p>
+    <p class="comparison-scroll-hint" id="comparison-scroll-hint">Scroll sideways to compare all three columns.</p>
+  </div>
+  <div class="comparison-scroll" role="region" tabindex="0" aria-label="Illustrative hotel comparison" aria-describedby="comparison-interaction-hint comparison-scroll-hint">
+    <table class="comparison-table">
+      <caption class="comparison-sr-only">Fictional example comparing an unnamed offer with two possible hotels. These are not search results or confirmed hotel identities. Select a criterion in the first column for an explanation.</caption>
+      <colgroup><col class="comparison-criterion-col"><col><col><col></colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="comparison-key-heading"><span>The details<br>to compare</span></th>
+          <th scope="col" class="comparison-offer-heading">
+            <div class="comparison-offer-art" aria-hidden="true"><span>?</span><span class="comparison-offer-rule"></span></div>
+            <span class="comparison-column-kicker">Your starting point</span>
+            <span class="comparison-hotel-name">The unnamed offer</span>
+            <span class="comparison-column-note">The clues you're given</span>
+          </th>
+          <th scope="col">
+            <img class="comparison-hotel-photo" src="assets/paloma-inspiration.png" alt="" loading="lazy" width="480" height="300">
+            <span class="comparison-column-kicker">Possible hotel · fictional example</span>
+            <span class="comparison-hotel-name">The Paloma</span>
+            <span class="comparison-column-note comparison-supported">Listed clues align</span>
+          </th>
+          <th scope="col">
+            <img class="comparison-hotel-photo comparison-atlas-photo" src="assets/atlas-inspiration.webp" alt="" loading="lazy" width="480" height="300">
+            <span class="comparison-column-kicker">Possible hotel · fictional example</span>
+            <span class="comparison-hotel-name">The Atlas</span>
+            <span class="comparison-column-note">Some evidence is missing</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="comparison-row-area" class="comparison-active-row">
+          <th scope="row"><button type="button" id="comparison-criterion-area" class="comparison-criterion" aria-pressed="true" aria-controls="comparison-explanation"><span>01</span>Area</button></th>
+          <td>Downtown</td><td>Downtown</td><td>Downtown</td>
+        </tr>
+        <tr id="comparison-row-stars">
+          <th scope="row"><button type="button" id="comparison-criterion-stars" class="comparison-criterion" aria-pressed="false" aria-controls="comparison-explanation"><span>02</span>Star rating</button></th>
+          <td>4 stars</td><td>4 stars</td><td>4 stars</td>
+        </tr>
+        <tr id="comparison-row-rating">
+          <th scope="row"><button type="button" id="comparison-criterion-rating" class="comparison-criterion" aria-pressed="false" aria-controls="comparison-explanation"><span>03</span>Guest rating</button></th>
+          <td>8.5<span class="comparison-value-suffix">+ / 10</span></td>
+          <td>9.1<span class="comparison-value-suffix"> / 10</span></td>
+          <td>9.0<span class="comparison-value-suffix"> / 10</span></td>
+        </tr>
+        <tr id="comparison-row-reviews">
+          <th scope="row"><button type="button" id="comparison-criterion-reviews" class="comparison-criterion" aria-pressed="false" aria-controls="comparison-explanation"><span>04</span>Review count</button></th>
+          <td>300+</td><td>648</td><td><span class="comparison-unknown">Not available</span></td>
+        </tr>
+        <tr id="comparison-row-amenities">
+          <th scope="row"><button type="button" id="comparison-criterion-amenities" class="comparison-criterion" aria-pressed="false" aria-controls="comparison-explanation"><span>05</span>Amenities</button></th>
+          <td>Pool <span class="comparison-amenity-separator">/</span> Wi-Fi</td>
+          <td>Pool <span class="comparison-amenity-separator">/</span> Wi-Fi</td>
+          <td>Wi-Fi <span class="comparison-unknown comparison-unknown-line">Pool not verified</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="comparison-reading" id="comparison-explanation" aria-live="polite" aria-atomic="true">
+    <span class="comparison-reading-label" id="comparison-explanation-label">Reading the area</span>
+    <p id="comparison-explanation-copy">Both possible hotels are in the offer's Downtown area. That narrows the field, but doesn't distinguish one from the other.</p>
+  </div>
+  <div class="comparison-footnotes">
+    <p>Names, details, and photographs illustrate the comparison only. Photos are travel inspiration, not images of actual matches.</p>
+    <p>Candidates are possibilities, never confirmed identities. Review the deal and complete any booking on Priceline.</p>
+  </div>
+</section>
