@@ -73,6 +73,49 @@ test('the real destination catalog finds Israel by country name, IL, and Tel Avi
   expect(hotelSearches).toBe(0);
 });
 
+test('Home destination loading and retry stay usable inside the reception', async ({ page }) => {
+  const searches = await recordSearches(page);
+  for (const width of [320, 1440]) {
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    let requests = 0;
+    const lookup = async route => {
+      if (++requests === 1) {
+        await pending;
+        await route.fulfill({ status: 503, json: {} });
+      } else await route.continue();
+    };
+    await page.route('**/api/v1/destinations?*', lookup);
+    try {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto('/');
+      const input = page.getByLabel('Where are you going?');
+      await input.fill('Tel Aviv');
+      const panel = page.locator('.destination-status-panel');
+      await expect(panel).toContainText('Finding destinations…');
+      await expect(panel).toBeInViewport({ ratio: 1 });
+      release();
+      const retry = panel.getByRole('button', { name: 'Try again', exact: true });
+      await expect(retry).toBeVisible();
+      await expect(panel).toBeInViewport({ ratio: 1 });
+      expect(await retry.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+      })).toBe(true);
+      await retry.click();
+      await destinationOptions(page).filter({ has: page.getByText('Tel Aviv', { exact: true }) }).click();
+      await expect(input).toHaveValue('Tel Aviv, Israel');
+      await expect(panel).toHaveCount(0);
+      expect(requests).toBe(2);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    } finally {
+      release();
+      await page.unroute('**/api/v1/destinations?*', lookup);
+    }
+  }
+  expect(searches).toHaveLength(0);
+});
+
 test('keyboard destination selection keeps the canonical city and waits for explicit search', async ({ page }) => {
   const searches = await recordSearches(page);
   await loadResults(page);

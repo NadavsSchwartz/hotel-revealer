@@ -9,8 +9,8 @@ export default function Home({ draftRef }) {
       <section className="room-scene" aria-labelledby="home-title">
         <div className="room-view" aria-hidden="true">
           <picture>
-            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.avif" type="image/avif" />
             <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.webp" type="image/webp" />
+            <source media="(max-width: 650px)" srcSet="/media/room-terrace-mobile.avif" type="image/avif" />
             <source srcSet="/media/room-terrace.avif" type="image/avif" />
             <img src="/media/room-terrace.webp" alt="" width="1536" height="1024" />
           </picture>

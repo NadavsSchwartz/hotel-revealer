@@ -23,3 +23,6 @@ retained at ../fonts/bodoni-LICENSE.txt. Imagery is inspiration, not a real offe
 
 room-stay.webp: the existing Christian Lambert pool photograph, resized from
 sketches/afterlight/assets/atlas-inspiration.webp to 900x1125, WebP quality 76.
+
+The Room homepage prefers mobile WebP with a matching preload; desktop prefers
+AVIF. Both formats are retained. Local measurement evidence is in docs/ACCEPTANCE.md.

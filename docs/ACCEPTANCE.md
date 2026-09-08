@@ -11,16 +11,69 @@ permission or exception to the published terms has been established.
 | Domain correctness | Local tests passed | Conservative clues, ambiguity, dates, duplicates/page partitions, order invariance and bounded IDs/work; known live hotel outcomes still absent |
 | Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
 | Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 288 local cases covered and passing | 72 scenarios across Chromium, mobile Chromium, Firefox and WebKit; exact audit-fix runs linked below. Production-build intercepted journeys and real app live flow are separate evidence |
+| Browser journeys | 291/292 passed initially; remaining case passed 3/3 reruns | 73 scenarios across Chromium, mobile Chromium, Firefox and WebKit. One intermittent Results traveler-focus failure remains unexplained; see Room verification below |
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Current local mobile LCP/CLS target passed in three runs | LCP 2.272/2.088/2.200s; CLS 0.0009533. Field INP/p75, controlled live-search latency and hosted sizing remain unverified |
+| Performance | Room local mobile LCP/CLS target passed in three runs | LCP 2.216/2.032/2.016s; CLS 0.000695. Initial AVIF-first batch missed once; both reports retained below. Field INP/p75 and hosted performance remain unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Room homepage — local verification
+
+The selected expanded Room design is integrated with the existing destination,
+dates, occupancy, draft and search-navigation behavior. The page has one static,
+explicitly fictional hotel reveal, a three-step process and native FAQs. No
+provider/API/identification changes or dependencies were added. Commits `6e65741`
+and `1722254` contain the entrance and complete page; the final adjustment makes
+mobile WebP the first picture source and aligns its homepage-only preload.
+
+**Release dependency:** this homepage expresses the intended one-hotel-per-deal
+product. The matcher, Results, Details and Terms still implement the existing
+candidate model. Their separate identification work must land before public
+release. No live hotel identity or accuracy was established in this task, and
+nothing was pushed or deployed.
+
+- `npm run check`: lint, 178 native tests and production build passed.
+- Full browser suite: 291/292 cases passed. Firefox's existing Results test
+  “travelers preserve keyboard and required age focus at 1440px” failed its
+  child-age focus assertion once, then passed 3/3 isolated reruns. Cause is
+  unconfirmed; it is not established as pre-existing. The focus code and assertion
+  remain unchanged. After the final image-format adjustment, both existing
+  Chromium/mobile 320px reflow checks passed. All four runs of the new destination loading/error/retry
+  regression passed. Original matrix and rerun logs are retained.
+- Independent skeptical reviews preceded each implementation milestone. Fixed
+  mobile navigation visibility, traveler and skip-link focus contrast, mobile
+  heading spacing and redundant FAQ decoration in accessible names. Final
+  aggregate code/test review found no additional actionable issues.
+- Rendered at 1440x1000, 1280x720, 832x900, 390x844 and 320x800 without horizontal
+  page overflow. Checked keyboard/anchor/FAQ behavior, long destination and
+  validation text, open controls, and lazy workflow-photo loading. 720x500 reflow
+  represents a 200% equivalent viewport for 1440x1000, with reduced-motion
+  emulation; actual browser zoom, physical devices and VoiceOver remain unverified.
+- Direct Results and Details entry loaded no Room images or homepage preload
+  links; those in-app checks used incomplete-link states. The existing lab also
+  verified zero Room-image requests on valid synthetic Results navigation.
+
+The existing three-cold-context Chrome lab measured AVIF-first LCP at
+2.572/1.992/1.984s, with the first run above the 2.5s target. Prioritizing the
+already-generated mobile WebP measured 2.216/2.032/2.016s with CLS 0.000695 in all
+three runs. This demonstrates passing local measurements, not a proven decoder
+root cause or field percentile. Desktop retains AVIF. Inventory was intercepted
+and external origins blocked; no real-provider latency was measured.
+
+Evidence lives under `output/verification/room-production/`: `logs/`,
+`layout.json`, `direct-routes.json`, viewport captures and
+`final-workflow-desktop.png`. `performance/browser-lab.json` retains the first
+batch; `performance-webp/browser-lab.json` contains the final batch. Both report
+Git HEAD `1722254`; the latter includes the then-uncommitted two-line mobile image
+selection change. Its measured HTML SHA-256 is
+`8fe43aba1de0785c4296d85ca81adf871484a4190db03d5c0e9478a220032693`.
+The lab's full-page screenshots can show the offscreen lazy photograph unloaded;
+the separate workflow capture verifies it rendered after scrolling.
 
 ## Rendered audit corrections (`4dd2217`)
 

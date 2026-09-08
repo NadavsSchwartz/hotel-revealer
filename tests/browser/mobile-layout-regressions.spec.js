@@ -39,6 +39,7 @@ test('invalid travel links reveal the mobile editor and the landing copy uses re
   await expect(page.getByRole('combobox', { name: 'Check-out', exact: true })).toHaveAttribute('aria-invalid', 'true');
   expect(searches).toBe(0);
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'How it works', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('mobile-home.png'), fullPage: true });
   const sizes = await page.locator('.room-description, .room-reception label').evaluateAll(elements =>
     elements.map(element => parseFloat(getComputedStyle(element).fontSize)));
