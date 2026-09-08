@@ -6,6 +6,7 @@ import store from './store/index.js';
 import App from './App.jsx';
 import 'antd/es/button/style/css';
 import './traveler/styles.css';
+import './traveler/theme.css';
 
 ReactDOM.render(
   <Provider store={store}>

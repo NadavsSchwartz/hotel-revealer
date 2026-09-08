@@ -4,10 +4,13 @@ import { numberOrNull, normalizeQuote } from '../domain/normalization.js';
 import { ProviderFailure, ServiceError } from './errors.js';
 import { MAX_JSON_BYTES } from './size.js';
 import { nightCount } from '../../shared/travel.js';
+import { isCurrency } from '../../shared/currency.js';
 
 const ENDPOINT = 'https://www.priceline.com/pws/v0/pcln-graph/';
 const PAGE_SIZE = 500;
 const MAX_DESTINATION_DISTANCE_KM = 100;
+// Observed on public quote responses; the provider uses AU$, not Intl's A$.
+const CURRENCY_PREFIXES = { USD: '$', EUR: '€', GBP: '£', CAD: 'C$', AUD: 'AU$' };
 
 const LISTINGS_QUERY = `query HotelRevealerListings(
   $locationID: ID, $checkIn: DateString, $checkOut: DateString,
@@ -208,20 +211,23 @@ function hasNearbyListing(rows, destination) {
 
 function originalOfferUrl(row, context) {
   // The public guest selector encodes aggregate room/adult counts and child ages.
-  if (context.currency !== 'USD' ||
+  if (!isCurrency(context.currency) ||
       typeof row.pclnId !== 'string' || !/^[a-f\d]{1,1024}$/i.test(row.pclnId) ||
       !/^[1-9]\d{0,15}$/.test(String(row.location?.cityId))) return null;
   return `https://www.priceline.com/relax-ui/at/express/${row.location.cityId}/${row.pclnId}` +
     `/from/${context.checkIn.replaceAll('-', '')}/to/${context.checkOut.replaceAll('-', '')}` +
     `/rooms/${context.rooms}/adults/${context.adults}` +
-    (context.childrenAges.length ? `/children/${context.childrenAges.join(',')}` : '') + '?cur=USD';
+    (context.childrenAges.length ? `/children/${context.childrenAges.join(',')}` : '') + `?cur=${context.currency}`;
 }
 
 function adaptQuote(ratesSummary, context, advertisedPercent) {
-  const percent = numberOrNull(advertisedPercent, { max: 100 });
+  // A provider fallback must never be displayed as the requested currency.
+  const sameCurrency = ratesSummary.minCurrencyCode === context.currency;
+  const rates = sameCurrency ? ratesSummary : { programName: ratesSummary.programName };
+  const percent = sameCurrency ? numberOrNull(advertisedPercent, { max: 100 }) : null;
   return {
-    ...ratesSummary, roomCount: context.rooms, nightlyBasis: 'per-room',
-    ...(ratesSummary.displayPricePerStay != null ? { stayBasis: 'all-rooms' } : {}),
+    ...rates, minCurrencyCode: context.currency, roomCount: context.rooms, nightlyBasis: 'per-room',
+    ...(rates.displayPricePerStay != null ? { stayBasis: 'all-rooms' } : {}),
     // Base-price field names alone do not establish fee treatment in every country.
     taxesFees: 'unknown',
     ...(percent !== null && percent > 0 && percent < 100 ? { advertisedDiscount: { percent, source: 'Priceline' } } : {}),
@@ -260,8 +266,9 @@ function modernPriceCents(amount) {
 }
 
 function originalQuote(original, context) {
-  if (!isRecord(original) || context.currency !== 'USD' || original.nightly?.currencyPrefix !== '$' ||
-      original.total?.currencyPrefix !== '$' || !Array.isArray(original.rooms) ||
+  const prefix = isCurrency(context.currency) ? CURRENCY_PREFIXES[context.currency] : null;
+  if (!isRecord(original) || !prefix || original.nightly?.currencyPrefix !== prefix ||
+      original.total?.currencyPrefix !== prefix || !Array.isArray(original.rooms) ||
       typeof original.total?.description !== 'string' || !/includes taxes\s*(?:&|and)\s*fees/i.test(original.total.description)) return null;
   const nightlyCents = modernPriceCents(original.nightly.amount);
   const totalCents = modernPriceCents(original.total.amount);
@@ -276,7 +283,7 @@ function originalQuote(original, context) {
   const expectedBase = nightlyCents * nightCount(context.checkIn, context.checkOut) * context.rooms;
   if (stayCents === null || !Number.isSafeInteger(expectedBase) || stayCents !== expectedBase) return null;
   const quote = normalizeQuote({
-    nightlyCents, stayCents, totalCents, currency: 'USD',
+    nightlyCents, stayCents, totalCents, currency: context.currency,
     roomCount: context.rooms, nightlyBasis: 'per-room', stayBasis: 'all-rooms',
     taxesFees: 'excluded', totalTaxesFees: 'included',
     advertisedDiscount: { percent: original.nightly.savingsPercentage, source: 'Priceline' },

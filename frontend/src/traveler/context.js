@@ -1,4 +1,5 @@
 import legacyDestinations from '../../../data/destinations-legacy-public.json' with { type: 'json' };
+import { isCurrency } from '../../../shared/currency.js';
 import { normalizeDestinationText as legacyKey } from '../../../shared/destinationText.js';
 import {
   DEFAULT_OCCUPANCY,
@@ -98,11 +99,11 @@ export function nights(context) {
   return nightCount(context.checkIn, context.checkOut);
 }
 
-export function money(cents) {
-  return Number.isInteger(cents) && cents >= 0
+export function money(cents, currency = 'USD') {
+  return Number.isSafeInteger(cents) && cents >= 0 && isCurrency(currency)
     ? new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD',
+        currency,
         minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
       }).format(cents / 100)
     : null;

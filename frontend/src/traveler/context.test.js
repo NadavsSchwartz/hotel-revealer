@@ -18,6 +18,13 @@ test('money displays integer cents as USD and rejects missing or invalid amounts
     assert.equal(money(value), null, String(value));
 });
 
+test('money formats the quote currency without converting or guessing unsupported currencies', () => {
+  for (const [currency, expected] of [['EUR', '€119.99'], ['GBP', '£119.99'], ['CAD', 'CA$119.99'], ['AUD', 'A$119.99']]) {
+    assert.equal(money(11999, currency), expected);
+  }
+  for (const currency of [null, 'INVALID', 'JPY', 'eur']) assert.equal(money(11999, currency), null);
+});
+
 test('safeHref preserves HTTPS links and restricts booking links to the provider', () => {
   for (const [value, expected] of [
     ['https://priceline.com/offer', 'https://priceline.com/offer'],

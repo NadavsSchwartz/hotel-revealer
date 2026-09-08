@@ -32,12 +32,9 @@ html:root {
 .brand-symbol { height: 40px; width: 40px; color: inherit; }
 .brand-type { font-size: 16px; font-weight: 650; letter-spacing: .035em; line-height: 1.22; }
 .brand-type > span { display: block; font-weight: inherit; }
-.direction-header nav { display: flex; align-items: center; gap: 30px; font-size: 13px; font-weight: 500; }
-.direction-header nav a { display: inline-flex; align-items: center; min-height: 44px; }
-.direction-header .currency { border-left: 1px solid var(--line); padding-left: 26px; color: var(--muted); font-size: 12px; }
 .direction-footer { width: min(var(--page-width), calc(100% - 128px)); margin: 24px auto 0; padding: 40px 0; background: transparent; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 25px; color: var(--muted); font-size: 12px; }
 .footer-copy { display: grid; gap: 4px; }
-.direction-header nav a:hover, .direction-footer a:hover { color: var(--blue); text-decoration: underline; }
+.direction-footer a:hover { color: var(--blue); text-decoration: underline; }
 .direction-footer nav { display: flex; gap: 26px; }
 .direction-footer a { display: inline-flex; align-items: center; min-height: 44px; }
 .unboxed-application button:focus-visible, .unboxed-application a:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
@@ -62,8 +59,6 @@ html:root .child-age-field .ant-select-item-option-selected { background: var(--
   .brand-type { font-size: 14px; }
   .brand-symbol { height: 32px; width: 32px; }
   .direction-header .brand { gap: 8px; }
-  .direction-header nav { gap: 16px; font-size: 12px; }
-  .direction-header nav a:first-child, .direction-header .currency { display: none; }
   .direction-footer { width: calc(100% - 64px); font-size: 12px; margin-top: 0; padding: 32px 0; display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
   .footer-copy { justify-self: end; }
   .direction-footer nav { grid-column: 1 / -1; gap: 24px; }

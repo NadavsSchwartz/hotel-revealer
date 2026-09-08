@@ -29,7 +29,7 @@ function normalizeDetails(value) {
 
 function normalizeOriginalQuote(value, context) {
   const quote = normalizeQuote(value);
-  return quote.totalCents != null && quote.totalTaxesFees === 'included' && quote.taxesFees === 'excluded' &&
+  return quote.currency === context.currency && quote.totalCents != null && quote.totalTaxesFees === 'included' && quote.taxesFees === 'excluded' &&
     quote.roomCount === context.rooms && quote.nightlyBasis === 'per-room' && quote.stayBasis === 'all-rooms'
     ? quote : null;
 }

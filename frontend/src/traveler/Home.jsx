@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import SearchForm from './SearchForm.jsx';
 import './room-home.css';
 
-export default function Home({ draftRef }) {
+export default function Home({ draftRef, currency }) {
   return (
     <div className="room-home">
       <section className="room-scene" aria-labelledby="home-title">
@@ -13,7 +13,7 @@ export default function Home({ draftRef }) {
         </div>
         <section className="room-reception" id="unboxed-search" aria-labelledby="search-title">
           <h2 id="search-title" tabIndex="-1">Start with your trip</h2>
-          <SearchForm draftRef={draftRef} submitLabel="Find hotel deals" />
+          <SearchForm draftRef={draftRef} currency={currency} submitLabel="Find hotel deals" />
         </section>
         <figure className="room-view">
           <picture>

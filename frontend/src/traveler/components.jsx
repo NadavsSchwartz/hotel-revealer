@@ -16,7 +16,7 @@ export function TripSummary({ context }) {
       {count} {count === 1 ? 'night' : 'nights'}
       <span aria-hidden="true"> / </span>
       {context.rooms} {context.rooms === 1 ? 'room' : 'rooms'}, {context.adults} {context.adults === 1 ? 'adult' : 'adults'}
-      {children > 0 && <>, {children} {children === 1 ? 'child' : 'children'}</>}, USD
+      {children > 0 && <>, {children} {children === 1 ? 'child' : 'children'}</>}, {context.currency}
     </p>
   );
 }
@@ -30,14 +30,15 @@ export function Quote({
   refreshing = false,
   refreshDisabled = false,
 }) {
-  const nightly = money(quote?.nightlyCents);
-  const stay = money(quote?.stayCents);
-  const total = quote?.totalTaxesFees === 'included' ? money(quote.totalCents) : null;
+  const format = cents => money(cents, quote?.currency ?? null);
+  const nightly = format(quote?.nightlyCents);
+  const stay = format(quote?.stayCents);
+  const total = quote?.totalTaxesFees === 'included' ? format(quote.totalCents) : null;
   const discount = quote?.advertisedDiscount?.source === 'Priceline' &&
     quote.advertisedDiscount.percent > 0 && quote.advertisedDiscount.percent < 100
     ? quote.advertisedDiscount.percent : null;
   const fees = total && Number.isSafeInteger(quote.stayCents) && quote.totalCents >= quote.stayCents
-    ? money(quote.totalCents - quote.stayCents) : null;
+    ? format(quote.totalCents - quote.stayCents) : null;
   const taxes =
     quote?.taxesFees === 'included'
       ? 'Taxes and fees included'
@@ -64,7 +65,7 @@ export function Quote({
             : stay ? quote.stayBasis === 'all-rooms' && quote.roomCount > 1
               ? `${stay} for ${quote.roomCount} rooms, entire stay`
               : `${stay} for the stay` : 'Stay total unavailable'}{' '}
-          <span>· USD</span>
+          {quote?.currency && <span>· {quote.currency}</span>}
         </p>}
         {total ? <details className="quote-breakdown">
           <summary>Price breakdown</summary>
@@ -222,7 +223,7 @@ const errorCopy = {
   ],
   UNSUPPORTED_CONTEXT: [
     'This trip is not supported',
-    'Review the travelers and use USD prices.',
+    'Review the travelers and choose a supported currency.',
   ],
   INVALID_OFFER_ID: [
     'This offer link is incomplete',

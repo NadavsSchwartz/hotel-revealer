@@ -52,7 +52,7 @@ test('explicit provider totals preserve base prices and separately identify incl
     taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1, nightlyBasis: 'per-room', stayBasis: 'all-rooms' });
   assert.deepEqual(normalizeQuote(quote), quote);
   for (const changes of [{ grandTotal: 197 }, { grandTotal: null }, { grandTotal: Infinity },
-    { grandTotal: '1e3' }, { grandTotal: Number.MAX_SAFE_INTEGER }, { minCurrencyCode: 'EUR' },
+    { grandTotal: '1e3' }, { grandTotal: Number.MAX_SAFE_INTEGER }, { minCurrencyCode: 'INVALID' },
     { totalTaxesFees: undefined }, { minPrice: null }, { displayPricePerStay: null }, { minPrice: 500 }]) {
     assert.equal(normalizeQuote({ ...raw, ...changes }).totalCents, undefined);
   }
@@ -191,14 +191,22 @@ test('different offers may share a named hotel, while duplicate conflicting offe
   assert.equal(conflict.offers[0].stars, null);
 });
 
-test('quotes require known USD, preserve zero and do not infer totals or taxes', () => {
+test('quotes require a supported currency, preserve zero and do not infer totals or taxes', () => {
   assert.deepEqual(normalizeQuote({ minPrice: 0, minCurrencyCode: 'USD' }), { nightlyCents: 0, stayCents: null, currency: 'USD', taxesFees: 'unknown' });
   for (const minPrice of [-1, '1e3', '', 'NaN', Infinity, {}, true]) assert.equal(normalizeQuote({ minPrice, minCurrencyCode: 'USD' }).nightlyCents, null);
-  for (const minCurrencyCode of [null, 'EUR', undefined]) assert.equal(normalizeQuote({ minPrice: 20, minCurrencyCode }).nightlyCents, null);
+  for (const minCurrencyCode of [null, 'INVALID', 'JPY', undefined]) assert.equal(normalizeQuote({ minPrice: 20, minCurrencyCode }).nightlyCents, null);
   assert.equal(normalizeQuote({ minPrice: '10.29', minCurrencyCode: 'USD' }).nightlyCents, 1029);
   assert.deepEqual(normalizeQuote({ nightlyCents: '12995', stayCents: 25990, currency: 'USD', taxesFees: 'included' }), {
     nightlyCents: 12995, stayCents: 25990, currency: 'USD', taxesFees: 'included',
   });
+});
+
+test('each supported currency retains provider amounts through quote normalization', () => {
+  for (const currency of ['USD', 'EUR', 'GBP', 'CAD', 'AUD']) {
+    const quote = normalizeQuote({ minPrice: '119.99', displayPricePerStay: '239.98', minCurrencyCode: currency });
+    assert.deepEqual(quote, { nightlyCents: 11999, stayCents: 23998, currency, taxesFees: 'unknown' });
+    assert.deepEqual(normalizeQuote(quote), quote);
+  }
 });
 
 test('original links are retained only on the exact HTTPS Priceline allowlist; no link is generated', () => {

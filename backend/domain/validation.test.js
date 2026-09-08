@@ -23,6 +23,13 @@ test('search validates and returns only normalized supported context without mut
   assert.deepEqual(validateSearch(result, now), result);
 });
 
+test('supported search currencies survive search and detail validation', () => {
+  for (const currency of ['USD', 'EUR', 'GBP', 'CAD', 'AUD']) {
+    assert.equal(validateSearch({ ...input, currency }, now).currency, currency);
+    assert.equal(validateDetail({ ...input, currency, offerId: 'offer-1' }, now).currency, currency);
+  }
+});
+
 test('missing, non-object, unsupported and injected request fields have stable errors', () => {
   for (const body of [null, undefined, [], '', 1]) assert.throws(() => validateSearch(body, now), error('INVALID_BODY'));
   assert.throws(() => validateSearch({ ...input, cityName: 'Elsewhere' }, now), error('INVALID_CITY'));
@@ -65,7 +72,7 @@ test('occupancy preserves selected rooms, adults, children including infants and
   for (const childrenAges of [[null], [undefined], ['3'], [-1], [18], [2.5], Array(1)]) {
     assert.throws(() => validateSearch({ ...input, childrenAges }, now), error('INVALID_CHILD_AGE'));
   }
-  for (const currency of ['EUR', null]) {
+  for (const currency of ['INVALID', 'JPY', 'eur', null]) {
     assert.throws(() => validateSearch({ ...input, currency }, now), error('UNSUPPORTED_CONTEXT'));
   }
 });

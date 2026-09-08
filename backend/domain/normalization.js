@@ -1,5 +1,6 @@
 import { isRecord, normalizedId } from './validation.js';
 import { MAX_OFFER_ID_LENGTH } from '../../shared/identifiers.js';
+import { isCurrency } from '../../shared/currency.js';
 
 const unknown = () => ({ kind: 'unknown' });
 const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -52,19 +53,20 @@ function cents(value) {
 export function normalizeQuote(value) {
   const source = isRecord(value) ? value : {};
   const normalized = Object.hasOwn(source, 'nightlyCents') || Object.hasOwn(source, 'stayCents') || Object.hasOwn(source, 'totalCents');
-  const usd = (normalized ? source.currency : source.minCurrencyCode) === 'USD';
+  const sourceCurrency = normalized ? source.currency : source.minCurrencyCode;
+  const currency = isCurrency(sourceCurrency) ? sourceCurrency : null;
   const quote = {
-    nightlyCents: usd ? normalized ? numberOrNull(source.nightlyCents, { integer: true }) : cents(source.minPrice) : null,
-    stayCents: usd ? normalized ? numberOrNull(source.stayCents, { integer: true }) : cents(source.displayPricePerStay) : null,
-    currency: 'USD',
-    taxesFees: usd && ['included', 'excluded'].includes(source.taxesFees) ? source.taxesFees : 'unknown',
+    nightlyCents: currency ? normalized ? numberOrNull(source.nightlyCents, { integer: true }) : cents(source.minPrice) : null,
+    stayCents: currency ? normalized ? numberOrNull(source.stayCents, { integer: true }) : cents(source.displayPricePerStay) : null,
+    currency,
+    taxesFees: currency && ['included', 'excluded'].includes(source.taxesFees) ? source.taxesFees : 'unknown',
   };
   if (Number.isInteger(source.roomCount) && source.roomCount >= 1 && source.roomCount <= 8) {
     quote.roomCount = source.roomCount;
     if (source.nightlyBasis === 'per-room') quote.nightlyBasis = 'per-room';
     if (source.stayBasis === 'all-rooms') quote.stayBasis = 'all-rooms';
   }
-  const totalCents = usd ? normalized ? numberOrNull(source.totalCents, { integer: true }) : cents(source.grandTotal) : null;
+  const totalCents = currency ? normalized ? numberOrNull(source.totalCents, { integer: true }) : cents(source.grandTotal) : null;
   if (source.totalTaxesFees === 'included' && quote.nightlyCents > 0 && quote.stayCents > 0 &&
       totalCents !== null && totalCents >= quote.stayCents && totalCents >= quote.nightlyCents) {
     quote.totalCents = totalCents;
@@ -72,7 +74,7 @@ export function normalizeQuote(value) {
   }
   const discount = source.advertisedDiscount;
   const percent = isRecord(discount) && discount.source === 'Priceline' ? numberOrNull(discount.percent, { max: 100 }) : null;
-  if (usd && percent !== null && percent > 0 && percent < 100) {
+  if (currency && percent !== null && percent > 0 && percent < 100) {
     quote.advertisedDiscount = { percent, source: 'Priceline' };
   }
   return quote;

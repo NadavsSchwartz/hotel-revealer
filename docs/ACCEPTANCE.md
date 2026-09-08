@@ -592,3 +592,25 @@ check exercises all eight distinct options, owned active IDs, scrolling into the
 visible popup bounds, Enter selection of the correct geographic ID, and Tab/Escape
 exit. The exception applies only to that single holder and rule; other Axe findings
 still fail the check. Manual VoiceOver/Safari validation remains an open release gate.
+
+
+### Currency and theme controls — September 8, 2026
+
+Removed the header's Hotels/How it works links and added currency and theme controls
+on every page, including mobile. USD/EUR/GBP/CAD/AUD selections request provider
+prices in that currency and carry through trip URLs, summaries, all quote amounts,
+and the original-offer link. Saved currency and theme choices survive reload;
+system theme is followed until a manual choice. No dependencies were added.
+
+Validation: `npm run check` passed (221 native tests, lint, production build);
+final frontend edits passed lint and build. The focused production-build currency,
+theme, navigation and mobile-layout suites passed all 80 cases across Chromium,
+mobile Chromium, Firefox and WebKit. They cover draft preservation, route variants,
+Back/Forward, new currency requests without relabeling old amounts, fee/retail
+quotes and links, theme persistence, unavailable storage, 320px controls and
+automated dark-theme contrast including calendar/destination/traveler portals.
+Full-page desktop/mobile screenshots were inspected, including WebKit dark mode.
+The independent review's draft-loss and route-matching findings were fixed and
+regression-tested. Fresh public synthetic currency probes are recorded in
+`docs/LIVE_ACCESS.md`. Hosted deployment, provider checkout-price parity and
+manual assistive-technology validation were not performed for this change.

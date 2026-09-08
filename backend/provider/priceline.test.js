@@ -275,6 +275,42 @@ const originalDetails = () => ({
 const pricingContext = { ...context, rooms: 2, adults: 4, childrenAges: [7] };
 const quoteRequest = adapter => adapter.hotelDetails({ context: pricingContext, hotelId: '49205', offerId: 'original-opaque-id' });
 
+test('currency binds listing amounts, original totals and provider handoff without conversion', async () => {
+  for (const [currency, prefix] of [['USD', '$'], ['EUR', '€'], ['GBP', '£'], ['CAD', 'C$'], ['AUD', 'AU$']]) {
+    const trip = { ...pricingContext, currency };
+    const rows = [named, opaque].map(row => ({ ...row, ratesSummary: { ...row.ratesSummary, minCurrencyCode: currency } }));
+    const original = originalDetails();
+    original.nightly.currencyPrefix = prefix;
+    original.total.currencyPrefix = prefix;
+    const { adapter, requests, search } = setup(request => jsonResponse(request.payload.operationName === 'HotelRevealerListings'
+      ? page({ hotels: rows }) : { data: { original, details: { hotel: { ratesSummary: rows[0].ratesSummary } } } }));
+    const listings = await search({ context: trip });
+    assert.equal(listings.listings[1].ratesSummary.minCurrencyCode, currency);
+    assert.equal(listings.listings[1].ratesSummary.minPrice, '66.00');
+    assert.ok(listings.listings[1].handoffUrl.endsWith(`?cur=${currency}`));
+    const detail = await adapter.hotelDetails({ context: trip, offerId: opaque.pclnId, hotelId: named.hotelId });
+    assert.equal(detail.originalQuote.currency, currency);
+    assert.equal(detail.originalQuote.totalCents, 37590);
+    assert.equal(detail.retailQuote.minCurrencyCode, currency);
+    assert.ok(requests.every(request => request.payload.variables.currencyCode === currency));
+    original.total.currencyPrefix = currency === 'USD' ? '€' : '$';
+    assert.equal((await adapter.hotelDetails({ context: trip, offerId: opaque.pclnId, hotelId: named.hotelId })).originalQuote, null);
+  }
+});
+
+test('provider currency fallback suppresses listing and retail prices instead of relabeling amounts', async () => {
+  const { adapter, search } = setup(request => jsonResponse(request.payload.operationName === 'HotelRevealerListings'
+    ? page() : { data: { details: { hotel: { ratesSummary: named.ratesSummary } } } }));
+  const trip = { ...context, currency: 'EUR' };
+  const result = await search({ context: trip });
+  assert.equal(result.listings[1].ratesSummary.minPrice, undefined);
+  assert.equal(result.listings[1].ratesSummary.displayPricePerStay, undefined);
+  assert.equal(result.listings[1].ratesSummary.advertisedDiscount, undefined);
+  const detail = await adapter.hotelDetails({ context: trip, offerId: opaque.pclnId, hotelId: named.hotelId });
+  assert.equal(detail.retailQuote.minPrice, undefined);
+  assert.equal(detail.originalQuote, null);
+});
+
 test('modern family total selects the unique rate matching advertised nightly and total prices', async () => {
   // Shape and amounts: modern-family-total.json, 2026-09-08T03:54:59Z,
   // 2 rooms, 4 adults, child7, Sep21–24. Root savings fields are separate advertised values.

@@ -8,6 +8,8 @@ import {
 } from 'react-router-dom';
 import Home from './traveler/Home.jsx';
 import Brand from './traveler/Brand.jsx';
+import CurrencySelector, { useCurrency } from './traveler/CurrencySelector.jsx';
+import ThemeToggle from './traveler/ThemeToggle.jsx';
 import SearchProgress from './traveler/SearchProgress.jsx';
 import './traveler/home.css';
 
@@ -55,6 +57,7 @@ function Policy({ privacy }) {
             sort choice, page and scroll position are kept in this tab’s
             session storage. Your unfinished search and results are held in
             application memory so you can return to your results.
+            Your currency and theme choices are saved in local storage on this browser.
           </p>
           <p>
             This application does not require an account and does not include
@@ -118,8 +121,10 @@ function Policy({ privacy }) {
           </p>
           <h2>Supported scope</h2>
           <p>
-            The interface supports worldwide destination search, English, US
-            dollars, room and adult counts, and children’s ages. Stays are
+            The interface supports worldwide destination search, English,
+            the currencies available in the currency selector, room and adult counts,
+            and children’s ages. Prices are requested from Priceline in your selected
+            currency. Stays are
             limited to 30 nights within the next 365 days. Destination coverage
             does not establish hotel availability. Final room assignments,
             occupancy and charges are confirmed on Priceline before booking.
@@ -230,6 +235,7 @@ export default function App() {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const homeDraft = useRef(null);
+  const { currency, setCurrency } = useCurrency();
   return (
     <div id="page-top" className={`unboxed-application ${isHome ? 'room-application' : ''}`}>
       <a className="skip-link" href="#main">
@@ -237,19 +243,16 @@ export default function App() {
       </a>
       <header className="direction-header">
         <Brand />
-        {!isHome && (
-          <nav aria-label="Main navigation">
-            <Link to="/">Hotels</Link>
-            <Link to="/#how-it-works">How it works</Link>
-            <span className="currency">USD</span>
-          </nav>
-        )}
+        <div className="header-preferences" role="group" aria-label="Display preferences">
+          <CurrencySelector currency={currency} onChange={setCurrency} />
+          <ThemeToggle />
+        </div>
       </header>
       <PageBehavior />
       <ErrorBoundary key={location.pathname}>
         <main id="main" tabIndex="-1">
           <Routes>
-            <Route path="/" element={<Home draftRef={homeDraft} />} />
+            <Route path="/" element={<Home draftRef={homeDraft} currency={currency} />} />
             <Route
               path="/results"
               element={

@@ -39,6 +39,25 @@ bypass provider restrictions.
 
 ## Recorded live evidence
 
+### Currency verification — September 8, 2026
+
+The selector supports USD, EUR, GBP, CAD and AUD. Priceline's public
+[hotel page](https://www.priceline.com/hotels) lists all five as accepted currencies.
+Fresh synthetic public searches for Las Vegas, October 12–14, one room, two adults
+and no children returned listing `minCurrencyCode` values matching each requested
+non-USD currency. One newly returned Express offer per currency then returned
+matching nightly/total prefixes: EUR `€`, GBP `£`, CAD `C$`, and AUD `AU$`.
+The corresponding two-night base/total pairs were EUR 240/414.21,
+GBP 206/356.06, CAD 384/664.19, and AUD 386/666.70. These are independent
+point-in-time quotes, not exchange-rate comparisons or hotel identity evidence.
+No saved personal trip was reused, and no booking was made.
+
+Amounts are supplied by the provider, with no client conversion. Search, details,
+quote normalization and handoff URLs carry the selected currency; currency
+fallbacks suppress affected prices. Original totals still require the exact
+rate/base/fee corroboration described below. Rendered provider checkout parity
+for these non-USD probes and hosted deployment remain unverified.
+
 The local artifacts below are ignored files under `output/live-access/`; they are
 not committed inventory fixtures. `flow-research.md` records the bounded public
 website/bundle research, the selected request shape and its limits.

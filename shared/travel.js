@@ -1,3 +1,5 @@
+import { isCurrency } from './currency.js';
+
 // Application limits, independent of any provider's bookability rules.
 export const TRAVEL_LIMITS = Object.freeze({
   maxNights: 30,
@@ -94,8 +96,8 @@ export function validateTripFields(input, now = new Date(), { allowPastGrace = f
   } else if (context.childrenAges.some(age => !Number.isInteger(age) || age < TRAVEL_LIMITS.minChildAge || age > TRAVEL_LIMITS.maxChildAge)) {
     fail('childrenAges', 'INVALID_CHILD_AGE', 'Enter an age from 0 to 17 for every child. Use 0 for infants under 1.');
   }
-  if (context.currency !== 'USD') {
-    fail('currency', 'UNSUPPORTED_CONTEXT', 'Prices are available in USD only.');
+  if (!isCurrency(context.currency)) {
+    fail('currency', 'UNSUPPORTED_CONTEXT', 'Choose a supported currency in the header.');
   }
   return { errors, errorCodes, context };
 }

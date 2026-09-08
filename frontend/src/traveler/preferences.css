@@ -1,0 +1,12 @@
+.header-preferences { display: flex; align-items: center; flex-shrink: 0; gap: 8px; color: var(--ink); }
+.currency-selector { position: relative; display: inline-flex; align-items: center; }
+.currency-selector select { appearance: none; min-height: 44px; padding: 0 30px 0 12px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: inherit; font: 600 13px Manrope, sans-serif; cursor: pointer; }
+.currency-selector option { background: var(--surface); color: var(--ink); }
+.currency-selector svg { position: absolute; right: 10px; width: 14px; height: 14px; pointer-events: none; }
+.currency-selector select:hover { border-color: currentColor; }
+.currency-selector select:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+.room-application .header-preferences { color: #f8f5ea; }
+@media (max-width: 380px) {
+  .header-preferences { gap: 2px; }
+  .currency-selector select { padding-left: 8px; }
+}

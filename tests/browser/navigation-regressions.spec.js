@@ -40,16 +40,16 @@ for (const destination of ['home', 'privacy']) {
 }
 
 test('hash navigation focuses the requested Home and Terms content', async ({ page }) => {
-  await page.goto('/privacy');
-  await page.getByRole('link', { name: 'How it works', exact: true }).click();
-  await expect(page).toHaveURL(/\/#how-it-works$/);
-  await expect(page.locator('#method-title')).toBeFocused();
-  await expect(page.locator('#how-it-works')).toBeInViewport();
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
+  await expect(page).toHaveURL(/\/#unboxed-search$/);
+  await expect(page.locator('#search-title')).toBeFocused();
+  await expect(page.locator('#unboxed-search')).toBeInViewport();
   await page.getByRole('link', { name: 'Terms', exact: true }).click();
   await expect(page).toHaveURL(/\/terms$/);
   await expect(page.locator('h1')).toBeFocused();
   await page.goBack();
-  await expect(page.locator('#method-title')).toBeFocused();
+  await expect(page.locator('#search-title')).toBeFocused();
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
   await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
   await expect(page.locator('#search-title')).toBeFocused();

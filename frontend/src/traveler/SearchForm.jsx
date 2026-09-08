@@ -9,7 +9,7 @@ import './search-controls.css';
 
 const emptyTrip = { cityName: '', checkIn: '', checkOut: '', ...DEFAULT_OCCUPANCY };
 
-export default function SearchForm({ initial = emptyTrip, compact = false, draftRef, blockedSearchKey = null, submitLabel = 'Search' }) {
+export default function SearchForm({ initial = emptyTrip, currency = initial.currency, compact = false, draftRef, blockedSearchKey = null, submitLabel = 'Search' }) {
   const navigate = useNavigate();
   const initialValue = JSON.stringify({ ...emptyTrip, ...initial });
   const previousInitial = useRef(initialValue);
@@ -32,11 +32,24 @@ export default function SearchForm({ initial = emptyTrip, compact = false, draft
 
   useEffect(() => {
     if (previousInitial.current === initialValue) return;
+    const previous = JSON.parse(previousInitial.current);
     previousInitial.current = initialValue;
     const next = JSON.parse(initialValue);
+    // Currency is applied separately without resetting the remaining draft.
+    if (JSON.stringify({ ...previous, currency: next.currency }) === initialValue) return;
     setTrip(next);
     setErrors(next.cityName || next.checkIn || next.checkOut ? validateContext(next).errors : {});
   }, [initialValue]);
+
+  useEffect(() => {
+    // A preference change must preserve unfinished destination/date/traveler edits.
+    setTrip(current => ({ ...current, currency }));
+    setErrors(current => {
+      const next = { ...current };
+      delete next.currency;
+      return next;
+    });
+  }, [currency]);
 
   function update(values, fieldErrors = {}) {
     setTrip((current) => ({ ...current, ...values }));
