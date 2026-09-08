@@ -92,10 +92,26 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
     const target = field === 'childrenAges' && ageIndex >= 0
       ? panel.current?.querySelector(`#child-age-${ageIndex}`)
       : panel.current?.querySelector(`button[aria-label="Increase ${counter}"]:not([disabled]), button[aria-label="Decrease ${counter}"]:not([disabled])`);
-    const control = target || panel.current?.querySelector('button:not([disabled])');
-    if (field) control?.scrollIntoView({ block: 'nearest' });
-    control?.focus({ preventScroll: true });
-    focusField.current = null;
+    const control = target || (!field && panel.current?.querySelector('button:not([disabled])'));
+    if (!control) return;
+    const row = control.closest('.child-age-field, .traveler-counter-row');
+    if (field && row && panel.current) {
+      // Scroll the panel itself; a newly mounted portal may not be positioned yet.
+      const top = row.offsetTop - panel.current.offsetTop;
+      const bottom = top + row.offsetHeight;
+      if (top < panel.current.scrollTop) panel.current.scrollTop = top;
+      else if (bottom > panel.current.scrollTop + panel.current.clientHeight) {
+        panel.current.scrollTop = bottom - panel.current.clientHeight;
+      }
+    }
+    control.focus({ preventScroll: true });
+    if (document.activeElement === control) focusField.current = null;
+  }
+
+  function attachPanel(node) {
+    panel.current = node;
+    // rc-trigger's visibility callback can precede its child DOM mount.
+    if (node && open && focusField.current) focusPanel();
   }
 
   useEffect(() => {
@@ -138,7 +154,7 @@ const Travelers = forwardRef(function Travelers({ trip, errors, onChange }, ref)
   }
 
   const content = (
-    <div ref={panel} id="travelers-panel" role="dialog" aria-labelledby="travelers-title" className="travelers-panel" style={{ maxHeight: panelLayout.maxHeight }} onKeyDown={panelKeyDown}>
+    <div ref={attachPanel} id="travelers-panel" role="dialog" aria-labelledby="travelers-title" className="travelers-panel" style={{ maxHeight: panelLayout.maxHeight }} onKeyDown={panelKeyDown}>
       <div className="travelers-panel-heading"><h3 id="travelers-title">Who’s traveling?</h3><button type="button" aria-label="Close travelers" onClick={() => close(true)}>×</button></div>
       <Counter name="Rooms" value={trip.rooms} minimum={1} maximum={TRAVEL_LIMITS.maxRooms} hint="At least 1 adult per room" onChange={(rooms) => onChange({ rooms })} />
       <Counter name="Adults" value={trip.adults} minimum={1} maximum={TRAVEL_LIMITS.maxAdults} hint="Ages 18 and above" onChange={(adults) => onChange({ adults })} />

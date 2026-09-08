@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { addCalendarDays, localToday } from '../../shared/travel.js';
 import { mockOffers, searchPath } from './fixtures.js';
 
 const travelerDialog = page => page.getByRole('dialog', { name: 'Who’s traveling?', exact: true });
@@ -154,4 +156,85 @@ test('travelers remain usable when the viewport changes while open', async ({ pa
   await expect(travelerDialog(page)).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expectNoPageScroll(page, scrollBeforePanelScroll);
+});
+
+
+async function enterFreshHomeTrip(page, width) {
+  await page.setViewportSize({ width, height: 844 });
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Where are you going?', exact: true }).fill('Las Vegas');
+  await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: 'Nevada' }).first().click();
+  const checkIn = addCalendarDays(localToday(), 14);
+  const checkOut = addCalendarDays(checkIn, 3);
+  await page.getByRole('combobox', { name: 'Check-in', exact: true }).click();
+  for (const [label, date] of [['Check-in', checkIn], ['Check-out', checkOut]]) {
+    const calendar = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
+    await expect(calendar).toBeVisible();
+    const day = calendar.locator(`td[title="${date}"] button`);
+    for (let month = 0; month < 12 && await day.count() === 0; month++) {
+      await calendar.getByRole('button', { name: 'Next month', exact: true }).click();
+    }
+    await day.click();
+  }
+}
+
+for (const width of [390, 1440]) {
+  for (const dismissal of ['Close travelers', 'Done']) {
+    test(`fresh Home pointer validation focuses the missing child age after ${dismissal} at ${width}px`, async ({ page }) => {
+      let hotelRequests = 0;
+      await page.route('**/api/v1/hotelDeals', route => {
+        hotelRequests++;
+        return route.fulfill({ status: 503, json: { error: { code: 'PROVIDER_NOT_CONFIGURED' } } });
+      });
+      await enterFreshHomeTrip(page, width);
+      await travelerTrigger(page).click();
+      await expectPanelInViewport(page);
+      await clickWithoutScrolling(page.getByRole('button', { name: 'Increase children', exact: true }));
+      const childAge = page.getByRole('combobox', { name: 'Child 1 age', exact: true });
+      await expect(childAge).toBeAttached();
+      await page.getByRole('button', { name: dismissal, exact: true }).click();
+      await expect(travelerDialog(page)).toHaveCount(0);
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await expectPanelInViewport(page);
+      await expect(childAge).toBeFocused();
+      await expect(childAge).toBeInViewport();
+      await expect(childAge).toHaveAttribute('aria-invalid', 'true');
+      await expect(travelerDialog(page).locator('#travelers-childrenAges-error')).toBeVisible();
+      expect(hotelRequests).toBe(0);
+    });
+  }
+}
+
+test('the enabled child-age placeholder meets text contrast and the opened panel passes Axe', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await travelerTrigger(page).click();
+  await expectPanelInViewport(page);
+  await clickWithoutScrolling(page.getByRole('button', { name: 'Increase children', exact: true }));
+  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toBeEnabled();
+  const placeholder = travelerDialog(page).locator('.ant-select-selection-placeholder');
+  await expect(placeholder).toHaveText('Select age');
+  await expect.poll(() => page.locator('.travelers-popup:visible').evaluate(element => getComputedStyle(element).opacity)).toBe('1');
+  const colors = await placeholder.evaluate(element => {
+    const channels = color => color.match(/[\d.]+/g).map(Number);
+    const foreground = channels(getComputedStyle(element).color);
+    let background = [255, 255, 255, 1];
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      const color = channels(getComputedStyle(parent).backgroundColor);
+      if ((color[3] ?? 1) === 1) { background = color; break; }
+    }
+    let opacity = foreground[3] ?? 1;
+    for (let node = element; node; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+    const rendered = foreground.slice(0, 3).map((value, index) => value * opacity + background[index] * (1 - opacity));
+    const luminance = values => values.slice(0, 3).map(value => value / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+      .reduce((total, value, index) => total + value * [0.2126, 0.7152, 0.0722][index], 0);
+    const levels = [luminance(rendered), luminance(background)].sort((a, b) => b - a);
+    return { foreground: rendered, background: background.slice(0, 3), opacity, contrast: (levels[0] + 0.05) / (levels[1] + 0.05) };
+  });
+  expect(colors.background).toEqual([255, 255, 255]);
+  expect(colors.opacity).toBe(1);
+  expect(colors.contrast, JSON.stringify(colors)).toBeGreaterThanOrEqual(4.5);
+  const audit = await new AxeBuilder({ page }).include('.travelers-popup').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(audit.violations).toEqual([]);
 });
