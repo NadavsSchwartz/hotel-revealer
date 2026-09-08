@@ -142,7 +142,7 @@ function Credits() {
       <h2>Destinations</h2>
       <p>Destination names come from <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
       <h2>Photography</h2>
-      <p>The homepage terrace is an original generated scene created for Hotel Revealer. It is travel inspiration and does not represent a hotel result or available offer. The homepage reveal example uses a fictional hotel and details.</p>
+      <p>The homepage terrace is an original generated scene created for Hotel Revealer. The pool photograph is by <a href="https://unsplash.com/photos/vmIWr0NnpCQ" target="_blank" rel="noreferrer">Christian Lambert on Unsplash</a>, used under the <a href="https://unsplash.com/license" target="_blank" rel="noreferrer">Unsplash License</a>. These images are travel inspiration and do not represent a hotel result or available offer.</p>
       <h2>Typography</h2>
       <p>Manrope by Mikhail Sharanda and Mirko Velimirovic is distributed under the <a href="/fonts/OFL.txt">SIL Open Font License</a>.</p>
       <p>Bodoni Moda by The Bodoni Moda Project Authors is distributed under the <a href="/fonts/bodoni-LICENSE.txt">SIL Open Font License</a>.</p>
@@ -292,7 +292,7 @@ export default function App() {
       </ErrorBoundary>
       <footer className="direction-footer">
         <Brand label="Back to home" to={isHome ? '/#page-top' : '/'} />
-        <div className="footer-copy"><span>© 2026 Hotel Revealer</span><span>Independent of Priceline.</span></div>
+        <div className="footer-copy"><span>© 2026 Hotel Revealer</span></div>
         <nav aria-label="Footer navigation">
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>

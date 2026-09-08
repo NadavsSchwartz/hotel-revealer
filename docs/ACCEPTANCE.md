@@ -15,7 +15,7 @@ permission or exception to the published terms has been established.
 | Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Rebuilt hero meets the local mobile target | LCP 1.968/1.924/1.920s; CLS 0.001434. Isolated production snapshot and laboratory protocol below; field/hosted performance remains unverified |
+| Performance | Current homepage meets the local mobile target | LCP 1.992/1.924/1.920s; CLS 0.000655. Local production laboratory protocol below; field/hosted performance remains unverified |
 | Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
@@ -23,6 +23,22 @@ permission or exception to the published terms has been established.
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
 ## Homepage copy and navigation cleanup
+
+The current entrance joins a full-width search form to a bounded panorama, with
+responsive rows below 1100px. The requested form note, example caption and footer
+independence line are removed. The reveal graphic now uses conceptual copy instead
+of fictional hotel facts. An additional section explains location and atmosphere,
+using the existing pool photo with its attribution retained on Credits.
+`npm run check` passed with 210 native tests, and 36 affected browser cases passed
+across the four projects. Six viewport renders had no horizontal overflow; filled
+dates fit at 1280px, 1101px and 768px. Production and development were inspected.
+Independent review verified settled popups and corrected the guest-ratings wording.
+The existing three-run mobile lab measured LCP 1.992/1.924/1.920s and CLS 0.000655
+for `7d58873-plus-home-composition`, with no page errors. Evidence is under
+`output/verification/home-composition/`. No dependencies, components, state or
+test suites were added. These results establish local UI behavior, not hotel identity.
+
+Earlier cleanup checkpoints:
 
 The homepage now leads with “Find the hotel behind the deal.” in one type style.
 Repeated navigation, section search links, inline credits and the second decorative
