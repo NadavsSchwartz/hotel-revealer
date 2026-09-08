@@ -229,7 +229,7 @@ export default function App() {
         Skip to content
       </a>
       <header className="direction-header">
-        <Brand variant={isHome ? 'room' : undefined} />
+        <Brand />
         <nav aria-label="Main navigation">
           {!isHome && <Link to="/">Hotels</Link>}
           <Link to="/#how-it-works">How it works</Link>
@@ -285,7 +285,8 @@ export default function App() {
         </main>
       </ErrorBoundary>
       <footer className="direction-footer">
-        <span>© 2026 Hotel Revealer</span>
+        <Brand label="Back to home" to={isHome ? '/#main' : '/'} />
+        <div className="footer-copy"><span>© 2026 Hotel Revealer</span><span>Independent of Priceline.</span></div>
         <nav aria-label="Footer navigation">
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>

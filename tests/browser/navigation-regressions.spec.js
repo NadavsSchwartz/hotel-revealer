@@ -45,6 +45,9 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
   await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
   await expect(page.locator('#search-title')).toBeFocused();
+  await page.getByRole('link', { name: 'Back to home', exact: true }).click();
+  await expect(page.locator('#home-title')).toBeFocused();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeInViewport();
 });
 
 test('an unsubmitted Home draft survives Terms and Back without validating the first keystroke', async ({ page }) => {

@@ -38,6 +38,9 @@ test('the explicitly disabled provider returns a useful recovery state without l
   expect(await health.json()).toMatchObject({ provider: { available: false } });
   await page.goto(searchPath);
   await expect(page.getByRole('heading', { name: 'Live search is not connected yet' })).toBeVisible();
+  await expect.poll(() => page.locator('.direction-footer').evaluate(footer =>
+    Math.abs(footer.getBoundingClientRect().bottom + window.scrollY - document.documentElement.scrollHeight),
+  )).toBeLessThan(2);
   await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
 });
