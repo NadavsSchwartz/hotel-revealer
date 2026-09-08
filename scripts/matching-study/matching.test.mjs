@@ -2,24 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { originalMatches, matchOriginal } from './original.mjs';
 import { isValidOffer, isValidHotel, matchRefactored } from './refactored.mjs';
+import { normalizeListings } from '../../backend/domain/normalization.js';
+import { matchListings } from '../../backend/domain/matching.js';
 
 const hotel = (fields = {}) => ({
-  hotelId: 101, starRating: 4, overallGuestRating: 8.4, totalReviewCount: 1254,
+  hotelId: 101, name: 'Example Hotel', starRating: 4, overallGuestRating: 8.4, totalReviewCount: 1254,
   location: { neighborhoodID: 'area-a' },
-  ratesSummary: { programName: 'Retail', minPrice: 150 },
+  ratesSummary: { programName: 'Retail', minPrice: 150, minCurrencyCode: 'USD' },
   hotelFeatures: { highlightedAmenities: ['POOL', 'WIFI'] },
   amenitiesIcons: [{ iconName: 'pool', amenityName: 'Pool' }, { iconName: 'wifi', amenityName: 'Internet' }],
   ...fields,
 });
 const offer = (fields = {}) => ({
   ...hotel(), pclnId: 'offer-a', overallGuestRating: 8, totalReviewCount: 1200,
-  ratesSummary: { programName: 'Express_Deal', minStrikePrice: 150 },
+  ratesSummary: { programName: 'Express_Deal', minPrice: 100, minStrikePrice: 150, minCurrencyCode: 'USD' },
   ...fields,
 });
 
 function expectPairs(offers, hotels, expected) {
   assert.deepEqual(matchOriginal(offers, hotels), expected);
   assert.deepEqual(matchRefactored(offers, hotels).pairs, expected);
+}
+
+function applicationPairs(offers, hotels) {
+  const normalized = normalizeListings([...offers, ...hotels]);
+  return matchListings(normalized.offers, normalized.hotels).offers.flatMap(offer =>
+    offer.candidates.map(hotel => [offer.offerId, hotel.hotelId]));
 }
 
 test('the independent reference preserves every original rejection condition', () => {
@@ -111,6 +119,34 @@ test('zero, one and multiple distinct hotels remain separate from duplicate rate
   expectPairs([offer(), offer({ pclnId: 'offer-b' }), offer()], hotels,
     ['offer-a', 'offer-b', 'offer-a'].flatMap(id => [[id, 102], [id, 101], [id, 102]]));
   expectPairs([offer()], [hotel({ hotelId: '101' }), hotel()], [['offer-a', '101'], ['offer-a', 101]]);
+});
+
+test('current and original policies report their own outcomes for repeated, missing and conflicting observations', () => {
+  for (const { rows, original, current } of [
+    { rows: [], original: [], current: [] },
+    { rows: [hotel()], original: [101], current: ['101'] },
+    { rows: [hotel(), hotel()], original: [101, 101], current: ['101'] },
+    { rows: [hotel(), hotel({ hotelId: 102 })], original: [101, 102], current: ['101', '102'] },
+    { rows: [hotel({ overallGuestRating: null })], original: [], current: ['101'] },
+    { rows: [hotel({ hotelFeatures: {} })], original: [], current: [] },
+    { rows: [hotel(), hotel({ starRating: 5 })], original: [101], current: [] },
+  ]) {
+    const offers = [offer()];
+    assert.deepEqual(matchOriginal(offers, rows).map(([, id]) => id), original);
+    assert.deepEqual(applicationPairs(offers, rows).map(([, id]) => id), current);
+  }
+});
+
+test('omitting the synthetic source hotel can leave a unique compatible neighbor under either policy', () => {
+  const source = hotel();
+  const neighbor = hotel({ hotelId: 102, name: 'Compatible Neighbor' });
+  const offers = [offer()];
+  expectPairs(offers, [source, neighbor], [['offer-a', 101], ['offer-a', 102]]);
+  assert.deepEqual(applicationPairs(offers, [source, neighbor]), [['offer-a', '101'], ['offer-a', '102']]);
+  expectPairs(offers, [neighbor], [['offer-a', 102]]);
+  assert.deepEqual(applicationPairs(offers, [neighbor]), [['offer-a', '102']]);
+  // The fixture source is 101: uniqueness among the remaining inventory is not
+  // proof of identity. Record the limitation without introducing a new heuristic.
 });
 
 test('incomplete required facts are rejected instead of matching equal absences', () => {

@@ -81,12 +81,36 @@ run, including validation. Each measurement used 20 warmups and 100 iterations.
 These are local CPU observations on one small capture; no speedup is claimed.
 The single capture took about 4.9 seconds, overwhelmingly outside matching work.
 
+## Saved-data follow-up
+
+The September 8 remediation replay used the same saved capture, with no provider
+requests. Original/refactored results remained 60 pairs; the current app retained
+180 pairs, including all 60 original pairs. Preparing amenity membership once per
+observation preserved the current app's complete output exactly against a saved
+pre-change result, including evidence, ordering and unassessed counts.
+
+Two additional deterministic checks compare the policies separately:
+
+- Zero, one and multiple distinct hotel outcomes remain visible. The original
+  retains repeated rate observations; the app collapses repeated hotel IDs.
+  Missing rating facts can leave an app candidate supported by amenities while
+  failing the original rule. Conflicting star observations for the same ID become
+  unassessed in the app, even when one observation passes the original rule.
+- A synthetic offer has a known source hotel and an equally compatible neighbor.
+  Both policies return both hotels. Removing the source leaves only the neighbor
+  under both policies. Thus a unique match within retrieved inventory does not
+  establish identity or prove the source hotel was retrieved.
+
+These tests preserve current behavior and expose its limits; they do not add a
+matching heuristic or measure identification accuracy. The saved capture has no
+independent identity labels, so it cannot determine which policy is more accurate.
+
 ## Reproduce
 
 Use Node 24.20.0 from `.nvmrc`. No additional dependencies are required.
 
 ```sh
-node --test scripts/matching-study/matching.test.mjs
+node --test scripts/matching-study/*.test.mjs
 node scripts/matching-study/compare.mjs output/original-matching/current-listings.json
 npm run check
 ```
