@@ -85,3 +85,14 @@ test('the command exits nonzero for invalid configuration without echoing its va
   assert.match(result.stderr, /HEALTH_HOST must be a plain/);
   assert.doesNotMatch(result.stderr, /private|secret/);
 });
+
+
+test('three consecutive unexpected search failures fail health without changing process availability', async () => {
+  for (const count of [0, 1, 2]) {
+    await run(json({ status: 'ok', provider: { available: true, search: { consecutiveUnexpectedFailures: count } } }));
+  }
+  for (const count of [3, 4]) {
+    await assert.rejects(run(json({ status: 'ok', provider: { available: true,
+      search: { consecutiveUnexpectedFailures: count } } })), /Three consecutive unexpected searches failed/);
+  }
+});

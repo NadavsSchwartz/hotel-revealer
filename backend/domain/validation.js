@@ -58,8 +58,8 @@ export function validateDetail(input, now = new Date()) {
   if (typeof input.offerId !== 'string' || !normalizedId(input.offerId, MAX_OFFER_ID_LENGTH)) {
     throw new ValidationError('INVALID_OFFER_ID', 'A valid original offer ID is required.');
   }
-  if (typeof input.hotelId !== 'string' || !normalizedId(input.hotelId)) {
+  if (Object.hasOwn(input, 'hotelId') && (typeof input.hotelId !== 'string' || !normalizedId(input.hotelId))) {
     throw new ValidationError('INVALID_HOTEL_ID', 'A valid candidate hotel ID is required.');
   }
-  return { ...result, offerId: input.offerId, hotelId: input.hotelId };
+  return { ...result, offerId: input.offerId, ...(Object.hasOwn(input, 'hotelId') ? { hotelId: input.hotelId } : {}) };
 }

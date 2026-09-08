@@ -48,6 +48,9 @@ export async function checkHealth(host, { fetchImpl = fetch, timeoutMs = 20_000 
     catch { throw new HealthcheckError('Health endpoint returned invalid JSON.'); }
     if (health?.status !== 'ok') throw new HealthcheckError('Application status is not healthy.');
     if (health?.provider?.available !== true) throw new HealthcheckError('Live provider is unavailable.');
+    if (health.provider.search?.consecutiveUnexpectedFailures >= 3) {
+      throw new HealthcheckError('Three consecutive unexpected searches failed.');
+    }
   } catch (error) {
     if (error instanceof HealthcheckError) throw error;
     throw new HealthcheckError(controller.signal.aborted

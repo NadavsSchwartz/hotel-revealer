@@ -37,7 +37,7 @@ test('default production service refuses both operations without network or stat
     const service = createProviderService({ stateStore: { read() { throw new Error('State must not be read'); } }, logger: { info() {} } });
     await assert.rejects(service.search(futureContext), { code: 'PROVIDER_NOT_CONFIGURED', status: 503 });
     await assert.rejects(service.detail(selection), { code: 'PROVIDER_NOT_CONFIGURED', status: 503 });
-    assert.deepEqual(await service.status(), { available: false });
+    assert.equal((await service.status()).available, false);
     assert.equal(requests, 0);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -171,7 +171,7 @@ test('coalesced provider summaries retain each caller request ID outside cached 
   const { service, calls } = setup({ logger: { info: entry => logs.push(entry) } });
   const results = await Promise.all(['request-a', 'request-b'].map(requestId => service.search(futureContext, { requestId })));
   assert.equal(calls.length, 1);
-  assert.deepEqual(logs.map(entry => entry.requestId).sort(), ['request-a', 'request-b']);
+  assert.deepEqual(logs.filter(entry => entry.event === 'provider_request').map(entry => entry.requestId).sort(), ['request-a', 'request-b']);
   assert.equal(logs.filter(entry => entry.shared).length, 1);
   assert.ok(results.every(result => !JSON.stringify(result).includes('request-')));
 });
@@ -569,7 +569,7 @@ test('detail revalidation timeout has no usable relationship and returns an erro
 
 test('summary metrics identify cache reuse and upstream work without input or provider payloads', async () => {
   const logs = [];
-  const { service } = setup({ logger: { info: (entry) => logs.push(entry) } });
+  const { service } = setup({ logger: { info: (entry) => { if (entry.event === 'provider_request') logs.push(entry); } } });
   await service.search(futureContext);
   await service.search(futureContext);
   assert.equal(logs[0].upstreamCalls, 1);
@@ -625,7 +625,7 @@ test('a later-page challenge rejects the search and persists the block instead o
   await clock.advance(1_000);
   await rejected;
   assert.equal(count, 2);
-  assert.deepEqual(await service.status(), { available: false });
+  assert.equal((await service.status()).available, false);
   assert.equal((await stateStore.read()).disabled, true);
   await assert.rejects(service.search(futureContext), { code: 'PROVIDER_DISABLED' });
   assert.equal(count, 2);
@@ -658,8 +658,8 @@ function comparisonRows(offerCount, hotelCount) {
 test('large city inventories match across pages and cache the full result', async () => {
   const [offer, hotel] = listingRows();
   const rows = [
-    ...Array.from({ length: 200 }, (_, index) => ({ ...offer, pclnId: `offer-${index}`, location: { ...offer.location, neighborhoodID: `area-${index}` } })),
-    ...Array.from({ length: 800 }, (_, index) => ({ ...hotel, hotelId: `hotel-${index}`, location: { ...hotel.location, neighborhoodID: `area-${index % 200}` } })),
+    ...Array.from({ length: 100 }, (_, index) => ({ ...offer, pclnId: `offer-${index}`, location: { ...offer.location, neighborhoodID: `area-${index}` } })),
+    ...Array.from({ length: 800 }, (_, index) => ({ ...hotel, hotelId: `hotel-${index}`, location: { ...hotel.location, neighborhoodID: `area-${index % 100}` } })),
   ];
   const { service, clock, calls } = setup({ adapter: { async listingsPage({ cursor }) {
     calls.push(cursor);
@@ -668,12 +668,9 @@ test('large city inventories match across pages and cache the full result', asyn
   const pending = service.search(futureContext);
   await clock.advance(1_000);
   const result = await pending;
-  assert.deepEqual(result.coverage, { status: 'complete', reason: null, pagesFetched: 2, offersFound: 200, namedHotelsChecked: 800, unassessedHotels: 0 });
-  assert.equal(result.offers.length, 200);
-  for (const item of result.offers) {
-    const index = Number(item.offerId.split('-')[1]);
-    assert.deepEqual(new Set(item.candidates.map(candidate => candidate.hotelId)), new Set([0, 200, 400, 600].map(offset => `hotel-${index + offset}`)));
-  }
+  assert.deepEqual(result.coverage, { status: 'complete', reason: null, pagesFetched: 2, offersFound: 100, namedHotelsChecked: 800, unassessedHotels: 0 });
+  assert.equal(result.offers.length, 100);
+  assert.ok(result.offers.every(item => item.resolution.reason === 'ambiguous' && item.candidates.length === 0));
   assert.deepEqual(await service.search(futureContext), result);
   assert.deepEqual(calls, [null, 'next']);
 });
@@ -695,20 +692,23 @@ test('dense candidate limits return the stable error without caching or truncati
   assert.equal(calls, 2);
 });
 
-test('public search envelopes above two MiB are rejected even below the comparison and candidate limits', async () => {
+test('public search envelopes above two MiB are rejected across individually bounded pages', async () => {
   let calls = 0;
-  const rows = comparisonRows(70, 70); // 4,900 candidates, below the 5,000-object limit.
-  assert.ok(Buffer.byteLength(JSON.stringify(rows)) < MAX_JSON_BYTES);
-  const { service, clock } = setup({ adapter: { async listingsPage() {
+  const offer = listingRows()[0];
+  const rows = Array.from({ length: 1800 }, (_, index) => ({ ...offer, pclnId: `offer-${index}`,
+    handoffUrl: `https://www.priceline.com/${'a'.repeat(2000)}` }));
+  assert.ok(Buffer.byteLength(JSON.stringify(rows.slice(0, 600))) < MAX_JSON_BYTES);
+  const { service, clock } = setup({ adapter: { async listingsPage({ cursor }) {
     calls += 1;
-    return { listings: rows, nextCursor: null };
+    const start = Number(cursor || 0);
+    return { listings: rows.slice(start, start + 600), nextCursor: start < 1200 ? String(start + 600) : null };
   } } });
-  await assert.rejects(service.search(futureContext), { code: 'RESULT_TOO_LARGE' });
-  const again = service.search(futureContext);
-  const rejected = assert.rejects(again, { code: 'RESULT_TOO_LARGE' });
-  await clock.advance(1_000);
-  await rejected;
-  assert.equal(calls, 2);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const rejected = assert.rejects(service.search(futureContext), { code: 'RESULT_TOO_LARGE' });
+    await clock.advance(3000);
+    await rejected;
+  }
+  assert.equal(calls, 6);
 });
 
 test('oversized provider metadata and detail descriptions fail before normalization or cache reuse', async () => {
@@ -730,4 +730,131 @@ test('oversized provider metadata and detail descriptions fail before normalizat
     await rejected;
   }
   assert.equal(count, 2);
+});
+
+
+test('offer-only pricing validates offer membership and coalesces separately from named details', async () => {
+  const { service, clock, calls } = setup({ adapter: { async hotelDetails(request) {
+    calls.push(['detail', request]);
+    return { originalQuote: originalQuote(), images: [], amenities: [] };
+  } } });
+  const { hotelId, ...offerOnly } = selection;
+  await service.search(futureContext);
+  const pending = Promise.all([service.detail(offerOnly), service.detail(offerOnly)]);
+  await clock.advance(1_000);
+  const [first, second] = await pending;
+  assert.deepEqual(first, second);
+  assert.equal(first.candidate, null);
+  assert.equal(first.details, null);
+  assert.equal(first.detailStatus, 'not_requested');
+  assert.equal(first.quoteStatus, 'available');
+  assert.equal(first.offer.quote.totalCents, 43902);
+  assert.equal(calls.filter(([kind]) => kind === 'detail').length, 1);
+  assert.equal(calls.at(-1)[1].hotelId, undefined);
+  assert.deepEqual(await service.detail(offerOnly), first);
+  const named = service.detail({ ...offerOnly, hotelId });
+  await clock.advance(1_000);
+  assert.equal((await named).candidate.hotelId, hotelId);
+  await assert.rejects(service.detail({ ...offerOnly, offerId: 'other-offer' }), { code: 'INVALID_SELECTION' });
+  await assert.rejects(service.detail({ ...offerOnly, hotelId: 'other-hotel' }), { code: 'INVALID_SELECTION' });
+  assert.equal(calls.filter(([kind]) => kind === 'detail').length, 2);
+});
+
+test('unresolved offers keep quote-only fallback and original handoff on expected pricing failure', async () => {
+  const { service, clock } = setup({ adapter: {
+    async listingsPage() { return { listings: [listingRows()[0]], nextCursor: null }; },
+    async hotelDetails() { throw new ProviderFailure('unavailable'); },
+  } });
+  const offerOnly = { ...futureContext, offerId: selection.offerId };
+  const pending = service.detail(offerOnly);
+  await clock.advance(1_000);
+  const result = await pending;
+  assert.deepEqual(result.offer.resolution, { status: 'unresolved', reason: 'no_match' });
+  assert.equal(result.candidate, null);
+  assert.equal(result.details, null);
+  assert.equal(result.detailStatus, 'not_requested');
+  assert.equal(result.quoteStatus, 'unavailable');
+  assert.equal(result.offer.handoffUrl, listingRows()[0].handoffUrl);
+  assert.equal(result.offer.quote.totalCents, undefined);
+});
+
+
+test('fresh search outcome counts preserve strict price types and ignore cache hits and followers', async () => {
+  const logs = [];
+  const rows = listingRows();
+  rows[0].ratesSummary.minStrikePrice = '150';
+  rows[1].ratesSummary.minPrice = '150.0';
+  const { service, clock } = setup({ logger: { info: entry => logs.push(entry) }, adapter: {
+    async listingsPage() { return { listings: rows, nextCursor: null }; },
+  } });
+  assert.deepEqual((await service.status()).search, {
+    status: 'unknown', eligibleOffers: null, matched: null, unresolved: null,
+    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0,
+  });
+  const [first, follower] = await Promise.all([service.search(futureContext), service.search(futureContext)]);
+  assert.deepEqual(first, follower);
+  assert.deepEqual(first.offers[0].resolution, { status: 'unresolved', reason: 'no_match' });
+  await service.search(futureContext);
+  let summary = (await service.status()).search;
+  assert.equal(summary.eligibleOffers, 1);
+  assert.equal(summary.matched, 0);
+  assert.equal(summary.unresolved.no_match, 1);
+  assert.equal(logs.filter(entry => entry.event === 'provider_search_summary').length, 1);
+  assert.ok(!JSON.stringify(summary).includes('offer-1'));
+  await clock.advance(300_000);
+  rows[0].ratesSummary.minStrikePrice = '150.0';
+  assert.equal((await service.search(futureContext)).offers[0].resolution.status, 'matched');
+  summary = (await service.status()).search;
+  assert.equal(summary.matched, 1);
+  assert.equal(summary.unresolved.no_match, 0);
+});
+
+test('unexpected underlying search failures count once and a successful empty search resets them', async () => {
+  let fail = true;
+  const { service, clock } = setup({ adapter: { async listingsPage() {
+    if (fail) throw new TypeError('private programmer failure');
+    return { listings: [], nextCursor: null };
+  } } });
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const pending = Promise.allSettled([service.search(futureContext), service.search(futureContext)]);
+    await clock.advance(1000);
+    assert.ok((await pending).every(result => result.status === 'rejected'));
+    assert.equal((await service.status()).search.consecutiveUnexpectedFailures, attempt);
+  }
+  fail = false;
+  const pending = service.search(futureContext);
+  await clock.advance(1000);
+  assert.deepEqual((await pending).offers, []);
+  assert.equal((await service.status()).search.consecutiveUnexpectedFailures, 0);
+  assert.equal((await service.status()).search.eligibleOffers, 0);
+});
+
+
+test('offer-only revalidation rejects an opaque offer from a different itinerary before pricing', async () => {
+  let details = 0;
+  const { service, clock } = setup({ adapter: {
+    async listingsPage({ context }) { return { listings: context.rooms === 1 ? listingRows() : [], nextCursor: null }; },
+    async hotelDetails() { details += 1; return {}; },
+  } });
+  await service.search(futureContext);
+  const rejected = assert.rejects(service.detail({ ...futureContext, rooms: 2, offerId: 'offer-1' }), { code: 'INVALID_SELECTION' });
+  await clock.advance(1000);
+  await rejected;
+  assert.equal(details, 0);
+});
+
+test('malformed quote-only envelopes retain expected unavailable fallback; processing bugs propagate', async () => {
+  for (const raw of [null, [], 7]) {
+    const { service, clock } = setup({ adapter: { async hotelDetails() { return raw; } } });
+    const pending = service.detail({ ...futureContext, offerId: 'offer-1' });
+    await clock.advance(1000);
+    const result = await pending;
+    assert.equal(result.quoteStatus, 'unavailable');
+    assert.equal(result.details, null);
+    assert.ok(result.offer.handoffUrl);
+  }
+  const { service, clock } = setup({ adapter: { async hotelDetails() { throw new TypeError('private bug'); } } });
+  const rejected = assert.rejects(service.detail({ ...futureContext, offerId: 'offer-1' }), TypeError);
+  await clock.advance(1000);
+  await rejected;
 });

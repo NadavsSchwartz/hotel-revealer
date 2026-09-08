@@ -232,11 +232,12 @@ export function normalizeListings(raw) {
   const hotels = [];
   let invalidRows = 0;
   for (const row of rows) {
-    if (!isRecord(row) || !isRecord(row.ratesSummary) || typeof row.ratesSummary.programName !== 'string') {
+    if (!isRecord(row) || !isRecord(row.ratesSummary) ||
+        (typeof row.ratesSummary.programName !== 'string' && !(row.hotelType === 'RTL' && row.ratesSummary.programName == null))) {
       invalidRows += 1;
       continue;
     }
-    const express = ['EXPRESS_DEAL', 'EXPRESS DEAL'].includes(row.ratesSummary.programName.toUpperCase());
+    const express = ['EXPRESS_DEAL', 'EXPRESS DEAL'].includes(row.ratesSummary.programName?.toUpperCase());
     const normalized = express ? normalizeOffer(row) : normalizeHotel(row);
     if (normalized) (express ? offers : hotels).push(normalized);
     else invalidRows += 1;

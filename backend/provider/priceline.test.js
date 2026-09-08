@@ -56,6 +56,8 @@ test('one public listing request retains dates, all occupants, and canonical des
   assert.equal(request.redirect, 'error');
   assert.equal(request.signal, controller.signal);
   assert.equal(request.payload.operationName, 'HotelRevealerListings');
+  assert.match(request.payload.query, /ratesSummary \{[^}]*minStrikePrice/);
+  assert.match(request.payload.query, /amenitiesIcons \{ iconName amenityName __typename \}/);
   assert.deepEqual(request.payload.variables, {
     checkIn: '20260921', checkOut: '20260924', adults: 3, children: ['1-0', '2-7'],
     roomCount: 2, currencyCode: 'USD', appCode: 'DESKTOP',
@@ -498,4 +500,30 @@ test('abort during response streaming cancels the reader and preserves AbortErro
   await assert.rejects(operation, { name: 'AbortError' });
   await cancelled;
   assert.equal(requests.length, 1);
+});
+
+
+test('offer-only request invokes only original pricing with the complete family context', async () => {
+  const { adapter, requests } = setup(() => jsonResponse({ data: { original: originalDetails() } }));
+  const result = await adapter.hotelDetails({ context: pricingContext, offerId: 'original-opaque-id' });
+  const { query, variables, operationName } = requests[0].payload;
+  assert.equal(operationName, 'HotelRevealerQuote');
+  assert.match(query, /original: sopqHotelDetails/);
+  assert.doesNotMatch(query, /details: hotelDetails|\$hotelID|\$adults:|\$children:|\$appCode|\$responseOptions|\$multiOcc/);
+  assert.equal(variables.hotelID, undefined);
+  assert.equal(variables.originalStringOfferId, 'original-opaque-id');
+  assert.equal(variables.roomsCount, 2);
+  assert.equal(variables.adultsString, '4');
+  assert.deepEqual(variables.childrenAges, [{ age: '1-7' }]);
+  assert.equal(result.originalQuote.totalCents, 37590);
+  assert.equal(result.available, false);
+});
+
+test('offer-only missing and partial original pricing remains an expected unavailable result', async () => {
+  for (const body of [{ data: { original: null } },
+    { data: { original: {} }, errors: [{ message: 'private failure', path: ['original', 'total'] }] }]) {
+    const { adapter } = setup(() => jsonResponse(body));
+    await assert.rejects(adapter.hotelDetails({ context: pricingContext, offerId: 'original-opaque-id' }),
+      { code: 'PROVIDER_RESPONSE_INVALID' });
+  }
 });

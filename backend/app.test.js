@@ -37,7 +37,9 @@ async function serve(t, options = {}) {
 test('default API health performs no provider calls and both operations fail closed with JSON errors', async (t) => {
   const app = await serve(t);
   const health = await app.request('/health');
-  assert.deepEqual(health.body, { status: 'ok', provider: { available: false } });
+  assert.equal(health.body.status, 'ok');
+  assert.equal(health.body.provider.available, false);
+  assert.equal(health.body.provider.search.status, 'unknown');
   for (const [route, body] of [
     ['/api/v1/hotelDeals', futureContext],
     ['/api/v1/deal', { ...futureContext, offerId: 'offer-1', hotelId: 'hotel-1' }],

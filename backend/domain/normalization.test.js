@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeListings, normalizeQuote, safeHandoffUrl, safeImageUrl, deduplicateHotels, deduplicateOffers, matchListings } from './index.js';
+import { normalizeListings, normalizeQuote, safeHandoffUrl, safeImageUrl, deduplicateHotels, deduplicateOffers } from './index.js';
 
 const named = (fields = {}) => ({
   hotelId: 123,
@@ -163,13 +163,9 @@ test('offer amenity ambiguity and city conflicts survive every page partition an
     hotelFeatures: { highlightedAmenities: ['SPA'] },
   });
   const rows = [pool, spa, pool];
-  const hotels = normalizeListings([named({ hotelFeatures: { highlightedAmenities: ['POOL'] } })]).hotels;
   const expectedOffers = normalizeListings(rows).offers;
-  const expectedMatch = matchListings(expectedOffers, hotels);
   assert.equal(expectedOffers[0].cityId, null);
   assert.equal(expectedOffers[0].clues.amenities, null);
-  assert.equal(expectedMatch.offers[0].candidates.length, 0);
-  assert.equal(expectedMatch.unassessedHotels, 1);
 
   for (const order of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
     const ordered = order.map(index => rows[index]);
@@ -182,8 +178,6 @@ test('offer amenity ambiguity and city conflicts survive every page partition an
       const sequential = pages.reduce((previous, page) => deduplicateOffers([...previous, ...page]), []);
       assert.deepEqual(merged, expectedOffers);
       assert.deepEqual(sequential, expectedOffers);
-      assert.deepEqual(matchListings(merged, hotels), expectedMatch);
-      assert.deepEqual(matchListings(sequential, hotels), expectedMatch);
     }
   }
 });

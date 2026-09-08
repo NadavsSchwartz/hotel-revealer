@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { originalMatches, matchOriginal } from './original.mjs';
-import { isValidOffer, isValidHotel, matchRefactored } from './refactored.mjs';
-import { normalizeListings } from '../../backend/domain/normalization.js';
+import { isValidOffer, isValidHotel, matchObservations as matchRefactored } from '../../backend/domain/matching.js';
 import { matchListings } from '../../backend/domain/matching.js';
 
 const hotel = (fields = {}) => ({
@@ -25,8 +24,7 @@ function expectPairs(offers, hotels, expected) {
 }
 
 function applicationPairs(offers, hotels) {
-  const normalized = normalizeListings([...offers, ...hotels]);
-  return matchListings(normalized.offers, normalized.hotels).offers.flatMap(offer =>
+  return matchListings(offers, hotels).offers.flatMap(offer =>
     offer.candidates.map(hotel => [offer.offerId, hotel.hotelId]));
 }
 
@@ -121,13 +119,13 @@ test('zero, one and multiple distinct hotels remain separate from duplicate rate
   expectPairs([offer()], [hotel({ hotelId: '101' }), hotel()], [['offer-a', '101'], ['offer-a', 101]]);
 });
 
-test('current and original policies report their own outcomes for repeated, missing and conflicting observations', () => {
+test('public single-hotel resolution preserves raw matching without exposing ambiguous or conflicting identities', () => {
   for (const { rows, original, current } of [
     { rows: [], original: [], current: [] },
     { rows: [hotel()], original: [101], current: ['101'] },
     { rows: [hotel(), hotel()], original: [101, 101], current: ['101'] },
-    { rows: [hotel(), hotel({ hotelId: 102 })], original: [101, 102], current: ['101', '102'] },
-    { rows: [hotel({ overallGuestRating: null })], original: [], current: ['101'] },
+    { rows: [hotel(), hotel({ hotelId: 102 })], original: [101, 102], current: [] },
+    { rows: [hotel({ overallGuestRating: null })], original: [], current: [] },
     { rows: [hotel({ hotelFeatures: {} })], original: [], current: [] },
     { rows: [hotel(), hotel({ starRating: 5 })], original: [101], current: [] },
   ]) {
@@ -137,12 +135,12 @@ test('current and original policies report their own outcomes for repeated, miss
   }
 });
 
-test('omitting the synthetic source hotel can leave a unique compatible neighbor under either policy', () => {
+test('omitting the synthetic source hotel can leave a unique compatible neighbor', () => {
   const source = hotel();
   const neighbor = hotel({ hotelId: 102, name: 'Compatible Neighbor' });
   const offers = [offer()];
   expectPairs(offers, [source, neighbor], [['offer-a', 101], ['offer-a', 102]]);
-  assert.deepEqual(applicationPairs(offers, [source, neighbor]), [['offer-a', '101'], ['offer-a', '102']]);
+  assert.deepEqual(applicationPairs(offers, [source, neighbor]), []);
   expectPairs(offers, [neighbor], [['offer-a', 102]]);
   assert.deepEqual(applicationPairs(offers, [neighbor]), [['offer-a', '102']]);
   // The fixture source is 101: uniqueness among the remaining inventory is not

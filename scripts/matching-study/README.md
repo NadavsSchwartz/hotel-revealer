@@ -1,134 +1,80 @@
-# Original matching refactor
+# Original matching rules in production
 
-This is the completed comparison step for preserving the original matcher while
-simplifying its implementation. It is offline tooling; the running app still uses
-`backend/domain/matching.js`. Replacing its matching policy and result presentation
-is a separate integration change.
+The study imports `matchObservations` from `backend/domain/matching.js`. There is
+one production implementation and an independent test oracle, `original.mjs`,
+which reproduces the conjunction in `728f9ed:backend/util/helpers.js`.
 
-## Implementation
+## Preserved behavior and limits
 
-- `original.mjs` independently reproduces the conjunction in
-  `728f9ed:backend/util/helpers.js`, with synchronous iteration and ordered
-  `[offerId, hotelId]` results. It supplies the behavior reference.
-- `refactored.mjs` validates each observation once, uses straightforward loops and
-  short-circuit checks, and returns the same ordered pairs for eligible input.
-- `matching.test.mjs` covers every condition, rounded boundaries, strict raw types,
-  array/object order, missing facts, duplicate rate observations, several hotels
-  per offer and several offers per hotel. A deterministic varied sample checks
-  ordered parity against the independent reference.
-- `compare.mjs` replays a saved capture through both versions and the current app
-  matcher. It asserts exact eligible-row parity and separately reports whether
-  running the original on all raw rows agrees or throws.
+Matching runs on adapted raw observations before display normalization. It retains:
 
-The refactor retains strict price, star and neighborhood equality; the original
-rating and review bounds; and exact JSON equality for highlighted amenities and
-icons. It preserves offer/hotel arrival order and repeated rate observations.
-It does not convert prices to cents, sort amenities or deduplicate observations.
+- Strict price, star and neighborhood equality, including raw number/string types.
+- The original inclusive rating and review-count bounds.
+- Exact JSON equality for highlighted amenities and icons, including array and
+  object-property order.
+- Arrival order and repeated rate observations in the raw pair results.
 
-Missing required facts are an explicit behavior change: the refactor rejects and
-counts those rows. The old function could throw or match two absent values.
-Eligibility requires nonempty IDs, finite numeric values or numeric strings,
-comparison objects and both amenity arrays. Values keep their original types.
-A named row must have an explicit RTL type or a nonempty program name; the exact
-`Express_Deal` program is excluded by the predicate. Empty amenity arrays remain
-eligible, as in the original. These rules are input availability checks, not a
-claim that all accepted fields establish identity.
+The promoted eligibility checks require nonempty IDs, finite numbers or numeric
+strings, comparison objects and both amenity arrays. They do not coerce values
+used by strict equality. Named rows require explicit RTL type or a nonempty
+program name; the predicate excludes exactly `Express_Deal`. Empty amenity arrays
+remain eligible. The independent legacy predicate can throw or match equal absent
+values on incomplete rows, so parity assertions cover eligible observations.
 
-## Current capture: 8 September 2026
+Production rejects more than 100,000 eligible raw observation pairs or more than
+5,000 retained matching pairs with `RESULT_TOO_LARGE`. Duplicate rates count
+before grouping hotel IDs; a response never truncates matches into a unique hotel.
 
-One request through the existing adapter/service, including its deadline and
-durable provider state, retrieved all 373 reported rows: 102 Express offers and
-271 named hotels. Context: Las Vegas, 21–24 September 2026, one room, two adults,
-no children, USD. Capture started at 18:35:08 UTC and completed at 18:35:13 UTC.
+After matching, production normalizes safe display fields and returns one likely
+hotel or an unresolved result. Partial coverage wins over all other outcomes;
+missing or conflicting facts precede ambiguity, no match and a single identity.
+Repeated rates for one coherent hotel remain one hotel. Tier ranking and the
+previous supporting-evidence model are retired.
 
-The query added only fields used by the original matcher:
+## Saved capture replay
 
-```graphql
-ratesSummary { minStrikePrice } # alongside existing selected rate fields
-amenitiesIcons { iconName amenityName __typename }
-```
+The existing September 8, 2026 capture contains 102 offers and 271 named hotels
+for Las Vegas, September 21–24, one room, two adults and no children. It contains
+both `ratesSummary.minStrikePrice` and `amenitiesIcons`. The capture used one
+request through the guarded provider service and took about 4.9 seconds. This
+integration replay reused the saved file and made no provider request.
 
-All rows contained both selected fields. Every Express strike price was a decimal
-string. One Express row lacked a review count and one named hotel lacked
-highlighted amenities; both were rejected and neither matched in the original.
-The capture contains adapted listing rows before domain normalization. The
-adapter retains the comparison values and arrays; it fills null retail program
-names with `RETAIL`, which has the same outcome under the original exclusion.
+The production matcher and independent original returned the same 60 ordered
+pairs over 27,270 eligible comparisons. One offer lacked a review count and one
+hotel lacked highlighted amenities. The public resolutions were:
 
-| Result on this capture | Original | Refactored | Current app |
-| --- | ---: | ---: | ---: |
-| Offer/hotel pairs | 60 | 60 | 180 |
-| Offers with one distinct matching hotel | 60 | 60 | 60 |
-| Offers with multiple distinct matching hotels | 0 | 0 | 38 |
-| Offers with no matching hotel | 42 | 42 | 4 |
+| Resolution | Offers |
+| --- | ---: |
+| Matched | 60 |
+| Unresolved: no match | 41 |
+| Unresolved: missing facts | 1 |
+| Unresolved: ambiguous | 0 |
 
-All 60 original pairs appear in the current app's results. Its other 120 pairs
-come from a different matching policy; they are not automatically wrong hotels.
-Original and refactored results agree exactly, including order, on this whole
-capture and on eligible rows separately.
+These pairs and outcomes are deterministic replay evidence, not independently
+verified identities. Removing the source hotel from a synthetic example can
+leave a unique compatible neighbor, so uniqueness does not prove identity.
 
-The strike-price condition matters in this sample: after the original program,
-star, neighborhood and rating checks, 287 pairs remain. Exact strike-price equality
-reduces them to 60; the review and amenity checks retain those 60. Removing only
-strike-price equality would admit matches for 37 previously unmatched offers.
-That observation does not justify removing it or establish current strike-price
-semantics universally. The retained rules remain unchanged.
-
-A star/neighborhood index reduced eligible pair visits from 27,270 to 394, but its
-measured median was slower (0.316 ms versus 0.209 ms), so it was removed. The final
-plain refactor measured 0.246 ms versus 0.198 ms for the reference in a separate
-run, including validation. Each measurement used 20 warmups and 100 iterations.
-These are local CPU observations on one small capture; no speedup is claimed.
-The single capture took about 4.9 seconds, overwhelmingly outside matching work.
-
-## Saved-data follow-up
-
-The September 8 remediation replay used the same saved capture, with no provider
-requests. Original/refactored results remained 60 pairs; the current app retained
-180 pairs, including all 60 original pairs. Preparing amenity membership once per
-observation preserved the current app's complete output exactly against a saved
-pre-change result, including evidence, ordering and unassessed counts.
-
-Two additional deterministic checks compare the policies separately:
-
-- Zero, one and multiple distinct hotel outcomes remain visible. The original
-  retains repeated rate observations; the app collapses repeated hotel IDs.
-  Missing rating facts can leave an app candidate supported by amenities while
-  failing the original rule. Conflicting star observations for the same ID become
-  unassessed in the app, even when one observation passes the original rule.
-- A synthetic offer has a known source hotel and an equally compatible neighbor.
-  Both policies return both hotels. Removing the source leaves only the neighbor
-  under both policies. Thus a unique match within retrieved inventory does not
-  establish identity or prove the source hotel was retrieved.
-
-These tests preserve current behavior and expose its limits; they do not add a
-matching heuristic or measure identification accuracy. The saved capture has no
-independent identity labels, so it cannot determine which policy is more accurate.
+The earlier study recorded 180 pairs under the previous application policy.
+That policy comparison is historical; the application now uses the original
+predicates. Earlier index experiments did not improve local CPU time and were
+removed. No performance improvement or identification accuracy is claimed.
 
 ## Reproduce
 
-Use Node 24.20.0 from `.nvmrc`. No additional dependencies are required.
+Use Node 24.20.0 from `.nvmrc` and the existing root workspace dependencies:
 
 ```sh
-node --test scripts/matching-study/*.test.mjs
+node --test backend/domain/matching.test.js backend/domain/normalization.test.js scripts/matching-study/*.test.mjs
 node scripts/matching-study/compare.mjs output/original-matching/current-listings.json
-npm run check
 ```
 
-Verified on Node 24.20.0: all 189 repository tests, lint and the production build
-pass. A separate skeptical review found and verified the fix for numeric-ID report
-grouping. No browser check was needed because application behavior is unchanged.
+The 41 focused tests cover every original predicate, boundaries and types, parity
+on deterministically varied rows, raw limits, resolution precedence, duplicate
+rates, missing/conflicting facts and safe display normalization. Whole-application
+and browser verification are recorded in `docs/ACCEPTANCE.md`.
 
-The capture and JSON report are ignored local artifacts under
-`output/original-matching/`; they are not shipped inventory. The comparison tool
-requires saved `{ pages: [{ listings: [...] }], context, ... }` data with both
-original fields selected and performs no network requests. A fresh clone can run
-the deterministic tests but needs its own capture for the live-data replay.
-
-This establishes original-rule viability and refactor equivalence for one current
-search. It does not measure hotel-identification accuracy, worldwide coverage,
-family-search matching or provider uptime. Before integrating, retain these raw
-comparison facts through the adapter and match observations before the current
-normalizer discards fields or merges conflicting rates. Public output should
-handle zero, one and multiple distinct hotel IDs explicitly; choosing the first
-match would change the preserved behavior.
+The comparison tool reads saved `{ pages: [{ listings: [...] }], context, ... }`
+data and makes no network requests. Capture and report files under
+`output/original-matching/` are ignored local artifacts. A fresh clone can run the
+deterministic tests without a capture. This work does not establish worldwide
+coverage, family-search accuracy, provider uptime or public readiness.

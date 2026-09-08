@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { matchOriginal } from './original.mjs';
-import { isValidOffer, isValidHotel, matchRefactored } from './refactored.mjs';
-import { normalizeListings } from '../../backend/domain/normalization.js';
+import { isValidOffer, isValidHotel, matchObservations as matchRefactored } from '../../backend/domain/matching.js';
 import { matchListings } from '../../backend/domain/matching.js';
 
 const filename = process.argv[2];
@@ -32,8 +31,7 @@ try {
 } catch {
   rawOriginal = { error: 'Original predicate throws on incomplete rows; parity covers eligible rows only.' };
 }
-const normalized = normalizeListings(rows);
-const current = matchListings(normalized.offers, normalized.hotels).offers;
+const current = matchListings(offers, hotels, { coverageStatus: capture.result?.coverage?.status ?? 'complete' }).offers;
 const currentPairs = current.flatMap(offer => offer.candidates.map(hotel => [offer.offerId, hotel.hotelId]));
 // Canonicalize only the cross-policy report: the app stringifies numeric IDs. Exact
 // refactor parity above still compares raw values, types and arrival order.
@@ -64,7 +62,11 @@ console.log(JSON.stringify({
     retrieval: capture.result?.coverage ?? null },
   rows: { offers: offers.length, hotels: hotels.length, rejectedOffers: refactored.rejectedOffers, rejectedHotels: refactored.rejectedHotels },
   parity: { equal: true, orderedPairs: original.length, distinctPairs: oldSet.size, outcomes: histogram(original), rawOriginal },
-  currentMatcher: { distinctPairs: currentSet.size, outcomes: histogram(currentPairs),
+  currentMatcher: { resolutions: current.reduce((counts, offer) => {
+    const key = offer.resolution.reason ?? 'matched';
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {}), distinctPairs: currentSet.size, outcomes: histogram(currentPairs),
     sharedWithOriginal: [...oldSet].filter(pair => currentSet.has(pair)).length,
     onlyOriginal: [...oldSet].filter(pair => !currentSet.has(pair)).length,
     onlyCurrent: [...currentSet].filter(pair => !oldSet.has(pair)).length },

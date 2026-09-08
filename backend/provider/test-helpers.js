@@ -4,13 +4,15 @@ export const futureContext = { cityName: 'Las Vegas, Nevada', checkIn: dateAfter
 
 export const listingRows = () => [
   {
-    pclnId: 'offer-1', starRating: 4,
+    pclnId: 'offer-1', starRating: 4, overallGuestRating: 9, totalReviewCount: 100,
+    hotelFeatures: { highlightedAmenities: [] }, amenitiesIcons: [],
     location: { cityId: 'city-1', neighborhoodID: 'area-1', neighborhoodName: 'The Strip' },
-    ratesSummary: { programName: 'EXPRESS_DEAL', minPrice: 100, displayPricePerStay: 200, minCurrencyCode: 'USD' },
+    ratesSummary: { programName: 'Express_Deal', minPrice: 100, minStrikePrice: 140, displayPricePerStay: 200, minCurrencyCode: 'USD' },
     clues: { guestRating: { kind: 'minimum', value: 8 } },
     handoffUrl: 'https://www.priceline.com/original-offer',
   },
   {
+    hotelFeatures: { highlightedAmenities: [] }, amenitiesIcons: [],
     hotelId: 'hotel-1', name: 'Example Hotel', starRating: 4, overallGuestRating: 9, totalReviewCount: 100,
     location: { cityId: 'city-1', neighborhoodID: 'area-1', neighborhoodName: 'The Strip' },
     ratesSummary: { programName: 'RETAIL', minPrice: 140, minCurrencyCode: 'USD' },

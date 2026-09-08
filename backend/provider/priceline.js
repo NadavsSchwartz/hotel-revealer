@@ -29,34 +29,15 @@ const LISTINGS_QUERY = `query HotelRevealerListings(
     cityInfo { cityId cityName stateCode countryCode searchedLatitude searchedLongitude }
     hotels {
       hotelId pclnId hotelType name starRating overallGuestRating totalReviewCount thumbnailUrl displaySavingsPct
-      ratesSummary { programName minPrice minCurrencyCode displayPricePerStay pricedOccupancy }
+      ratesSummary { programName minPrice minStrikePrice minCurrencyCode displayPricePerStay pricedOccupancy }
       location { cityId neighborhoodID neighborhoodName latitude longitude }
       hotelFeatures { highlightedAmenities }
+      amenitiesIcons { iconName amenityName __typename }
     }
   }
 }`;
 
-const DETAILS_QUERY = `query HotelRevealerDetails(
-  $hotelID: ID, $originalStringOfferId: String!, $checkIn: String!, $checkOut: String!, $roomsCount: Int!,
-  $currencyCode: String!, $appCode: String, $adults: Int, $children: [String],
-  $responseOptions: String, $includePrepaidFeeRates: Boolean,
-  $multiOccDisplay: Boolean, $multiOccRates: Boolean,
-  $adultsString: String!, $childrenAges: [ChildInput]
-) {
-  details: hotelDetails(
-    hotelID: $hotelID, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
-    currencyCode: $currencyCode, appCode: $appCode, adults: $adults, children: $children,
-    responseOptions: $responseOptions, includePrepaidFeeRates: $includePrepaidFeeRates,
-    multiOccDisplay: $multiOccDisplay, multiOccRates: $multiOccRates
-  ) {
-    errorMessage
-    hotel {
-      location { address { addressLine1 addressLine2 cityName provinceCode isoCountryCode } }
-      hotelFeatures { hotelAmenities { name code } }
-      images { imageHDURL imageURL }
-      ratesSummary { minPrice minCurrencyCode }
-    }
-  }
+const ORIGINAL_QUERY = `
   original: sopqHotelDetails(pclnId: $originalStringOfferId, context: { appCode: "DESKTOP" }) {
     nightly: price(
       hotelRequest: {
@@ -84,7 +65,37 @@ const DETAILS_QUERY = `query HotelRevealerDetails(
         total: price(priceType: TOTAL) { amount }
       }
     }
+  }`;
+
+const QUOTE_QUERY = `query HotelRevealerQuote(
+  $originalStringOfferId: String!, $checkIn: String!, $checkOut: String!, $roomsCount: Int!,
+  $currencyCode: String!, $adultsString: String!, $childrenAges: [ChildInput]
+) {
+${ORIGINAL_QUERY}
+}`;
+
+const DETAILS_QUERY = `query HotelRevealerDetails(
+  $hotelID: ID, $originalStringOfferId: String!, $checkIn: String!, $checkOut: String!, $roomsCount: Int!,
+  $currencyCode: String!, $appCode: String, $adults: Int, $children: [String],
+  $responseOptions: String, $includePrepaidFeeRates: Boolean,
+  $multiOccDisplay: Boolean, $multiOccRates: Boolean,
+  $adultsString: String!, $childrenAges: [ChildInput]
+) {
+  details: hotelDetails(
+    hotelID: $hotelID, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
+    currencyCode: $currencyCode, appCode: $appCode, adults: $adults, children: $children,
+    responseOptions: $responseOptions, includePrepaidFeeRates: $includePrepaidFeeRates,
+    multiOccDisplay: $multiOccDisplay, multiOccRates: $multiOccRates
+  ) {
+    errorMessage
+    hotel {
+      location { address { addressLine1 addressLine2 cityName provinceCode isoCountryCode } }
+      hotelFeatures { hotelAmenities { name code } }
+      images { imageHDURL imageURL }
+      ratesSummary { minPrice minCurrencyCode }
+    }
   }
+${ORIGINAL_QUERY}
 }`;
 
 const invalidResponse = () => new ServiceError('PROVIDER_RESPONSE_INVALID');
@@ -342,14 +353,19 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
     },
 
     async hotelDetails({ context, offerId, hotelId, signal }) {
-      // One HTTP request contains two resolver calls with separate opaque/named IDs.
       const trip = tripVariables(context);
-      const parsed = await request('HotelRevealerDetails', DETAILS_QUERY, {
-        ...trip, hotelID: hotelId, originalStringOfferId: offerId, roomsCount: context.rooms,
-        responseOptions: 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES',
+      const quoteVariables = {
+        originalStringOfferId: offerId, checkIn: trip.checkIn, checkOut: trip.checkOut,
+        roomsCount: context.rooms, currencyCode: context.currency,
         adultsString: String(context.adults), childrenAges: trip.children.map(age => ({ age })),
-      }, signal, true);
-      const details = detailsAlias(parsed, 'details');
+      };
+      const parsed = hotelId === undefined
+        ? await request('HotelRevealerQuote', QUOTE_QUERY, quoteVariables, signal, true)
+        : await request('HotelRevealerDetails', DETAILS_QUERY, {
+          ...trip, ...quoteVariables, hotelID: hotelId,
+          responseOptions: 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES',
+        }, signal, true);
+      const details = hotelId === undefined ? null : detailsAlias(parsed, 'details');
       const selectedQuote = originalQuote(detailsAlias(parsed, 'original'), context);
       const namedAvailable = isRecord(details) && !details.errorMessage && isRecord(details.hotel);
       if (!namedAvailable && !selectedQuote) {

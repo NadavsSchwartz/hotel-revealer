@@ -95,7 +95,7 @@ export function createApp({ logger = console, service = createProviderService({ 
   app.get('/health', async (req, res, next) => {
     try {
       const provider = typeof service.status === 'function' ? await service.status() : { available: false };
-      res.set('Cache-Control', 'no-store').json({ status: 'ok', provider: { available: provider.available === true } });
+      res.set('Cache-Control', 'no-store').json({ status: 'ok', provider: { available: provider.available === true, ...(provider.search ? { search: provider.search } : {}) } });
     } catch (error) { next(error); }
   });
   app.use('/api/v1', createHotelRoutes(service));

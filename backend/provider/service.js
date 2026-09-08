@@ -1,5 +1,5 @@
 import {
-  validateSearch, validateDetail, normalizeListings, matchListings, normalizeQuote, safeImageUrl, MatchLimitError,
+  validateSearch, validateDetail, matchListings, normalizeQuote, safeImageUrl, MatchLimitError,
 } from '../domain/index.js';
 import { FreshCache } from './cache.js';
 import { ProviderFailure, ServiceError } from './errors.js';
@@ -56,6 +56,10 @@ export function createProviderService({ adapter = null, clock = realClock, state
   let state = cleanState();
   let loaded;
   let draining = false;
+  let searchSummary = {
+    status: 'unknown', eligibleOffers: null, matched: null, unresolved: null,
+    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0,
+  };
 
   function log(level, entry) {
     try { logger?.[level]?.(entry); } catch { /* Logging cannot change availability. */ }
@@ -127,7 +131,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
     }, { deadline });
   }
 
-  async function searchWork(context, deadline, metrics) {
+  async function retrieveSearch(context, deadline, metrics) {
     await withDeadline(available({ allowCooldown: true }), deadline, clock);
     const key = contextKey(context);
     const cached = searches.get(key);
@@ -151,16 +155,18 @@ export function createProviderService({ adapter = null, clock = realClock, state
         }
         const rawRows = Array.isArray(page.listings) ? page.listings : page.listings?.data?.listings?.hotels ?? page.listings?.listings?.hotels ?? page.listings?.hotels;
         if (!Array.isArray(rawRows) || rawRows.length > 2_000) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
-        const normalized = normalizeListings(rawRows, context);
-        if (!normalized || !Array.isArray(normalized.offers) || !Array.isArray(normalized.hotels)) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
-        offers.push(...normalized.offers);
-        hotels.push(...normalized.hotels);
+        // Keep raw types, array order and repeated observations for matching.
+        for (const row of rawRows) {
+          const program = row?.ratesSummary?.programName;
+          if (typeof program !== 'string' && !(row?.hotelType === 'RTL' && row.ratesSummary && program == null)) {
+            reason ||= 'Some provider listings could not be assessed.';
+            cacheable = false;
+            continue;
+          }
+          (['EXPRESS_DEAL', 'EXPRESS DEAL'].includes(program?.toUpperCase()) ? offers : hotels).push(row);
+        }
         pagesFetched += 1;
         retrievedAt ??= clock.now();
-        if (normalized.invalidRows > 0) {
-          reason ||= 'Some provider listings could not be assessed.';
-          cacheable = false;
-        }
         cursor = page.nextCursor;
         if (cursor !== null && seenCursors.has(cursor)) {
           reason = 'The provider repeated a page. Coverage is incomplete.';
@@ -179,18 +185,19 @@ export function createProviderService({ adapter = null, clock = realClock, state
     if (cursor !== null && pagesFetched === 3) reason ||= 'The three-page retrieval limit was reached. Coverage is incomplete.';
     let matched;
     try {
-      matched = matchListings(offers, hotels);
+      matched = matchListings(offers, hotels, { coverageStatus: reason ? 'partial' : 'complete' });
     } catch (error) {
       if (error instanceof MatchLimitError) throw new ServiceError('RESULT_TOO_LARGE');
       throw error;
     }
+    if (matched.invalidRows > 0) cacheable = false;
     const result = {
       context,
       retrievedAt: iso(retrievedAt ?? clock.now()),
       expiresAt: iso((retrievedAt ?? clock.now()) + SEARCH_TTL),
       coverage: {
         status: reason ? 'partial' : 'complete', reason, pagesFetched,
-        offersFound: new Set(offers.map((offer) => offer.offerId)).size,
+        offersFound: matched.offers.length,
         namedHotelsChecked: new Set(hotels.map((hotel) => hotel.hotelId)).size,
         unassessedHotels: matched.unassessedHotels,
       },
@@ -200,6 +207,33 @@ export function createProviderService({ adapter = null, clock = realClock, state
     const bytes = assertJsonSize(result);
     if (cacheable && deadline > clock.now()) searches.set(key, result, { bytes, expiresAt: Date.parse(result.expiresAt) });
     return result;
+  }
+
+  async function searchWork(context, deadline, metrics) {
+    try {
+      const result = await retrieveSearch(context, deadline, metrics);
+      if (metrics.searchCache === 'miss') {
+        const unresolved = { no_match: 0, ambiguous: 0, missing_facts: 0, incomplete_search: 0 };
+        let matched = 0;
+        for (const offer of result.offers) {
+          if (offer.resolution.status === 'matched') matched += 1;
+          else unresolved[offer.resolution.reason] += 1;
+        }
+        searchSummary = {
+          status: 'observed', eligibleOffers: result.offers.length, matched, unresolved,
+          lastSuccessfulFreshSearch: iso(clock.now()), consecutiveUnexpectedFailures: 0,
+        };
+        log('info', { event: 'provider_search_summary', ...searchSummary });
+      }
+      return result;
+    } catch (error) {
+      if (!(error instanceof ServiceError) || error.code === 'INTERNAL_ERROR') {
+        searchSummary = { ...searchSummary, status: 'observed',
+          consecutiveUnexpectedFailures: Math.min(Number.MAX_SAFE_INTEGER, searchSummary.consecutiveUnexpectedFailures + 1) };
+        log('error', { event: 'provider_search_failed', ...searchSummary, diagnostic: diagnostic(error) });
+      }
+      throw error;
+    }
   }
 
   function coalesce(flights, key, work) {
@@ -245,43 +279,46 @@ export function createProviderService({ adapter = null, clock = realClock, state
       const admittedAt = clock.now();
       const { offerId, hotelId, ...context } = validateDetail(input, new Date(admittedAt));
       const deadline = admittedAt + 10_000;
-      const key = JSON.stringify([contextKey(context), offerId, hotelId]);
+      const key = JSON.stringify([contextKey(context), offerId, hotelId ?? null]);
       const metrics = newMetrics();
       metrics.shared = detailFlights.has(key);
       const request = coalesce(detailFlights, key, async () => {
         // Relationship revalidation shares this detail request's total budget.
         const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics)), deadline, clock);
         const offer = search.offers.find((item) => item.offerId === offerId);
-        const candidate = offer?.candidates.find((item) => item.hotelId === hotelId);
-        if (!candidate) throw new ServiceError('INVALID_SELECTION');
+        const candidate = hotelId === undefined ? null : offer?.candidates.find((item) => item.hotelId === hotelId);
+        if (!offer || (hotelId !== undefined && !candidate)) throw new ServiceError('INVALID_SELECTION');
         const cached = details.get(key);
         if (cached) {
           metrics.detailCache = 'hit';
           const cachedQuoteFresh = Date.parse(cached.offer?.quoteExpiresAt) > clock.now();
           const refreshedOffer = cachedQuoteFresh
             ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
-          const result = { ...cached, offer: refreshedOffer, candidate, offerExpiresAt: search.expiresAt,
+          const result = { ...cached, offer: refreshedOffer, candidate, quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: search.expiresAt,
             expiresAt: iso(Math.min(Date.parse(search.expiresAt), Date.parse(cached.retrievedAt) + DETAIL_TTL)) };
           assertJsonSize(result);
           return result;
         }
         metrics.detailCache = 'miss';
-        let normalizedDetails;
+        let normalizedDetails = null;
         let originalQuote = null;
-        let detailStatus = 'available';
+        let detailStatus = hotelId === undefined ? 'not_requested' : 'available';
         let cacheable = true;
         try {
           const rawDetails = await call('hotelDetails', { context, offerId, hotelId }, deadline, metrics);
           assertJsonSize(rawDetails);
-          normalizedDetails = normalizeDetails(rawDetails);
+          if (!rawDetails || typeof rawDetails !== 'object' || Array.isArray(rawDetails)) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
+          if (hotelId !== undefined) normalizedDetails = normalizeDetails(rawDetails);
           originalQuote = normalizeOriginalQuote(rawDetails.originalQuote, context);
-          if (rawDetails.available === false) detailStatus = 'unavailable';
+          if (hotelId !== undefined && rawDetails.available === false) detailStatus = 'unavailable';
         } catch (error) {
           if (!(error instanceof ServiceError) || !['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED'].includes(error.code)) throw error;
           metrics.failureCode = error.code;
-          detailStatus = 'unavailable';
           cacheable = false;
-          normalizedDetails = { description: null, images: [], amenities: [], address: null, retailQuote: null };
+          if (hotelId !== undefined) {
+            detailStatus = 'unavailable';
+            normalizedDetails = { description: null, images: [], amenities: [], address: null, retailQuote: null };
+          }
         }
         const retrievedAt = clock.now();
         const refreshedOffer = originalQuote
@@ -289,6 +326,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         const result = {
           context, retrievedAt: iso(retrievedAt), expiresAt: iso(Math.min(Date.parse(search.expiresAt), retrievedAt + DETAIL_TTL)), offerExpiresAt: search.expiresAt,
           offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
+          quoteStatus: originalQuote ? 'available' : 'unavailable',
         };
         // Missing retailQuote does not imply Express unavailability.
         const bytes = assertJsonSize(result);
@@ -298,9 +336,9 @@ export function createProviderService({ adapter = null, clock = realClock, state
       return observe('detail', request, admittedAt, metrics, requestId);
     },
     async status() {
-      if (!configured || draining) return { available: false };
+      if (!configured || draining) return { available: false, search: structuredClone(searchSummary) };
       await loadState();
-      return { available: !state.disabled && state.cooldownUntil <= clock.now() };
+      return { available: !state.disabled && state.cooldownUntil <= clock.now(), search: structuredClone(searchSummary) };
     },
     drain() { draining = true; },
     close() { draining = true; scheduler.close(); },

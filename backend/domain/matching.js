@@ -1,8 +1,6 @@
-import { deduplicateHotels, deduplicateOffers, normalizeAmenityCodes, normalizeNumericClue, numberOrNull } from './normalization.js';
-import { normalizedId } from './validation.js';
-
-const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-const familyLabels = { guestRating: 'Guest rating', reviewCount: 'Review count', amenities: 'Advertised amenities' };
+import { normalizeListings } from './normalization.js';
+import { isRecord, normalizedId } from './validation.js';
+import { MAX_OFFER_ID_LENGTH } from '../../shared/identifiers.js';
 
 // Conservative application budgets, not documented provider limits.
 export const MAX_MATCH_COMPARISONS = 100_000;
@@ -17,164 +15,140 @@ export class MatchLimitError extends Error {
   }
 }
 
-export function compareNumericClue(rawClue, rawValue, options) {
-  const clue = normalizeNumericClue(rawClue, options);
-  const value = numberOrNull(rawValue, options);
-  if (clue.kind === 'unknown' || value === null) return 'unknown';
-  const matched = clue.kind === 'exact' ? value === clue.value
-    : clue.kind === 'minimum' ? value >= clue.value
-      : value >= clue.min && value <= clue.max;
-  return matched ? 'match' : 'contradiction';
+const isId = value => typeof value === 'string' ? value.trim().length > 0
+  : typeof value === 'number' && Number.isFinite(value);
+// Check availability without converting values used by strict equality.
+const isNumeric = value => typeof value === 'number' ? Number.isFinite(value)
+  : typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value));
+
+function hasComparisonFacts(row) {
+  return isRecord(row) && isRecord(row.location) && isRecord(row.ratesSummary) &&
+    isRecord(row.hotelFeatures) && isId(row.location.neighborhoodID) &&
+    isNumeric(row.starRating) && isNumeric(row.overallGuestRating) && isNumeric(row.totalReviewCount) &&
+    Array.isArray(row.hotelFeatures.highlightedAmenities) && Array.isArray(row.amenitiesIcons);
 }
 
-function compareAmenities(offer, hotel) {
-  const offered = offer.amenityCodes;
-  const named = hotel.amenitySet;
-  if (!offered?.length || named === null) return 'unknown';
-  if (offered.every(code => named.has(code))) return 'match';
-  return hotel.amenitiesComplete === true ? 'contradiction' : 'unknown';
+export function isValidOffer(row) {
+  return hasComparisonFacts(row) && isId(row.pclnId) && isNumeric(row.ratesSummary.minStrikePrice);
 }
 
-function compareHotel(offer, hotel) {
-  const neighborhood = [normalizedId(offer.neighborhoodId), normalizedId(hotel.neighborhoodId)];
-  const stars = [numberOrNull(offer.stars, { min: 0.5, max: 5 }), numberOrNull(hotel.stars, { min: 0.5, max: 5 })];
-  const cities = [normalizedId(offer.cityId), normalizedId(hotel.cityId)];
-  // A known contradiction excludes a hotel; null never means unequal.
-  if ((cities.every(value => value !== null) && cities[0] !== cities[1]) ||
-      (neighborhood.every(value => value !== null) && neighborhood[0] !== neighborhood[1]) ||
-      (stars.every(value => value !== null) && stars[0] !== stars[1])) return null;
-  const families = [
-    ['guestRating', compareNumericClue(offer.clues?.guestRating, hotel.guestRating, { max: 10 })],
-    ['reviewCount', compareNumericClue(offer.clues?.reviewCount, hotel.reviewCount, { integer: true })],
-    ['amenities', compareAmenities(offer, hotel)],
-  ];
-  if (families.some(([, state]) => state === 'contradiction')) return null;
-  if (neighborhood.includes(null) || stars.includes(null)) return 'unassessed';
-  if (!families.some(([, state]) => state === 'match')) return 'unassessed';
-  return families;
+export function isValidHotel(row) {
+  return hasComparisonFacts(row) && isId(row.hotelId) && isNumeric(row.ratesSummary.minPrice) &&
+    (row.hotelType === 'RTL' ||
+      typeof row.ratesSummary.programName === 'string' && row.ratesSummary.programName.trim().length > 0);
 }
 
-function candidateFrom(hotel, families) {
-  const matched = families.filter(([, state]) => state === 'match');
+function matches(offer, hotel) {
+  if (hotel.ratesSummary.programName === 'Express_Deal') return false;
+  if (offer.starRating !== hotel.starRating) return false;
+  if (offer.location.neighborhoodID !== hotel.location.neighborhoodID) return false;
+  if (!(offer.overallGuestRating >= Math.floor(hotel.overallGuestRating) &&
+        offer.overallGuestRating <= Math.ceil(hotel.overallGuestRating))) return false;
+  if (offer.ratesSummary.minStrikePrice !== hotel.ratesSummary.minPrice) return false;
+  if (!(offer.totalReviewCount >= Math.floor(hotel.totalReviewCount / 100) * 100 &&
+        offer.totalReviewCount <= Math.ceil(hotel.totalReviewCount / 100) * 100)) return false;
+  if (JSON.stringify(offer.hotelFeatures.highlightedAmenities) !==
+      JSON.stringify(hotel.hotelFeatures.highlightedAmenities)) return false;
+  return JSON.stringify(offer.amenitiesIcons) === JSON.stringify(hotel.amenitiesIcons);
+}
+
+// Raw adapted observations only. Preserve strict types, arrival order and every
+// repeated rate until the bounded comparison work has finished.
+export function matchObservations(offers, hotels) {
+  const validOffers = offers.filter(isValidOffer);
+  const validHotels = hotels.filter(isValidHotel);
+  const comparisons = validOffers.length * validHotels.length;
+  if (comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
+  const pairs = [];
+  for (const offer of validOffers) {
+    for (const hotel of validHotels) {
+      if (!matches(offer, hotel)) continue;
+      if (pairs.length >= MAX_MATCH_CANDIDATES) throw new MatchLimitError();
+      pairs.push([offer.pclnId, hotel.hotelId]);
+    }
+  }
   return {
-    hotelId: hotel.hotelId,
-    name: hotel.name,
-    neighborhoodName: hotel.neighborhoodName ?? null,
-    stars: hotel.stars ?? null,
-    guestRating: hotel.guestRating ?? null,
-    reviewCount: hotel.reviewCount ?? null,
-    amenities: hotel.amenities ?? null,
-    thumbnailUrl: hotel.thumbnailUrl ?? null,
-    tier: matched.length === families.length ? 'supported' : 'partial',
-    evidence: {
-      supporting: ['Neighborhood matches', 'Star rating matches', ...matched.map(([family]) => `${familyLabels[family]} match`)],
-      missing: families.filter(([, state]) => state === 'unknown').map(([family]) => `${familyLabels[family]} cannot be compared`),
-      comparisons: { neighborhood: 'match', stars: 'match', ...Object.fromEntries(families) },
-    },
+    pairs, comparisons,
+    rejectedOffers: offers.length - validOffers.length,
+    rejectedHotels: hotels.length - validHotels.length,
   };
 }
 
-function prepareListings(offers, hotels) {
-  const named = deduplicateHotels(Array.isArray(hotels) ? hotels : []);
-  const normalizedOffers = deduplicateOffers(Array.isArray(offers) ? offers : []);
-  // Deduplication returns copies. Prepare membership once without changing the
-  // amenity arrays retained in public evidence.
-  for (const offer of normalizedOffers) offer.amenityCodes = normalizeAmenityCodes(offer.clues?.amenities?.codes);
-  const neighborhoods = new Map();
-  for (const hotel of named) {
-    const codes = normalizeAmenityCodes(hotel.amenities);
-    hotel.amenitySet = codes === null ? null : new Set(codes);
-    const neighborhood = normalizedId(hotel.neighborhoodId);
-    const stars = numberOrNull(hotel.stars, { min: 0.5, max: 5 });
-    if (!neighborhoods.has(neighborhood)) neighborhoods.set(neighborhood, new Map());
-    const byStars = neighborhoods.get(neighborhood);
-    if (!byStars.has(stars)) byStars.set(stars, []);
-    byStars.get(stars).push(hotel);
+function groupRows(rows, key, maximum) {
+  const groups = new Map();
+  for (const row of rows) {
+    const id = normalizedId(row?.[key], maximum);
+    if (id === null) continue;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(row);
   }
-  return { named, normalizedOffers, neighborhoods };
+  return groups;
 }
 
-function compatibleGroups(groups, key) {
-  // Unknown evidence must still be assessed; only known contradictions can be skipped.
-  return key === null ? groups.values() : [groups.get(key), groups.get(null)].filter(Boolean);
+function offerFacts(row) {
+  return JSON.stringify([row.starRating, row.location.neighborhoodID, row.overallGuestRating,
+    row.totalReviewCount, row.ratesSummary.minStrikePrice, row.hotelFeatures.highlightedAmenities, row.amenitiesIcons]);
 }
 
-function* comparableHotels(offer, neighborhoods) {
-  const neighborhood = normalizedId(offer.neighborhoodId);
-  const stars = numberOrNull(offer.stars, { min: 0.5, max: 5 });
-  for (const byStars of compatibleGroups(neighborhoods, neighborhood)) {
-    for (const hotels of compatibleGroups(byStars, stars)) yield* hotels;
+function conflictingCities(rows) {
+  const cities = rows.map(row => normalizedId(row.location?.cityId)).filter(id => id !== null);
+  return new Set(cities).size > 1;
+}
+
+function coherentHotel(hotel, rows = []) {
+  // Every raw row for this ID must survive display normalization. Otherwise a
+  // nameless conflicting observation could disappear and manufacture certainty.
+  return hotel && rows.every(row => typeof row.name === 'string' && row.name.trim()) &&
+    !conflictingCities(rows) && ['name', 'neighborhoodId', 'stars', 'guestRating', 'reviewCount', 'amenities']
+      .every(key => hotel[key] !== null && hotel[key] !== undefined);
+}
+
+function candidateFrom(hotel) {
+  return {
+    hotelId: hotel.hotelId, name: hotel.name,
+    neighborhoodName: hotel.neighborhoodName, stars: hotel.stars,
+    guestRating: hotel.guestRating, reviewCount: hotel.reviewCount,
+    amenities: hotel.amenities, thumbnailUrl: hotel.thumbnailUrl,
+  };
+}
+
+export function matchListings(rawOffers, rawHotels, { coverageStatus = 'complete' } = {}) {
+  const offers = Array.isArray(rawOffers) ? rawOffers : [];
+  const hotels = Array.isArray(rawHotels) ? rawHotels : [];
+  const { pairs } = matchObservations(offers, hotels);
+  // Normalize only after matching: this sorts amenities and merges display
+  // conflicts, neither of which may alter the original predicates above.
+  const normalized = normalizeListings([...offers, ...hotels]);
+  const hotelById = new Map(normalized.hotels.map(hotel => [hotel.hotelId, hotel]));
+  const offerGroups = groupRows(offers, 'pclnId', MAX_OFFER_ID_LENGTH);
+  const hotelGroups = groupRows(hotels, 'hotelId');
+  const matchedHotels = new Map();
+  for (const [rawOfferId, rawHotelId] of pairs) {
+    const offerId = normalizedId(rawOfferId, MAX_OFFER_ID_LENGTH);
+    if (!matchedHotels.has(offerId)) matchedHotels.set(offerId, new Set());
+    // An unusable matched ID remains a missing identity, never disappears to
+    // turn another matching hotel into a unique result.
+    matchedHotels.get(offerId).add(normalizedId(rawHotelId));
   }
-}
-
-export function countUnassessedHotels(offers, hotels) {
-  const { normalizedOffers, neighborhoods } = prepareListings(offers, hotels);
-  // Standalone coverage queries do not construct public candidates. The service
-  // uses matchListings to gather this count during its existing comparison pass.
-  const unassessed = new Set();
-  let comparisons = 0;
-  for (const offer of normalizedOffers) {
-    for (const hotel of comparableHotels(offer, neighborhoods)) {
-      if (unassessed.has(hotel.hotelId)) continue;
-      if (++comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
-      if (compareHotel(offer, hotel) === 'unassessed') unassessed.add(hotel.hotelId);
-    }
-  }
-  return unassessed.size;
-}
-
-function comparablePrices(offer, candidates, hotels) {
-  // Rank by price only if every candidate within this tier has the same known
-  // price basis; pairwise fallback would create a non-transitive comparator.
-  const quotes = [offer.quote, ...candidates.map(candidate => hotels.get(candidate.hotelId)?.retailQuote)];
-  if (quotes.some(quote => !quote || quote.currency !== 'USD' ||
-      !['included', 'excluded'].includes(quote.taxesFees) || quote.taxesFees !== quotes[0].taxesFees)) return null;
-  const key = ['stayCents', 'nightlyCents'].find(field => quotes.every(quote => numberOrNull(quote[field], { integer: true }) !== null));
-  return key ? new Map(candidates.map((candidate, index) => [candidate.hotelId, Math.abs(quotes[index + 1][key] - quotes[0][key])])) : null;
-}
-
-export function matchListings(offers, hotels) {
-  const { named, normalizedOffers, neighborhoods } = prepareListings(offers, hotels);
-  const byId = new Map(named.map(hotel => [hotel.hotelId, hotel]));
-  const unassessedHotels = new Set();
-  let candidateCount = 0;
-  let comparisons = 0;
-  const publicOffers = normalizedOffers.map(offer => {
-    let unassessedCount = 0;
-    const tiers = { supported: [], partial: [] };
-    for (const hotel of comparableHotels(offer, neighborhoods)) {
-      if (++comparisons > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
-      const result = compareHotel(offer, hotel);
-      if (result === 'unassessed') {
-        unassessedCount += 1;
-        unassessedHotels.add(hotel.hotelId);
-      } else if (result) {
-        // Never build or return a truncated candidate list. This limit covers
-        // the entire response, including candidates shared by several offers.
-        if (candidateCount >= MAX_MATCH_CANDIDATES) throw new MatchLimitError();
-        candidateCount += 1;
-        const candidate = candidateFrom(hotel, result);
-        tiers[candidate.tier].push(candidate);
-      }
-    }
-    for (const candidates of Object.values(tiers)) {
-      const distances = comparablePrices(offer, candidates, byId);
-      candidates.sort((a, b) => (distances ? distances.get(a.hotelId) - distances.get(b.hotelId) : 0) || compareText(a.hotelId, b.hotelId));
-    }
+  const unassessedHotels = [...hotelGroups].filter(([id, rows]) =>
+    !rows.some(isValidHotel) || !coherentHotel(hotelById.get(id), rows)).length;
+  const publicOffers = normalized.offers.map(offer => {
+    const rows = offerGroups.get(offer.offerId) ?? [];
+    const ids = [...(matchedHotels.get(offer.offerId) ?? [])];
+    const missingFacts = !rows.length || !rows.every(isValidOffer) ||
+      new Set(rows.map(offerFacts)).size > 1 || conflictingCities(rows) ||
+      ids.some(id => !coherentHotel(hotelById.get(id), hotelGroups.get(id)));
+    const reason = coverageStatus !== 'complete' ? 'incomplete_search'
+      : missingFacts ? 'missing_facts'
+        : ids.length > 1 ? 'ambiguous'
+          : ids.length === 0 ? 'no_match' : null;
     return {
       offerId: offer.offerId,
-      neighborhoodName: offer.neighborhoodName ?? null,
-      stars: offer.stars ?? null,
-      clues: structuredClone(offer.clues),
-      quote: offer.quote,
-      handoffUrl: offer.handoffUrl ?? null,
-      candidates: [...tiers.supported, ...tiers.partial],
-      unassessedCount,
+      neighborhoodName: offer.neighborhoodName, stars: offer.stars,
+      clues: offer.clues, quote: offer.quote, handoffUrl: offer.handoffUrl,
+      resolution: reason ? { status: 'unresolved', reason } : { status: 'matched' },
+      candidates: reason ? [] : [candidateFrom(hotelById.get(ids[0]))],
     };
   });
-  return { offers: publicOffers, unassessedHotels: unassessedHotels.size };
-}
-
-export function matchOffers(offers, hotels) {
-  return matchListings(offers, hotels).offers;
+  return { offers: publicOffers, unassessedHotels, invalidRows: normalized.invalidRows };
 }
