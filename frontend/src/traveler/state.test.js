@@ -15,7 +15,7 @@ const tripKey = contextKey(trip);
 const key = detailKey(trip, offerId, hotelId);
 const shortlist = (context = trip) => ({
   context, expiresAt: '2027-01-01T00:05:00.000Z', coverage: { status: 'complete' },
-  offers: [{ offerId, candidates: [{ hotelId }] }],
+  offers: [{ offerId, resolution: { status: 'matched' }, candidates: [{ hotelId }] }],
 });
 
 function cacheSearch(state, context, requestId, data = shortlist(context)) {
@@ -36,6 +36,7 @@ const loadedDetail = () => ({
   context: trip, offer: shortlist().offers[0], candidate: { hotelId, name: 'Known hotel' },
   expiresAt: '2027-01-01T00:01:00.000Z', offerExpiresAt: '2027-01-01T00:05:00.000Z',
   details: { images: ['https://images.priceline.com/property.jpg'], description: 'Known property information' },
+  detailStatus: 'available', quoteStatus: 'unavailable',
 });
 const succeedDetail = (state, requestId, data = loadedDetail()) => travelerReducer(state, {
   type: 'detail/success', key, tripKey, requestId, data,
@@ -196,8 +197,8 @@ test('detail response still requires exact offer and candidate identities', asyn
     ['cd'.repeat(168), hotelId, false],
     [offerId, 'hotel-2', false],
   ]) {
-    reply = { context: trip, expiresAt: '2027-01-01T00:05:00.000Z',
-      offer: { offerId: returnedOffer }, candidate: { hotelId: returnedHotel } };
+    reply = { ...loadedDetail(),
+      offer: { ...shortlist().offers[0], offerId: returnedOffer }, candidate: { hotelId: returnedHotel } };
     let state = cacheSearch(undefined, trip, 'search-1');
     await loadDetail(trip, offerId, hotelId)((action) => { state = travelerReducer(state, action); });
     assert.equal(state.detail.status, accepted ? 'success' : 'error');
@@ -317,4 +318,140 @@ test('cooldown storage prunes expired records and remains bounded to five trips'
   state = travelerReducer(state, { type: 'search/error', key: tripKey, requestId: 10, receivedAt: now + 60000,
     error: { code: 'PROVIDER_COOLDOWN', retryAt: new Date(now + 120000).toISOString() } });
   assert.deepEqual(Object.keys(state.searchCooldowns), [tripKey]);
+});
+
+test('offer-only requests omit hotelId and require the distinct null-candidate envelope', async t => {
+  let reply;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    assert.equal(Object.hasOwn(JSON.parse(options.body), 'hotelId'), false);
+    return { ok: true, json: async () => reply };
+  });
+  const unresolved = { offerId, resolution: { status: 'unresolved', reason: 'no_match' }, candidates: [] };
+  const data = { ...loadedDetail(), offer: unresolved, candidate: null, details: null, detailStatus: 'not_requested' };
+  const offerOnlyKey = detailKey(trip, offerId, null);
+  assert.equal(offerOnlyKey, detailKey(trip, offerId));
+  assert.equal(JSON.parse(offerOnlyKey)[2], null);
+  for (const [response, accepted] of [
+    [data, true],
+    [{ ...data, offer: shortlist().offers[0] }, true],
+    [{ ...data, candidate: { hotelId } }, false],
+    [{ ...data, details: {} }, false],
+    [{ ...data, detailStatus: 'unavailable' }, false],
+    [{ ...data, offer: { ...unresolved, offerId: 'other' } }, false],
+  ]) {
+    reply = response;
+    let state = cacheSearch(undefined, trip, 'cached', { ...shortlist(), offers: [unresolved] });
+    await loadDetail(trip, offerId, null)(action => { state = travelerReducer(state, action); });
+    assert.equal(state.detail.status, accepted ? 'success' : 'error');
+    if (accepted) {
+      const selected = view(state, { key: offerOnlyKey, hotelId: null });
+      assert.equal(selected.data, response);
+      assert.equal(selected.candidate, null);
+      assert.equal(selected.bindingRejected, false);
+    }
+  }
+});
+
+test('old response shapes require a refresh instead of identifying a hotel', async t => {
+  let response;
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => response }));
+  const oldOffer = { offerId, candidates: [{ hotelId }] };
+  for (const kind of ['search', 'detail']) {
+    response = kind === 'search' ? { ...shortlist(), offers: [oldOffer] } : { ...loadedDetail(), offer: oldOffer };
+    let state = travelerReducer(undefined, {});
+    const request = kind === 'search' ? loadSearch(trip) : loadDetail(trip, offerId, hotelId);
+    await request(action => { state = travelerReducer(state, action); });
+    assert.equal(state[kind].status, 'error');
+    assert.equal(state[kind].error.code, 'PROVIDER_RESPONSE_INVALID');
+  }
+});
+
+test('named rejection hides the identity but preserves a separately validated opaque offer', () => {
+  const original = shortlist();
+  original.offers[0].providerUrl = 'https://www.priceline.com/express/offer';
+  let state = startDetail(cacheSearch(undefined, trip, 1, original), 2);
+  state = rejectSelection(state, 2);
+  assert.equal(state.searches[tripKey], undefined);
+  assert.equal(view(state).candidate, null);
+  assert.equal(view(state).offer, original.offers[0]);
+  assert.equal(view(state).expiresAt, original.expiresAt);
+  assert.equal(view(state).bindingRejected, true);
+});
+
+test('offer-only membership survives hotel changes but a newer removed offer rejects an old response', () => {
+  const offerOnlyKey = detailKey(trip, offerId, null);
+  const start = (state, requestId) => travelerReducer(state, {
+    type: 'detail/start', key: offerOnlyKey, tripKey, offerId, hotelId: null, requestId,
+  });
+  const selected = state => view(state, { key: offerOnlyKey, hotelId: null });
+  let state = start(cacheSearch(undefined, trip, 1), 2);
+  assert.equal(selected(state).bindingRejected, false);
+  assert.equal(selected(state).candidate, null);
+  const changed = { ...shortlist(), offers: [{ offerId, resolution: { status: 'unresolved', reason: 'ambiguous' }, candidates: [] }] };
+  state = cacheSearch(state, trip, 3, changed);
+  const data = { ...loadedDetail(), offer: changed.offers[0], candidate: null, details: null, detailStatus: 'not_requested' };
+  state = succeedDetail(state, 2, data);
+  assert.deepEqual(selected(state).data, data);
+  assert.equal(state.searches[tripKey], changed, 'detail completion preserves the search object and its listing quote');
+  state = start(state, 4);
+  state = cacheSearch(state, trip, 5, { ...shortlist(), offers: [] });
+  state = succeedDetail(state, 4, data);
+  assert.equal(state.detail.status, 'error');
+  assert.equal(selected(state).offer, null);
+  assert.equal(selected(state).data, null);
+});
+
+test('a newer unresolved search withdraws offer-only hotel hints while preserving completed or in-flight quotes', () => {
+  const offerOnlyKey = detailKey(trip, offerId, null);
+  const start = (state, requestId) => travelerReducer(state, {
+    type: 'detail/start', key: offerOnlyKey, tripKey, offerId, hotelId: null, requestId,
+  });
+  const newer = { ...shortlist(), offers: [{
+    offerId, resolution: { status: 'unresolved', reason: 'ambiguous' }, candidates: [],
+  }] };
+  const quote = { totalCents: 25000, currency: 'USD' };
+  const data = { ...loadedDetail(), candidate: null, details: null, detailStatus: 'not_requested', quoteStatus: 'available',
+    offer: { ...shortlist().offers[0], quote, providerUrl: 'https://www.priceline.com/express/offer' } };
+  for (const completeBeforeSearch of [false, true]) {
+    let state = start(cacheSearch(undefined, trip, 1), 2);
+    if (completeBeforeSearch) state = succeedDetail(state, 2, data);
+    state = cacheSearch(state, trip, 3, newer);
+    if (!completeBeforeSearch) state = succeedDetail(state, 2, data);
+    const selected = view(state, { key: offerOnlyKey, hotelId: null });
+    assert.equal(selected.data.offer.resolution, newer.offers[0].resolution);
+    assert.deepEqual(selected.data.offer.candidates, []);
+    assert.equal(selected.offer.quote, quote);
+    assert.equal(selected.offer.providerUrl, data.offer.providerUrl);
+    assert.equal(selected.expiresAt, data.offerExpiresAt);
+    assert.equal(state.searches[tripKey], newer);
+    assert.equal(newer.offers[0].quote, undefined);
+    state = succeedDetail(start(state, 4), 4, data);
+    assert.equal(view(state, { key: offerOnlyKey, hotelId: null }).offer.resolution.status, 'matched',
+      'a later detail request can revalidate the hotel relationship');
+  }
+});
+
+test('superseded searches settle and Back A retains its exact snapshot after B fails and retries', async t => {
+  let state = cacheSearch(undefined, trip, 'cached');
+  const snapshot = state.searches[tripKey];
+  let call = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    call += 1;
+    if (call === 1) return new Promise((resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    });
+    if (call === 2) throw new Error('offline');
+    return { ok: true, json: async () => shortlist(otherTrip) };
+  });
+  const dispatch = action => { state = travelerReducer(state, action); };
+  const pendingA = loadSearch(trip)(dispatch);
+  await loadSearch(otherTrip)(dispatch);
+  await pendingA;
+  assert.equal(state.search.status, 'error');
+  assert.equal(state.search.key, contextKey(otherTrip));
+  assert.equal(state.searches[tripKey], snapshot);
+  await loadSearch(otherTrip)(dispatch);
+  assert.equal(state.search.status, 'success');
+  assert.equal(state.searches[tripKey], snapshot);
+  assert.deepEqual(state.searches[contextKey(otherTrip)].context, otherTrip);
 });
