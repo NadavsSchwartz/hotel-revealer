@@ -52,6 +52,10 @@ website/bundle research, the selected request shape and its limits.
 | Tel Aviv listing probe | `tel-aviv-page.json`: one Express offer and 99 named hotels. Provider city country code was `IS`, not GeoNames ISO `IL` |
 | Coordinate-only route | `coordinate-only-summary.json`: HTTP 200 with provider error 498, “Null exact match or null matched city”; no recorded challenge. This did not establish a usable coordinate-only search |
 | Named-hotel details | `detail-probe.json`, plus the actual app flow described below, establish separate retail detail retrieval; they do not verify hidden hotel identity |
+| Listing discounts | `pricing-listings.json`: the combined query returns provider `displaySavingsPct`; this adds no per-offer detail request |
+| Original-offer total | `original-total-display-s.json`: the preferred Express room rate quotes USD 66 nightly, USD 198 base stay and USD 439.02 `grandTotal`; its summary `rateIdentifier` selects that exact room rate |
+| Modern total semantics | `modern-total.json`: the current `sopqHotelDetails.price` response reports USD 439.02 and explicitly describes it as including taxes and fees; this corroborates the legacy detail amount for that offer/context |
+| Family original-offer total | `family-original-total.json`, captured 2026-09-08 03:40:21 UTC: September 21–24, two rooms, four adults and child age 7. The matched preferred rate quotes USD 66 nightly, USD 396 base stay and USD 873.06 total. The same saved opaque offer later displayed as unavailable on Priceline; this verifies API amounts, not current bookability or a successful family handoff |
 
 The two combined Las Vegas probes used September 21–24, 2026, one room, two adults,
 USD and the same request options. The 500-row probe retrieved that snapshot in one
@@ -80,6 +84,63 @@ quote. It preceded the 500-row optimization. Inventory and quotes are point-in-t
 observations, so these runs are not a controlled before/after latency comparison.
 Address display now works without a description.
 
+## Added quote and comparison contract
+
+Search offers now expose normalized `clues` for guest rating, review count and
+amenities. Each candidate's `evidence.comparisons` has stable keys for
+`neighborhood`, `stars`, `guestRating`, `reviewCount` and `amenities`, with `match`
+or `unknown` values. Known contradictions exclude a candidate; matching values
+remain evidence for a possible hotel, not an identity confirmation.
+
+Listing quotes may include `advertisedDiscount:{percent,source:'Priceline'}` from
+`displaySavingsPct`. Selected original quotes use the matching room rate's
+`savingPct`. These are provider-reported base-rate discounts; they are not savings
+derived from a candidate's retail rate or discounts on a fee-inclusive total.
+In the recorded Las Vegas probe, the base-rate discount was 61%, while the modern
+total response reported 42%. Priceline's [savings disclosure](https://www.priceline.com/partner/savings-day)
+also permits an average-based estimated retail comparator. Missing/invalid
+discounts are omitted. The app does not promise “you save” a computed amount.
+
+Opening a candidate requests named details and the original opaque quote in one
+HTTP request containing two `hotelDetails` resolver calls. The `details` alias
+uses only the named `hotelID`; `original` uses only the opaque `pclnID`, with the
+same dates, rooms, adults, child ages and currency. The app does not fetch room
+details for every result. An original quote is accepted only for USD,
+`status:AVAILABLE`, and exactly one Express room rate whose identifier matches
+`ratesSummary.rateIdentifier`. Other rooms and the candidate's retail quote never
+supply its total.
+
+For multi-room original quotes, the adapter additionally requires exact base
+arithmetic in cents: nightly amount × calendar nights × rooms. The family probe
+above satisfies USD 66 × 3 × 2 = USD 396; its USD 873.06 total came directly from
+the provider and is not twice the earlier one-room USD 439.02 total. Any base
+mismatch, even one cent, preserves the listing fallback without an inclusive
+quote. There is no rounding tolerance or total multiplication. This conservative
+guard can omit a quote when provider rounding differs; it does not verify every
+room allocation or change single-room handling.
+
+After the family API response, opening that same saved opaque offer on Priceline
+showed “Looks like this hotel is no longer available.” The capture therefore
+corroborates the API's quoted amount and base arithmetic only. A fresh family
+search, details retrieval and successful provider-page handoff remain unverified;
+the API's `AVAILABLE` status did not establish browser bookability in this check.
+
+When valid, the original quote adds `totalCents` and `totalTaxesFees:'included'`
+to `offer.quote`; its separate nightly and stay base amounts use
+`taxesFees:'excluded'`. The USD 439.02 API quote above is an actual provider-quoted
+amount, corroborated by the modern response's explicit tax/fee description. A
+separate rendered website check showed USD 418.77 for the linked offer. Those
+amounts did not agree, and the cause was not established; neither this field nor
+the handoff link guarantees an identical website or final checkout price. The
+modern schema was used to verify semantics, not added as another runtime call.
+
+If original pricing is missing, invalid, ambiguous or unavailable, no inclusive
+total is invented and the listing quote remains. Named details can still be
+available in that case. Conversely, a valid original total can accompany
+`detailStatus:'unavailable'` when named metadata fails. Listing tax/fee treatment
+remains `unknown`; final room selection, optional incidentals and any later
+provider price changes remain outside this quote contract.
+
 ## Provider handoff and interpretation
 
 The ordinary provider guest editor and rendered Express page were checked for
@@ -93,8 +154,10 @@ aggregate rooms/adults and child ages. The verified route preserves the same tri
 This is an original opaque offer link. A named candidate's retail rate remains
 separate. Room allocation and the final bookable room choice still occur at the
 provider; a listing cannot promise the final booking total. Quotes may change
-between retrieval and handoff. Tax/fee inclusion defaults to `unknown`; field names
-and isolated US examples do not establish inclusion or exclusion for every trip.
+between retrieval and handoff. Tax/fee inclusion defaults to `unknown` for listing
+and retail base quotes; the separately verified original-detail total uses the
+explicit inclusion contract above. These probes do not establish worldwide
+pricing accuracy or agreement between the API and every provider web session.
 
 The provider UI displayed masked rating/review clues as minimums, including “7+” /
 “3000+” and “8+” / “2100+”. The adapter explicitly marks those clues as minimums.
@@ -108,9 +171,13 @@ Otherwise the API returns `PROVIDER_DESTINATION_UNSUPPORTED` (422). This guards
 against distant namesakes but does not establish exact provider city boundaries,
 worldwide inventory or the meaning of non-ISO provider country codes.
 
-`offerExpiresAt` keeps the five-minute original offer lifetime separate from the
-one-minute details lifetime. Once a retail quote expires, it is hidden with a
-refresh action; an independently fresh original offer can remain available.
+`offerExpiresAt` keeps the five-minute search relationship and original-offer link
+separate from the one-minute details lifetime. An inclusive original quote also
+has its own nested `offer.quoteExpiresAt`, 60 seconds after retrieval. The cached
+total is not extended by search revalidation; an expired total falls back to the
+current listing quote rather than borrowing the link's longer lifetime. The UI
+must hide expired original totals and retail quotes and offer refresh while an
+independently fresh original-offer link can remain available.
 
 ## Remaining evidence and risks
 

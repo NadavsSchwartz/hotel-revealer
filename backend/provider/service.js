@@ -24,6 +24,13 @@ function normalizeDetails(value) {
   };
 }
 
+function normalizeOriginalQuote(value, context) {
+  const quote = normalizeQuote(value);
+  return quote.totalCents != null && quote.totalTaxesFees === 'included' && quote.taxesFees === 'excluded' &&
+    quote.roomCount === context.rooms && quote.nightlyBasis === 'per-room' && quote.stayBasis === 'all-rooms'
+    ? quote : null;
+}
+
 function withDeadline(operation, deadline, clock) {
   return new Promise((resolve, reject) => {
     const timer = clock.setTimeout(() => reject(new ServiceError('DEADLINE_EXCEEDED')), Math.max(0, deadline - clock.now()));
@@ -235,19 +242,24 @@ export function createProviderService({ adapter = null, clock = realClock, state
         const cached = details.get(key);
         if (cached) {
           metrics.cache = 'hit';
-          const result = { ...cached, offer, candidate, offerExpiresAt: search.expiresAt,
+          const cachedQuoteFresh = Date.parse(cached.offer?.quoteExpiresAt) > clock.now();
+          const refreshedOffer = cachedQuoteFresh
+            ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
+          const result = { ...cached, offer: refreshedOffer, candidate, offerExpiresAt: search.expiresAt,
             expiresAt: iso(Math.min(Date.parse(search.expiresAt), Date.parse(cached.retrievedAt) + DETAIL_TTL)) };
           assertJsonSize(result);
           return result;
         }
         metrics.cache = 'miss';
         let normalizedDetails;
+        let originalQuote = null;
         let detailStatus = 'available';
         let cacheable = true;
         try {
           const rawDetails = await call('hotelDetails', { context, offerId, hotelId }, deadline, metrics);
           assertJsonSize(rawDetails);
           normalizedDetails = normalizeDetails(rawDetails);
+          originalQuote = normalizeOriginalQuote(rawDetails.originalQuote, context);
           if (rawDetails.available === false) detailStatus = 'unavailable';
         } catch (error) {
           if (!(error instanceof ServiceError) || !['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED'].includes(error.code)) throw error;
@@ -256,13 +268,15 @@ export function createProviderService({ adapter = null, clock = realClock, state
           normalizedDetails = { description: null, images: [], amenities: [], address: null, retailQuote: null };
         }
         const retrievedAt = clock.now();
+        const refreshedOffer = originalQuote
+          ? { ...offer, quote: originalQuote, quoteExpiresAt: iso(retrievedAt + DETAIL_TTL) } : offer;
         const result = {
           context, retrievedAt: iso(retrievedAt), expiresAt: iso(Math.min(Date.parse(search.expiresAt), retrievedAt + DETAIL_TTL)), offerExpiresAt: search.expiresAt,
-          offer, candidate, details: normalizedDetails, detailStatus,
+          offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
         };
         // Missing retailQuote does not imply Express unavailability.
         assertJsonSize(result);
-        if (cacheable && deadline > clock.now()) details.set(key, result);
+        if (cacheable && deadline > clock.now()) details.set(key, result, retrievedAt + DETAIL_TTL);
         return result;
       });
       return observe('detail', request, admittedAt, metrics);

@@ -22,6 +22,12 @@ function setup(overrides = {}) {
   return { clock, calls, adapter, service: createProviderService({ clock, adapter, stateStore: overrides.stateStore || createMemoryStateStore(), logger: overrides.logger || { info() {} } }) };
 }
 const selection = { ...futureContext, offerId: 'offer-1', hotelId: 'hotel-1' };
+const originalQuote = (changes = {}) => ({
+  nightlyCents: 6600, stayCents: 19800, totalCents: 43902, currency: 'USD',
+  taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1,
+  nightlyBasis: 'per-room', stayBasis: 'all-rooms', advertisedDiscount: { percent: 61, source: 'Priceline' },
+  ...changes,
+});
 
 test('default production service refuses both operations without network or state I/O', async () => {
   const originalFetch = globalThis.fetch;
@@ -172,6 +178,95 @@ test('details require the current context relationship and missing retail stays 
   await clock.advance(60_000);
   await service.detail(selection);
   assert.equal(calls.length, 3);
+});
+
+test('selected-offer total has one-minute freshness and survives detail-cache hits without changing search prices', async () => {
+  let totalCents = 43902;
+  const { service, clock, calls } = setup({ adapter: { async hotelDetails(request) {
+    calls.push(['detail', request]);
+    return { description: 'Named hotel information', originalQuote: originalQuote({ totalCents, quoteExpiresAt: '2099-01-01T00:00:00.000Z' }) };
+  } } });
+  const search = await service.search(futureContext);
+  const pending = service.detail(selection);
+  await clock.advance(1000);
+  const first = await pending;
+  assert.deepEqual(first.offer.quote, originalQuote());
+  assert.equal(first.offer.quoteExpiresAt, new Date(clock.now() + 60000).toISOString());
+  assert.equal(first.offerExpiresAt, search.expiresAt);
+  assert.equal(first.expiresAt, first.offer.quoteExpiresAt);
+  assert.equal((await service.search(futureContext)).offers[0].quote.nightlyCents, 10000);
+  await clock.advance(59000);
+  const cached = await service.detail(selection);
+  assert.deepEqual(cached.offer.quote, first.offer.quote);
+  assert.equal(cached.offer.quoteExpiresAt, first.offer.quoteExpiresAt);
+  assert.equal(calls.filter(([type]) => type === 'detail').length, 1);
+  totalCents = 44400;
+  await clock.advance(1000);
+  const refreshed = await service.detail(selection);
+  assert.equal(refreshed.offer.quote.totalCents, 44400);
+  assert.equal(Date.parse(refreshed.offer.quoteExpiresAt) - clock.now(), 60000);
+  assert.equal(calls.filter(([type]) => type === 'detail').length, 2);
+});
+
+test('search revalidation updates the relationship while preserving the still-fresh selected-offer quote', async () => {
+  let searches = 0;
+  const { service, clock, calls } = setup({ adapter: {
+    async listingsPage(request) {
+      calls.push(['search', request]);
+      searches += 1;
+      const rows = listingRows();
+      if (searches > 1) rows[1].name = 'Updated hotel name';
+      return { listings: rows, nextCursor: null };
+    },
+    async hotelDetails(request) { calls.push(['detail', request]); return { originalQuote: originalQuote() }; },
+  } });
+  const search = await service.search(futureContext);
+  await clock.advance(299000);
+  const first = await service.detail(selection);
+  assert.equal(first.expiresAt, search.expiresAt);
+  assert.equal(Date.parse(first.offer.quoteExpiresAt) - clock.now(), 60000);
+  await clock.advance(1001);
+  const revalidated = await service.detail(selection);
+  assert.equal(revalidated.candidate.name, 'Updated hotel name');
+  assert.equal(revalidated.offer.candidates[0].name, 'Updated hotel name');
+  assert.deepEqual(revalidated.offer.quote, first.offer.quote);
+  assert.equal(revalidated.offer.quoteExpiresAt, first.offer.quoteExpiresAt);
+  assert.ok(Date.parse(revalidated.offerExpiresAt) > Date.parse(first.offerExpiresAt));
+  assert.equal(calls.filter(([type]) => type === 'detail').length, 1);
+});
+
+test('invalid original quote enrichment preserves known listing prices and independent named details', async () => {
+  for (const quote of [null, {}, originalQuote({ totalCents: undefined }), originalQuote({ totalCents: 19000 }),
+    originalQuote({ totalCents: Number.MAX_SAFE_INTEGER + 1 }), originalQuote({ totalCents: 43902.5 }),
+    originalQuote({ currency: 'EUR' }), originalQuote({ roomCount: 2 }), originalQuote({ nightlyCents: null }),
+    originalQuote({ taxesFees: 'unknown' }), originalQuote({ totalTaxesFees: 'unknown' }),
+    originalQuote({ nightlyBasis: undefined }), originalQuote({ stayBasis: undefined })]) {
+    const { service, clock } = setup({ adapter: { async hotelDetails() {
+      return { description: 'Named hotel information', originalQuote: quote };
+    } } });
+    const search = await service.search(futureContext);
+    const pending = service.detail(selection);
+    await clock.advance(1000);
+    const detail = await pending;
+    assert.deepEqual(detail.offer.quote, search.offers[0].quote);
+    assert.equal(detail.offer.quoteExpiresAt, undefined);
+    assert.equal(detail.details.description, 'Named hotel information');
+    assert.equal(detail.detailStatus, 'available');
+  }
+});
+
+test('original total remains independent when named hotel details are unavailable', async () => {
+  const { service, clock } = setup({ adapter: { async hotelDetails() {
+    return { available: false, originalQuote: originalQuote() };
+  } } });
+  await service.search(futureContext);
+  const pending = service.detail(selection);
+  await clock.advance(1000);
+  const detail = await pending;
+  assert.equal(detail.detailStatus, 'unavailable');
+  assert.equal(detail.offer.quote.totalCents, 43902);
+  assert.equal(detail.details.retailQuote, null);
+  assert.equal(Date.parse(detail.offer.quoteExpiresAt) - clock.now(), 60000);
 });
 
 test('details share in-flight search and retain ten-second total budget including revalidation', async () => {

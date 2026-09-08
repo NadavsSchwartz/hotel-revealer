@@ -50,24 +50,41 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
 - Coverage: `{status:'complete'|'partial',reason:null|string,pagesFetched,
   offersFound,namedHotelsChecked,unassessedHotels}`. Complete means retrieved
   pagination only, never exhaustive hidden inventory or verified identity.
-- Offer: `{offerId,neighborhoodName,stars,quote,handoffUrl,candidates,
-  unassessedCount}`. Quote: `{nightlyCents,stayCents,currency:'USD',
+- Offer: `{offerId,neighborhoodName,stars,clues,quote,handoffUrl,candidates,
+  unassessedCount,quoteExpiresAt?}`. Public `clues` contain the normalized
+  `guestRating`, `reviewCount` and `amenities` evidence described below.
+  Quote: `{nightlyCents,stayCents,currency:'USD',
   taxesFees:'included'|'excluded'|'unknown'}`; missing amounts are null.
   Verified price-basis metadata is optional: `{roomCount,nightlyBasis:'per-room',
   stayBasis:'all-rooms'}`. The adapter preserves provider stay amounts rather than
-  inventing a total. Fee inclusion stays unknown without explicit source evidence.
+  inventing a total. Listing quote tax/fee treatment remains unknown.
+  Optional `advertisedDiscount:{percent,source:'Priceline'}` is a provider-reported
+  base-rate discount, not a discount on the tax-inclusive total or savings computed
+  from a possible candidate. Invalid or absent discounts are omitted.
+  A separately retrieved original-offer quote can add
+  `{totalCents,totalTaxesFees:'included'}`; its nightly/stay base amounts retain
+  `taxesFees:'excluded'`. Missing or invalid totals are omitted, never synthesized.
   Opaque offer IDs permit up to 1024 safe characters; named hotel IDs remain 200.
 - Candidate: `{hotelId,name,neighborhoodName,stars,guestRating,reviewCount,
-  amenities,thumbnailUrl,tier:'supported'|'partial',evidence:{supporting:[],missing:[]}}`.
+  amenities,thumbnailUrl,tier:'supported'|'partial',evidence:{supporting:[],missing:[],
+  comparisons:{neighborhood,stars,guestRating,reviewCount,amenities}}}`.
+  Comparisons on returned candidates use `match` or `unknown`; known
+  contradictions exclude the candidate. Stable family keys and public clues let
+  the UI compare values without interpreting human-readable evidence strings.
 - Detail input: context fields plus `{offerId,hotelId}`.
 - Detail response: `{context,retrievedAt,expiresAt,offerExpiresAt,offer,candidate,
   details:{description,images:[],amenities:[],address,retailQuote:null|object},
   detailStatus:'available'|'unavailable'}`. A missing retail rate does not
   establish Express unavailability. Search relationship is checked server-side.
   Metadata cache expiry does not shorten the separately revalidated offer expiry.
-  The UI hides an expired retail quote and offers detail refresh while preserving
-  a fresh original-offer link. Address rendering does not depend on description
-  availability; the current adapter supplies no unverified description field.
+  An accepted original-offer total replaces `offer.quote` and adds the nested
+  `offer.quoteExpiresAt` (60 seconds from retrieval). `offerExpiresAt` still tracks
+  the five-minute search relationship and original-offer link; it does not extend
+  price freshness. Cached inclusive quotes are reused only while their own expiry
+  is fresh. Retail quotes and original-offer totals must be hidden or refreshed
+  when stale while an independently fresh original-offer link may remain usable.
+  Address rendering does not depend on description availability; the current
+  adapter supplies no unverified description field.
 - The API paths stay POST `/api/v1/hotelDeals` and POST `/api/v1/deal`.
 - No test response mode or fixture switch is exposed by the production server.
 
@@ -104,6 +121,27 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
 - Searches combine `RTL` named hotels and `SOPQ` Express offers, requesting 500
   rows per page. The coordinator permits at most three pages. Incomplete retrieval
   stays explicit; retrieved pagination completeness is not exhaustive inventory.
+- Listing discounts come from `displaySavingsPct` without another provider request.
+  Opening details sends one HTTP request with two GraphQL `hotelDetails` resolver
+  calls: `details` uses the named `hotelID`; `original` uses only the opaque
+  `pclnID`. Both use the same travel context. This does not fetch room totals for
+  every search result or use candidate retail rates to price the original offer.
+  The original response must be USD and `AVAILABLE`, and its summary
+  `rateIdentifier` must select exactly one Express room rate. Only that rate's
+  `grandTotal`, base amounts and `savingPct` are considered. Rate order, lowest
+  guessed amount and other rooms' totals are not substitutes.
+  For more than one room, base-stay cents must exactly equal nightly cents × the
+  shared calendar-night count × rooms. Any mismatch, including one cent, leaves
+  the listing quote unchanged. This conservative check adds no rounding tolerance
+  and never multiplies the provider's total; single-room behavior is unchanged.
+  Named detail availability and original quote availability are independent:
+  missing original pricing leaves the listing quote; missing named details can
+  return `detailStatus:'unavailable'` while retaining a valid original total.
+  A recoverable failure of both leaves the revalidated offer with unavailable
+  details.
+  The inclusive total is the provider API's quote, not a guarantee of the website
+  or checkout price. A recorded API total of $439.02 differed from $418.77 shown
+  in the browser; [LIVE_ACCESS.md](LIVE_ACCESS.md) records the scope and limits.
 - Each nonempty page must contain a named hotel's coordinates or an opaque
   offer's neighborhood coordinates within 100 km of the selected GeoNames place.
   Otherwise the API returns `PROVIDER_DESTINATION_UNSUPPORTED` (422). This catches
@@ -125,12 +163,13 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
 
 ## Required verification / remaining external gates
 
-The integration passed `npm run check` (lint, 129 native tests and production
-build) and all 140 browser cases (35 scenarios in four engine/viewport projects),
+The earlier integration baseline passed `npm run check` (lint, 129 native tests
+and production build) and all 140 browser cases (35 scenarios in four engine/viewport projects),
 with no retries or skips. The existing single-holder Axe combobox exception
 remains. The real homepage-to-Tel-Aviv-details-to-Priceline journey also passed;
-see [ACCEPTANCE.md](ACCEPTANCE.md) for evidence and limits. Do not treat browser
-fixtures as live identity or pricing evidence.
+see [ACCEPTANCE.md](ACCEPTANCE.md) for current verification and limits. Those counts
+predate the additive quote/clue contract above and do not establish its validation.
+Do not treat browser fixtures as live identity or pricing evidence.
 Manual VoiceOver, real mobile devices, known hotel outcomes, 3–5 first-time users,
 selected-design performance, host sizing, deployment/rollback/reboot and the public
 live journey remain explicit gates until completed. Provider permission and

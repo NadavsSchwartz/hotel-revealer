@@ -1,8 +1,9 @@
 import { getDestination } from '../destinations/index.js';
 import { isRecord, normalizedId } from '../domain/validation.js';
-import { numberOrNull } from '../domain/normalization.js';
+import { numberOrNull, normalizeQuote } from '../domain/normalization.js';
 import { ProviderFailure, ServiceError } from './errors.js';
 import { MAX_JSON_BYTES } from './size.js';
+import { nightCount } from '../../shared/travel.js';
 
 const ENDPOINT = 'https://www.priceline.com/pws/v0/pcln-graph/';
 const PAGE_SIZE = 500;
@@ -27,7 +28,7 @@ const LISTINGS_QUERY = `query HotelRevealerListings(
     errorMessage offset pageSize totalSize
     cityInfo { cityId cityName stateCode countryCode searchedLatitude searchedLongitude }
     hotels {
-      hotelId pclnId hotelType name starRating overallGuestRating totalReviewCount thumbnailUrl
+      hotelId pclnId hotelType name starRating overallGuestRating totalReviewCount thumbnailUrl displaySavingsPct
       ratesSummary { programName minPrice minCurrencyCode displayPricePerStay pricedOccupancy }
       location { cityId neighborhoodID neighborhoodName latitude longitude }
       hotelFeatures { highlightedAmenities }
@@ -36,10 +37,11 @@ const LISTINGS_QUERY = `query HotelRevealerListings(
 }`;
 
 const DETAILS_QUERY = `query HotelRevealerDetails(
-  $hotelID: ID, $checkIn: String, $checkOut: String, $roomsCount: Int,
+  $hotelID: ID, $offerId: ID, $checkIn: String, $checkOut: String, $roomsCount: Int,
   $currencyCode: String, $appCode: String, $adults: Int, $children: [String],
   $responseOptions: String, $includePrepaidFeeRates: Boolean,
-  $multiOccDisplay: Boolean, $multiOccRates: Boolean
+  $multiOccDisplay: Boolean, $multiOccRates: Boolean,
+  $originalResponseOptions: String, $rateDisplayOption: String, $paymentRateMerge: Boolean
 ) {
   details: hotelDetails(
     hotelID: $hotelID, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
@@ -55,6 +57,21 @@ const DETAILS_QUERY = `query HotelRevealerDetails(
       ratesSummary { minPrice minCurrencyCode }
     }
   }
+  original: hotelDetails(
+    pclnID: $offerId, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
+    currencyCode: $currencyCode, appCode: $appCode, adults: $adults, children: $children,
+    responseOptions: $originalResponseOptions, includePrepaidFeeRates: $includePrepaidFeeRates,
+    multiOccDisplay: $multiOccDisplay, multiOccRates: $multiOccRates,
+    rateDisplayOption: $rateDisplayOption, paymentRateMerge: $paymentRateMerge
+  ) {
+    errorMessage
+    hotel {
+      ratesSummary { minCurrencyCode rateIdentifier status }
+      transformedRooms {
+        roomRates { rateIdentifier price grandTotal totalPriceExcludingTaxesAndFeePerStay programName savingPct }
+      }
+    }
+  }
 }`;
 
 const invalidResponse = () => new ServiceError('PROVIDER_RESPONSE_INVALID');
@@ -67,7 +84,7 @@ async function cancelBody(response) {
   try { await response.body?.cancel(); } catch { /* Cancellation is best effort. */ }
 }
 
-async function readJson(response, signal) {
+async function readJson(response, signal, allowPartialDetails = false) {
   const contentLength = response.headers.get('content-length');
   if (contentLength !== null && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_JSON_BYTES) {
     await cancelBody(response);
@@ -95,8 +112,11 @@ async function readJson(response, signal) {
     let parsed;
     try { parsed = JSON.parse(body); } catch { throw invalidResponse(); }
     if (!isRecord(parsed)) throw invalidResponse();
-    if (parsed.errors != null && (!Array.isArray(parsed.errors) || parsed.errors.length > 0)) {
-      throw new ProviderFailure('unavailable');
+    if (parsed.errors != null) {
+      if (!Array.isArray(parsed.errors) || (parsed.errors.length > 0 && !(allowPartialDetails && isRecord(parsed.data) &&
+          parsed.errors.every(error => Array.isArray(error?.path) && ['details', 'original'].includes(error.path[0]))))) {
+        throw new ProviderFailure('unavailable');
+      }
     }
     return parsed;
   } catch (error) {
@@ -167,18 +187,20 @@ function originalOfferUrl(row, context) {
     (context.childrenAges.length ? `/children/${context.childrenAges.join(',')}` : '') + '?cur=USD';
 }
 
-function adaptQuote(ratesSummary, context) {
+function adaptQuote(ratesSummary, context, advertisedPercent) {
+  const percent = numberOrNull(advertisedPercent, { max: 100 });
   return {
     ...ratesSummary, roomCount: context.rooms, nightlyBasis: 'per-room',
     ...(ratesSummary.displayPricePerStay != null ? { stayBasis: 'all-rooms' } : {}),
     // Base-price field names alone do not establish fee treatment in every country.
     taxesFees: 'unknown',
+    ...(percent !== null && percent > 0 && percent < 100 ? { advertisedDiscount: { percent, source: 'Priceline' } } : {}),
   };
 }
 
 function adaptListing(row, context) {
   if (!isRecord(row) || !isRecord(row.ratesSummary)) return row;
-  const ratesSummary = adaptQuote(row.ratesSummary, context);
+  const ratesSummary = adaptQuote(row.ratesSummary, context, row.displaySavingsPct);
   // hotelType was observed independently of nullable retail programName.
   if (row.hotelType === 'RTL' && row.ratesSummary.programName == null) {
     return { ...row, ratesSummary: { ...ratesSummary, programName: 'RETAIL' } };
@@ -199,11 +221,44 @@ function adaptListing(row, context) {
   };
 }
 
+function originalQuote(original, context) {
+  const hotel = original?.hotel;
+  const summary = hotel?.ratesSummary;
+  if (!isRecord(original) || original.errorMessage || !isRecord(hotel) || !isRecord(summary) ||
+      summary.status !== 'AVAILABLE' || summary.minCurrencyCode !== 'USD' ||
+      typeof summary.rateIdentifier !== 'string' || !summary.rateIdentifier || summary.rateIdentifier.length > 4096 ||
+      !Array.isArray(hotel.transformedRooms)) return null;
+  const matches = hotel.transformedRooms.flatMap(room => Array.isArray(room?.roomRates) ? room.roomRates : [])
+    .filter(rate => isRecord(rate) && rate.rateIdentifier === summary.rateIdentifier);
+  // A preferred identifier must select exactly one rate; never guess by room order.
+  if (matches.length !== 1 || typeof matches[0].programName !== 'string' ||
+      matches[0].programName.toUpperCase() !== 'EXPRESS_DEAL') return null;
+  const rate = matches[0];
+  const quote = normalizeQuote({
+    minPrice: rate.price, displayPricePerStay: rate.totalPriceExcludingTaxesAndFeePerStay,
+    grandTotal: rate.grandTotal, minCurrencyCode: summary.minCurrencyCode,
+    roomCount: context.rooms, nightlyBasis: 'per-room', stayBasis: 'all-rooms',
+    taxesFees: 'excluded', totalTaxesFees: 'included',
+    advertisedDiscount: { percent: rate.savingPct, source: 'Priceline' },
+  });
+  if (quote.totalCents == null) return null;
+  if (context.rooms > 1) {
+    const expectedBase = quote.nightlyCents * nightCount(context.checkIn, context.checkOut) * context.rooms;
+    // Confirm the all-room base instead of multiplying a possibly per-room total.
+    if (!Number.isSafeInteger(expectedBase) || quote.stayCents !== expectedBase) return null;
+  }
+  return quote;
+}
+
+function detailsAlias(parsed, alias) {
+  return parsed.errors?.some(error => error.path?.[0] === alias) ? null : parsed.data?.[alias];
+}
+
 /** Normal public requests only; the service owns scheduling, deadlines and caching. */
 export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('A fetch implementation is required.');
 
-  async function request(operationName, query, variables, signal) {
+  async function request(operationName, query, variables, signal, allowPartialDetails = false) {
     throwIfAborted(signal);
     try {
       const response = await fetchImpl(ENDPOINT, {
@@ -226,7 +281,7 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
         await cancelBody(response);
         throw new ProviderFailure('unavailable');
       }
-      return await readJson(response, signal);
+      return await readJson(response, signal, allowPartialDetails);
     } catch (error) {
       throwIfAborted(signal);
       if (error instanceof ProviderFailure || error instanceof ServiceError) throw error;
@@ -262,16 +317,22 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
         cityInfo: isRecord(page.cityInfo) ? page.cityInfo : null };
     },
 
-    async hotelDetails({ context, hotelId, signal }) {
+    async hotelDetails({ context, offerId, hotelId, signal }) {
+      // One HTTP request contains two resolver calls with separate opaque/named IDs.
       const parsed = await request('HotelRevealerDetails', DETAILS_QUERY, {
-        ...tripVariables(context), hotelID: hotelId, roomsCount: context.rooms,
+        ...tripVariables(context), hotelID: hotelId, offerId, roomsCount: context.rooms,
         responseOptions: 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES',
-      }, signal);
-      const details = parsed.data?.details;
-      if (!isRecord(details)) throw invalidResponse();
-      if (details.errorMessage) throw new ProviderFailure('unavailable');
-      const hotel = details.hotel;
-      if (!isRecord(hotel)) throw invalidResponse();
+        originalResponseOptions: 'RATE_SUMMARY,DETAILED_ROOM,RATE_CHARGES_DETAIL,RATE_IMPORTANT_INFO',
+        rateDisplayOption: 'S', paymentRateMerge: false,
+      }, signal, true);
+      const details = detailsAlias(parsed, 'details');
+      const selectedQuote = originalQuote(detailsAlias(parsed, 'original'), context);
+      const namedAvailable = isRecord(details) && !details.errorMessage && isRecord(details.hotel);
+      if (!namedAvailable && !selectedQuote) {
+        if (details?.errorMessage) throw new ProviderFailure('unavailable');
+        throw invalidResponse();
+      }
+      const hotel = namedAvailable ? details.hotel : {};
       const address = hotel.location?.address;
       return {
         // Add description only after its current GraphQL field is verified.
@@ -283,6 +344,8 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
         address: isRecord(address) ? [address.addressLine1, address.addressLine2, address.cityName,
           address.provinceCode, address.isoCountryCode].map(trimText).filter(Boolean).join(', ') || null : null,
         retailQuote: isRecord(hotel.ratesSummary) ? adaptQuote(hotel.ratesSummary, context) : null,
+        originalQuote: selectedQuote,
+        ...(!namedAvailable ? { available: false } : {}),
       };
     },
   };

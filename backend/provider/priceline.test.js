@@ -206,7 +206,7 @@ test('unsupported listing envelopes and contradictory pagination are rejected', 
   assert.equal((await search()).nextCursor, null);
 });
 
-test('details query binds named hotel only and returns candidate display fields', async () => {
+test('one detail transport keeps named hotel and original opaque IDs in separate resolver calls', async () => {
   const { adapter, requests } = setup(() => jsonResponse({ data: { details: { errorMessage: null, hotel: {
     location: { address: { addressLine1: ' 1 Main Street ', addressLine2: '', cityName: 'Las Vegas', provinceCode: 'NV', isoCountryCode: 'US' } },
     hotelFeatures: { hotelAmenities: [{ code: 'POOL', name: 'Pool' }, null, { code: 'FITNESS', name: ' Gym ' }] },
@@ -214,23 +214,32 @@ test('details query binds named hotel only and returns candidate display fields'
       { imageHDURL: null, imageURL: 'https://images.priceline.com/second.jpg' }, null],
     ratesSummary: { minPrice: '128.90', minCurrencyCode: 'USD' },
   } } } }));
-  const result = await adapter.hotelDetails({ context, hotelId: '49205', offerId: 'OPAQUE_ID_MUST_NOT_BE_SENT' });
+  const result = await adapter.hotelDetails({ context, hotelId: '49205', offerId: 'original-opaque-id' });
   assert.equal(requests.length, 1);
   const { variables, query } = requests[0].payload;
   assert.equal(variables.hotelID, '49205');
+  assert.equal(variables.offerId, 'original-opaque-id');
   assert.equal(variables.roomsCount, 2);
   assert.equal(variables.adults, 3);
   assert.deepEqual(variables.children, ['0', '7']);
   assert.equal(variables.checkIn, '20260921');
   assert.equal(variables.checkOut, '20260924');
   assert.equal(variables.responseOptions, 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES');
-  assert.doesNotMatch(requests[0].body, /OPAQUE_ID_MUST_NOT_BE_SENT|pclnID|guestReviews|bookings|authToken|cguid/i);
+  assert.doesNotMatch(query.slice(query.indexOf('details: hotelDetails'), query.indexOf('original: hotelDetails')), /pclnID/);
+  assert.match(query.slice(query.indexOf('original: hotelDetails')), /pclnID: \$offerId/);
+  assert.doesNotMatch(query.slice(query.indexOf('original: hotelDetails')), /hotelID/);
+  assert.equal((query.match(/: hotelDetails\(/g) || []).length, 2);
+  assert.equal(variables.originalResponseOptions, 'RATE_SUMMARY,DETAILED_ROOM,RATE_CHARGES_DETAIL,RATE_IMPORTANT_INFO');
+  assert.equal(variables.rateDisplayOption, 'S');
+  assert.equal(variables.paymentRateMerge, false);
+  assert.doesNotMatch(requests[0].body, /guestReviews|bookings|authToken|cguid/i);
   assert.doesNotMatch(query, /REVIEWS|BOOKINGS/);
   assert.deepEqual(result, {
     description: null,
     images: ['https://images.priceline.com/hd.jpg', 'https://images.priceline.com/second.jpg'],
     amenities: ['Pool', 'Gym'], address: '1 Main Street, Las Vegas, NV, US',
     retailQuote: { minPrice: '128.90', minCurrencyCode: 'USD', roomCount: 2, nightlyBasis: 'per-room', taxesFees: 'unknown' },
+    originalQuote: null,
   });
 });
 
@@ -241,8 +250,130 @@ test('missing details are rejected while absent optional display fields remain u
   }
   const { adapter } = setup(() => jsonResponse({ data: { details: { hotel: {} } } }));
   assert.deepEqual(await adapter.hotelDetails({ context, hotelId: '49205' }), {
-    description: null, images: [], amenities: [], address: null, retailQuote: null,
+    description: null, images: [], amenities: [], address: null, retailQuote: null, originalQuote: null,
   });
+});
+
+const preferredRate = () => ({ rateIdentifier: 'preferred-rate', price: 66, grandTotal: 439.02,
+  totalPriceExcludingTaxesAndFeePerStay: 198, programName: 'Express_Deal', savingPct: 61 });
+const originalDetails = () => ({ errorMessage: null, hotel: {
+  ratesSummary: { minCurrencyCode: 'USD', rateIdentifier: 'preferred-rate', status: 'AVAILABLE' },
+  transformedRooms: [
+    { roomRates: [{ ...preferredRate(), rateIdentifier: 'other-rate', price: 86, grandTotal: 509.31 }] },
+    { roomRates: [preferredRate()] },
+  ],
+} });
+const pricingContext = { ...context, rooms: 1, adults: 2, childrenAges: [] };
+const quoteRequest = adapter => adapter.hotelDetails({ context: pricingContext, hotelId: '49205', offerId: 'original-opaque-id' });
+
+test('selected-offer quote uses the matching preferred rate rather than the first room', async () => {
+  const { adapter, requests } = setup(() => jsonResponse({ data: { details: { hotel: {} }, original: originalDetails() } }));
+  const result = await quoteRequest(adapter);
+  assert.deepEqual(result.originalQuote, { nightlyCents: 6600, stayCents: 19800, totalCents: 43902,
+    currency: 'USD', taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1,
+    nightlyBasis: 'per-room', stayBasis: 'all-rooms', advertisedDiscount: { percent: 61, source: 'Priceline' } });
+  assert.equal(result.originalQuote.propertyFeesCents, undefined);
+  assert.equal(requests.length, 1);
+});
+
+test('observed two-room preferred rate corroborates all-room base and retains the supplied total', async () => {
+  // From the 2026-09-08 family-original-total.json probe: 2 rooms, 4 adults,
+  // one child aged 7, Sep 21–24; 66 × 3 × 2 = 396 base, API total 873.06.
+  const original = originalDetails();
+  Object.assign(original.hotel.transformedRooms[1].roomRates[0], {
+    totalPriceExcludingTaxesAndFeePerStay: 396, grandTotal: 873.06,
+  });
+  const { adapter, requests } = setup(() => jsonResponse({ data: { details: { hotel: {} }, original } }));
+  const result = await adapter.hotelDetails({ context: { ...pricingContext, rooms: 2, adults: 4, childrenAges: [7] },
+    hotelId: '46745', offerId: 'original-family-offer' });
+  assert.equal(result.originalQuote.nightlyCents, 6600);
+  assert.equal(result.originalQuote.stayCents, 39600);
+  assert.equal(result.originalQuote.totalCents, 87306);
+  assert.equal(result.originalQuote.roomCount, 2);
+  assert.equal(result.originalQuote.stayBasis, 'all-rooms');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].payload.variables.roomsCount, 2);
+  assert.equal(requests[0].payload.variables.adults, 4);
+  assert.deepEqual(requests[0].payload.variables.children, ['7']);
+});
+
+test('multiroom original totals require an exact all-room base without guessing rounding tolerance', async () => {
+  for (const [base, total] of [[198, 439.02], [396.01, 873.06], [395.99, 873.06]]) {
+    const original = originalDetails();
+    Object.assign(original.hotel.transformedRooms[1].roomRates[0], {
+      totalPriceExcludingTaxesAndFeePerStay: base, grandTotal: total,
+    });
+    const { adapter } = setup(() => jsonResponse({ data: { original, details: { hotel: {
+      ratesSummary: { minPrice: '128.90', minCurrencyCode: 'USD' },
+    } } } }));
+    const result = await adapter.hotelDetails({ context: { ...pricingContext, rooms: 2, adults: 4, childrenAges: [7] },
+      hotelId: '46745', offerId: 'original-family-offer' });
+    assert.equal(result.originalQuote, null);
+    assert.equal(result.retailQuote.minPrice, '128.90');
+  }
+});
+
+test('unsafe or unassociated original totals leave named details available without guessing', async () => {
+  const invalid = [null, { errorMessage: 'Unavailable' }, { hotel: {} }];
+  for (const changes of [
+    { rateIdentifier: 'missing-rate' }, { minCurrencyCode: 'EUR' }, { status: 'SOLD_OUT' },
+  ]) {
+    const original = originalDetails();
+    Object.assign(original.hotel.ratesSummary, changes);
+    invalid.push(original);
+  }
+  for (const changes of [
+    { grandTotal: 197 }, { grandTotal: Number.MAX_SAFE_INTEGER }, { grandTotal: 'NaN' },
+    { price: null }, { totalPriceExcludingTaxesAndFeePerStay: null }, { programName: 'RETAIL' },
+  ]) {
+    const original = originalDetails();
+    Object.assign(original.hotel.transformedRooms[1].roomRates[0], changes);
+    invalid.push(original);
+  }
+  const duplicate = originalDetails();
+  duplicate.hotel.transformedRooms.push({ roomRates: [preferredRate()] });
+  invalid.push(duplicate);
+  for (const original of invalid) {
+    const { adapter } = setup(() => jsonResponse({ data: { original, details: { hotel: {
+      ratesSummary: { minPrice: '128.90', minCurrencyCode: 'USD' },
+    } } } }));
+    const result = await quoteRequest(adapter);
+    assert.equal(result.originalQuote, null);
+    assert.equal(result.retailQuote.minPrice, '128.90');
+    assert.equal(result.available, undefined);
+  }
+});
+
+test('a partial GraphQL failure in the optional original quote preserves named data', async () => {
+  const { adapter } = setup(() => jsonResponse({
+    errors: [{ message: 'private original resolver detail', path: ['original'] }],
+    data: { original: originalDetails(), details: { hotel: { hotelFeatures: { hotelAmenities: [{ name: 'Pool' }] } } } },
+  }));
+  const result = await quoteRequest(adapter);
+  assert.equal(result.originalQuote, null);
+  assert.deepEqual(result.amenities, ['Pool']);
+  assert.equal(JSON.stringify(result).includes('private'), false);
+});
+
+test('a valid original quote remains usable when the independent named resolver fails', async () => {
+  const { adapter } = setup(() => jsonResponse({
+    errors: [{ message: 'private named resolver detail', path: ['details'] }],
+    data: { original: originalDetails(), details: null },
+  }));
+  const result = await quoteRequest(adapter);
+  assert.equal(result.available, false);
+  assert.equal(result.originalQuote.totalCents, 43902);
+  assert.deepEqual(result.images, []);
+});
+
+test('listing discounts use only displaySavingsPct and remain explicitly provider-advertised', async () => {
+  for (const percent of [61, '39.5', 0, 100, -1, null]) {
+    const { search, requests } = setup(() => jsonResponse(page({ hotels: [named, { ...opaque, displaySavingsPct: percent }] })));
+    const result = await search();
+    assert.match(requests[0].payload.query, /displaySavingsPct/);
+    assert.deepEqual(result.listings[1].ratesSummary.advertisedDiscount,
+      Number(percent) > 0 && Number(percent) < 100 ? { percent: Number(percent), source: 'Priceline' } : undefined);
+  }
 });
 
 test('429 preserves Retry-After and never retries', async () => {

@@ -29,6 +29,32 @@ test('multi-room price basis survives normalization without synthesizing a total
   assert.equal(normalizeQuote({ minPrice: '190.00', minCurrencyCode: 'USD', roomCount: 2, nightlyBasis: 'per-room' }).stayCents, null);
 });
 
+test('explicit provider totals preserve base prices and separately identify included taxes and fees', () => {
+  const raw = { minPrice: '66.00', displayPricePerStay: 198, grandTotal: 439.02, minCurrencyCode: 'USD',
+    taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1, nightlyBasis: 'per-room', stayBasis: 'all-rooms' };
+  const quote = normalizeQuote(raw);
+  assert.deepEqual(quote, { nightlyCents: 6600, stayCents: 19800, totalCents: 43902, currency: 'USD',
+    taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1, nightlyBasis: 'per-room', stayBasis: 'all-rooms' });
+  assert.deepEqual(normalizeQuote(quote), quote);
+  for (const changes of [{ grandTotal: 197 }, { grandTotal: null }, { grandTotal: Infinity },
+    { grandTotal: '1e3' }, { grandTotal: Number.MAX_SAFE_INTEGER }, { minCurrencyCode: 'EUR' },
+    { totalTaxesFees: undefined }, { minPrice: null }, { displayPricePerStay: null }, { minPrice: 500 }]) {
+    assert.equal(normalizeQuote({ ...raw, ...changes }).totalCents, undefined);
+  }
+  assert.equal(normalizeQuote({ ...quote, totalCents: 43902.5 }).totalCents, undefined);
+  assert.equal(normalizeQuote({ ...quote, totalCents: Number.MAX_SAFE_INTEGER + 1 }).totalCents, undefined);
+});
+
+test('discounts retain only bounded provider-advertised percentages and never infer a comparison saving', () => {
+  const raw = { minPrice: 66, minCurrencyCode: 'USD', advertisedDiscount: { percent: '61.0', source: 'Priceline' } };
+  assert.deepEqual(normalizeQuote(raw).advertisedDiscount, { percent: 61, source: 'Priceline' });
+  for (const percent of [0, 100, 101, -1, null, true, Infinity, '1e2', {}]) {
+    assert.equal(normalizeQuote({ ...raw, advertisedDiscount: { percent, source: 'Priceline' } }).advertisedDiscount, undefined);
+  }
+  assert.equal(normalizeQuote({ ...raw, advertisedDiscount: { percent: 61, source: 'candidate-price' } }).advertisedDiscount, undefined);
+  assert.equal(normalizeQuote({ minPrice: 66, minCurrencyCode: 'USD', minStrikePrice: 172.89 }).advertisedDiscount, undefined);
+});
+
 test('observed legacy listing shape normalizes numeric strings and stable code sets', () => {
   const raw = { data: { listings: { hotels: [named(), express()] } } };
   const snapshot = JSON.stringify(raw);
