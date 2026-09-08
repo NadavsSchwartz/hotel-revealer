@@ -27,11 +27,11 @@ export function compareNumericClue(rawClue, rawValue, options) {
   return matched ? 'match' : 'contradiction';
 }
 
-function compareAmenities(clue, hotel) {
-  const offered = normalizeAmenityCodes(clue?.codes);
-  const named = normalizeAmenityCodes(hotel.amenities);
+function compareAmenities(offer, hotel) {
+  const offered = offer.amenityCodes;
+  const named = hotel.amenitySet;
   if (!offered?.length || named === null) return 'unknown';
-  if (offered.every(code => named.includes(code))) return 'match';
+  if (offered.every(code => named.has(code))) return 'match';
   return hotel.amenitiesComplete === true ? 'contradiction' : 'unknown';
 }
 
@@ -46,7 +46,7 @@ function compareHotel(offer, hotel) {
   const families = [
     ['guestRating', compareNumericClue(offer.clues?.guestRating, hotel.guestRating, { max: 10 })],
     ['reviewCount', compareNumericClue(offer.clues?.reviewCount, hotel.reviewCount, { integer: true })],
-    ['amenities', compareAmenities(offer.clues?.amenities, hotel)],
+    ['amenities', compareAmenities(offer, hotel)],
   ];
   if (families.some(([, state]) => state === 'contradiction')) return null;
   if (neighborhood.includes(null) || stars.includes(null)) return 'unassessed';
@@ -79,6 +79,13 @@ function prepareListings(offers, hotels) {
   const normalizedOffers = deduplicateOffers(Array.isArray(offers) ? offers : []);
   // Reject before pair comparisons or public candidate construction starts.
   if (normalizedOffers.length * named.length > MAX_MATCH_COMPARISONS) throw new MatchLimitError();
+  // Deduplication returns copies. Prepare membership once without changing the
+  // amenity arrays retained in public evidence.
+  for (const offer of normalizedOffers) offer.amenityCodes = normalizeAmenityCodes(offer.clues?.amenities?.codes);
+  for (const hotel of named) {
+    const codes = normalizeAmenityCodes(hotel.amenities);
+    hotel.amenitySet = codes === null ? null : new Set(codes);
+  }
   return { named, normalizedOffers };
 }
 

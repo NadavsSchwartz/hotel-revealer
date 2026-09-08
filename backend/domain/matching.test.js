@@ -85,6 +85,20 @@ test('empty advertised amenity list is no extra evidence family', () => {
   assert.equal(result.unassessedCount, 1);
 });
 
+test('amenity preparation preserves normalized codes and unknown invalid inventories', () => {
+  const input = offer({ clues: { guestRating: { kind: 'unknown' }, reviewCount: { kind: 'unknown' },
+    amenities: { codes: [{ code: 123 }, 'WIFI', 'WIFI'], complete: false } } });
+  const result = matchOffers([input], [
+    hotel('valid', { amenities: ['WIFI', '123', 'POOL'] }),
+    hotel('invalid', { amenities: ['WIFI', null], amenitiesComplete: true }),
+    hotel('oversized', { amenities: Array(101).fill('WIFI'), amenitiesComplete: true }),
+  ])[0];
+  assert.deepEqual(result.candidates.map(candidate => candidate.hotelId), ['valid']);
+  assert.equal(result.unassessedCount, 2);
+  assert.equal(result.candidates[0].evidence.comparisons.amenities, 'match');
+  assert.deepEqual(result.clues, input.clues);
+});
+
 test('ambiguous candidates are all retained with stable ID tie breaks and no winner claim', () => {
   const result = matchOffers([offer()], [hotel('z'), hotel('a'), hotel('m')])[0];
   assert.deepEqual(result.candidates.map(candidate => candidate.hotelId), ['a', 'm', 'z']);
