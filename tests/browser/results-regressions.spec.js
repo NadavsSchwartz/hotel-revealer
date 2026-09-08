@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { context, searchPath, searchResponse } from './fixtures.js';
 
-test('expanding maximum-length offer IDs keeps reload and page restoration usable', async ({ page }) => {
+test('maximum-length offer IDs keep pagination and reload usable', async ({ page }) => {
   const data = searchResponse();
   data.offers = Array.from({ length: 18 }, (_, index) => ({
     ...data.offers[0], offerId: `${'A'.repeat(1020)}${index.toString(16).padStart(4, '0')}`,
@@ -10,29 +10,25 @@ test('expanding maximum-length offer IDs keeps reload and page restoration usabl
   await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: data }); });
   await page.goto(searchPath);
   await expect(page.locator('.offer-card')).toHaveCount(12);
-  for (let index = 0; index < 12; index++)
-    await page.getByRole('button', { name: 'Why these matches?', exact: true }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.locator('.offer-card')).toHaveCount(6);
-  for (let index = 0; index < 6; index++)
-    await page.getByRole('button', { name: 'Why these matches?', exact: true }).first().click();
   expect(page.url().length).toBeLessThan(2000);
   expect(new URL(page.url()).searchParams.has('expanded')).toBe(false);
   expect(searches).toBe(1);
   const response = await page.reload();
   expect(response.status()).toBe(200);
-  await expect(page.getByRole('button', { name: 'Hide match details', exact: true })).toHaveCount(6);
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(6);
   await page.getByRole('button', { name: 'Previous', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Hide match details', exact: true })).toHaveCount(12);
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(12);
   expect(searches).toBe(2);
 });
 
-test('an old expanded link migrates without refetching or losing the open comparison', async ({ page }) => {
+test('an old expanded link drops retired comparison state without refetching', async ({ page }) => {
   let searches = 0;
   const data = searchResponse();
   await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: data }); });
   await page.goto(`${searchPath}&sort=price&expanded=${data.offers[0].offerId}`);
-  await expect(page.getByRole('button', { name: 'Hide match details', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toBeVisible();
   expect(new URL(page.url()).searchParams.has('expanded')).toBe(false);
   await expect(page.getByLabel('Sort by')).toHaveValue('price');
   expect(searches).toBe(1);
@@ -54,7 +50,7 @@ test('all same-trip refresh controls honor cooldown and recover at its deadline'
   await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Refresh search', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Refresh Express offers', exact: true })).toBeDisabled();
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toBeVisible();
   const edit = page.getByRole('button', { name: 'Edit trip', exact: true });
   if (await edit.isVisible()) await edit.click();
   await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeDisabled();
@@ -64,7 +60,7 @@ test('all same-trip refresh controls honor cooldown and recover at its deadline'
   expect(searches).toBe(2);
   await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
   await expect.poll(() => searches).toBe(3);
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toBeVisible();
 });
 
 test('returning to a cooling-down trip preserves its retry after expiry without an automatic request', async ({ page }) => {
@@ -103,4 +99,27 @@ test('returning to a cooling-down trip preserves its retry after expiry without 
   await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toHaveCount(0);
   expect(requests).toEqual([context, tripB, context]);
+});
+
+test('old search response formats require an explicit refresh before displaying a hotel', async ({ page }) => {
+  const old = searchResponse();
+  delete old.offers[0].resolution;
+  let calls = 0;
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: ++calls === 1 ? old : searchResponse() }));
+  await page.goto(searchPath);
+  await expect(page.getByRole('heading', { name: 'We could not verify this response', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(0);
+  expect(calls).toBe(1);
+  await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
+  expect(calls).toBe(2);
+});
+
+test('a fresh offer without a listing rate still offers the current supplier price', async ({ page }) => {
+  const data = searchResponse();
+  data.offers[0].quote = { nightlyCents: null, stayCents: null, currency: 'USD', taxesFees: 'unknown' };
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
+  await page.goto(searchPath);
+  await expect(page.getByText('Rate unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', data.offers[0].handoffUrl);
 });

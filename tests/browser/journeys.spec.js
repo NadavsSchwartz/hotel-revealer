@@ -45,13 +45,17 @@ test('the explicitly disabled provider returns a useful recovery state without l
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
 });
 
-test('offer ambiguity, retail failure, and original handoff stay separate', async ({ page }) => {
+test('a likely hotel, unavailable details, and original handoff stay separate', async ({ page }) => {
   const searches = [];
-  await page.route('**/api/v1/hotelDeals', async (route) => {
+  await page.route('**/api/v1/hotelDeals', async route => {
     searches.push(route.request().postDataJSON());
     await route.fulfill({ json: searchResponse() });
   });
-  await page.route('**/api/v1/deal', (route) => route.fulfill({ json: detailResponse() }));
+  const details = [];
+  await page.route('**/api/v1/deal', route => {
+    details.push(route.request().postDataJSON());
+    return route.fulfill({ json: detailResponse() });
+  });
   await page.goto('/');
   await chooseDestination(page, 'Las Vegas', 'Nevada, United States');
   await chooseDate(page, 'Check-in', context.checkIn);
@@ -59,41 +63,39 @@ test('offer ambiguity, retail failure, and original handoff stay separate', asyn
   await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
-  await expect(page.getByText('Additional taxes and fees may apply').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View possible hotel: Desert House', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Desert House', exact: true })).toBeVisible();
+  await expect(page.getByText('Taxes and fees are not confirmed').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(1);
+  await expect(page.getByText('Likely hotel', { exact: true })).toBeVisible();
   await page.getByLabel('Sort by').selectOption('price');
-  expect(searches).toHaveLength(1);
-  expect(searches[0]).toEqual(context);
-  await page.getByRole('link', { name: /View hotel details.*Juniper House/ }).click();
+  expect(searches).toEqual([context]);
+  expect(details).toHaveLength(0);
+  await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await expect(page.getByText('Additional hotel details are unavailable')).toBeVisible();
-  await expect(page.getByText('One of 2 hotels matching this offer', { exact: true })).toBeVisible();
-  const handoff = page.getByRole('link', { name: /View original Express offer/ });
-  await expect(handoff).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
-  await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
+  await expect(page.getByText('A complete total is unavailable.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
+  expect(details).toEqual([{ ...context, offerId: 'offer-one', hotelId: 'hotel-one' }]);
   await page.getByRole('link', { name: /Back to results/ }).click();
   await expect(page.getByLabel('Sort by')).toHaveValue('price');
-  await expect(page.getByRole('heading', { name: 'Desert House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeFocused();
   expect(searches).toHaveLength(1);
 });
 
-test('partial inventory and stale prices remain explicit and cannot hand off as fresh', async ({ page }) => {
+test('partial inventory stays unresolved and stale prices withdraw the price without blocking Priceline', async ({ page }) => {
   const data = searchResponse();
   data.coverage.status = 'partial';
   data.coverage.reason = 'Page limit';
+  data.offers[0].resolution = { status: 'unresolved', reason: 'incomplete_search' };
+  data.offers[0].candidates = [];
   data.expiresAt = new Date(Date.now() - 1000).toISOString();
   await mockOffers(page, data);
   await page.goto(searchPath);
   await expect(page.getByText('Partial results', { exact: true })).toBeVisible();
-  await expect(page.getByText('These quotes need a refresh.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Refresh Express offers', exact: true })).toBeEnabled();
+  await expect(page.getByText('We couldn’t identify this hotel.', { exact: true })).toBeVisible();
+  await expect(page.locator('.quote-price')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Check total price/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', data.offers[0].handoffUrl);
 });
 
 test('a rejected relationship invalidates cached matches and returns to a fresh search', async ({ page }) => {
@@ -111,21 +113,21 @@ test('a rejected relationship invalidates cached matches and returns to a fresh 
   });
   await page.route('**/api/v1/deal', route => route.fulfill({ status: 409, json: { error: { code: 'INVALID_SELECTION' } } }));
   await page.goto(searchPath);
-  await page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true }).click();
+  await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
   await expect(page.getByRole('link', { name: /Back to results/ })).toBeVisible();
   await page.getByRole('button', { name: 'Return to results', exact: true }).click();
   try {
     await expect.poll(() => searches).toBe(2);
     await expect(page.getByRole('region', { name: 'Hotel search progress', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toHaveCount(0);
   } finally {
     release();
   }
-  await expect(page.getByRole('link', { name: 'View possible hotel: Cedar House', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
+  await expect(page.getByRole('link', { name: 'View likely hotel: Cedar House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
   expect(searches).toBe(2);
 });
 
@@ -157,12 +159,12 @@ test('a slower earlier search cannot overwrite the next trip', async ({ page }) 
   await openTripEditor(page);
   await chooseDestination(page, 'Chicago', 'Illinois, United States');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Hotel matches in Chicago' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hotel deals in Chicago' })).toBeVisible();
   release();
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue('Chicago, United States');
-  await expect(page.getByRole('heading', { name: 'Hotel matches in Las Vegas' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Hotel deals in Las Vegas' })).toHaveCount(0);
 });
 
 test('successful empty results are an empty state, not endless loading', async ({ page }) => {
@@ -192,7 +194,7 @@ test('a search capacity failure preserves the trip and recovers only when the tr
   expect(searches).toEqual([context]);
   await notice.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('heading', { name: '1 Express offer', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
   expect(searches).toEqual([context, context]);
 });
@@ -204,10 +206,9 @@ test('upstream labels are plain text and offsite handoff URLs are rejected', asy
   data.offers[0].handoffUrl = 'https://www.priceline.com.evil.example/redirect';
   await mockOffers(page, data);
   await page.goto(searchPath);
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await expect(page.getByRole('heading', { name: hostileName, exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: `View likely hotel: ${hostileName}`, exact: true })).toBeVisible();
   await expect(page.locator('img[src="x"]')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Original offer unavailable' })).toBeDisabled();
 });
 
@@ -235,10 +236,9 @@ test('landing and result states have no automated WCAG A/AA violations', async (
   await mockOffers(page);
   await page.goto(searchPath);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
   results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
-  await page.getByRole('link', { name: /View hotel details.*Juniper House/ }).click();
+  await page.getByRole('link', { name: /View likely hotel:.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   results = await auditAccessibility(page);
   expect(results.violations).toEqual([]);
@@ -275,8 +275,7 @@ test('a 336-character Express offer ID survives candidate URLs, detail requests,
     await route.fulfill({ json: detail });
   });
   await page.goto(searchPath);
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  const candidate = page.getByRole('link', { name: /View hotel details.*Juniper House/ });
+  const candidate = page.getByRole('link', { name: /View likely hotel:.*Juniper House/ });
   const candidateUrl = new URL(await candidate.getAttribute('href'), page.url());
   expect(candidateUrl.searchParams.get('offerId')).toBe(offerId);
   await candidate.click();
@@ -285,12 +284,12 @@ test('a 336-character Express offer ID survives candidate URLs, detail requests,
   await expect.poll(() => detailInputs.length).toBe(1);
   expect(detailInputs).toEqual([{ ...context, offerId, hotelId: 'hotel-one' }]);
   expect(new URL(page.url()).searchParams.get('offerId')).toBe(offerId);
-  const handoff = page.getByRole('link', { name: /View original Express offer/ });
+  const handoff = page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ });
   await expect(handoff).toHaveAttribute('href', search.offers[0].handoffUrl);
   await expect(handoff).toHaveAttribute('target', '_blank');
   await page.getByRole('link', { name: /Back to results/ }).click();
   expect(new URL(page.url()).searchParams.has('expanded')).toBe(false);
-  await expect(page.getByRole('button', { name: 'Hide match details', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeFocused();
   await page.goto(candidateUrl.href);
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await expect.poll(() => detailInputs.length).toBe(2);
@@ -315,7 +314,7 @@ test('expired candidate metadata preserves a fresh offer until the offer itself 
   await page.route('**/api/v1/deal', route => route.fulfill({ json: detail }));
   await page.goto(`/deal?${new URLSearchParams({ ...context, offerId: detail.offer.offerId, hotelId: detail.candidate.hotelId })}`);
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
-  const handoff = page.getByRole('link', { name: /View original Express offer/ });
+  const handoff = page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ });
   await expect(handoff).toBeVisible();
   await expect(handoff).toHaveAttribute('href', detail.offer.handoffUrl);
   await expect(page.getByText('The retail price is out of date.', { exact: true })).toBeVisible();
@@ -325,9 +324,9 @@ test('expired candidate metadata preserves a fresh offer until the offer itself 
   await expect(page.getByRole('region', { name: 'Original Express quote', exact: true })).toContainText('$119');
   await expect(page.getByText('This quote is out of date.', { exact: true })).toHaveCount(0);
   await page.clock.fastForward(61000);
-  await expect(page.getByText('This quote is out of date.', { exact: true })).toBeVisible();
-  await expect(handoff).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Refresh Express offers', exact: true })).toBeEnabled();
+  await expect(page.getByText('The quoted price needs a refresh.', { exact: true })).toBeVisible();
+  await expect(page.locator('.detail-quote-panel .quote-price')).toHaveCount(0);
+  await expect(handoff).toHaveAttribute('href', detail.offer.handoffUrl);
 });
 
 test('multiroom quotes distinguish a per-room nightly rate from the entire stay total', async ({ page }) => {
@@ -348,38 +347,28 @@ test('multiroom quotes distinguish a per-room nightly rate from the entire stay 
     const quote = page.getByRole('region', { name: 'Original Express quote', exact: true });
     await expect(quote).toContainText('$119 / room / night');
     await expect(quote).toContainText('$476 for 2 rooms, entire stay');
-    await expect(quote).toContainText('Additional taxes and fees may apply');
+    await expect(quote).toContainText('Taxes and fees are not confirmed');
   };
   await page.goto(`/results?${new URLSearchParams(trip)}`);
   await checkQuote();
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await page.getByRole('link', { name: /View hotel details.*Juniper House/ }).click();
+  await page.getByRole('link', { name: /View likely hotel:.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await checkQuote();
 });
 
-test('offer pagination, sorting and expansion are local and return to the same results page', async ({ page }) => {
+test('offer pagination and sorting are local and return to the same results page', async ({ page }) => {
   const data = searchResponse();
   const base = data.offers[0];
   data.offers = Array.from({ length: 25 }, (_, index) => {
     const ordinal = String(index + 1).padStart(2, '0');
-    const strong = [16, 24].includes(index);
+    const matched = index !== 0;
     return {
-      ...base,
-      offerId: `offer-${ordinal}`,
-      neighborhoodName: `Area ${ordinal}`,
-      unassessedCount: 0,
+      ...base, offerId: `offer-${ordinal}`, neighborhoodName: `Area ${ordinal}`,
       quote: { ...base.quote, nightlyCents: 11900 + index * 100, stayCents: 23800 + index * 200 },
-      candidates: base.candidates.map((candidate, position) => ({
-        ...candidate,
-        hotelId: `hotel-${ordinal}-${position + 1}`,
-        name: `Hotel ${ordinal}${position === 0 ? 'A' : 'B'}`,
-        tier: strong ? 'supported' : 'partial',
-        evidence: strong ? { supporting: ['Area agrees', 'Hotel class agrees', 'Guest score agrees', 'Review count agrees', 'Features agree'], missing: [] } : candidate.evidence,
-      })),
+      resolution: matched ? { status: 'matched' } : { status: 'unresolved', reason: 'no_match' },
+      candidates: matched ? [{ ...base.candidates[0], hotelId: `hotel-${ordinal}`, name: `Hotel ${ordinal}` }] : [],
     };
   });
-  data.coverage = { ...data.coverage, offersFound: 25, namedHotelsChecked: 50, unassessedHotels: 0 };
   let searches = 0;
   let details = 0;
   await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: data }); });
@@ -387,42 +376,35 @@ test('offer pagination, sorting and expansion are local and return to the same r
     details++;
     const input = route.request().postDataJSON();
     const offer = data.offers.find(item => item.offerId === input.offerId);
-    const candidate = offer.candidates.find(item => item.hotelId === input.hotelId);
-    return route.fulfill({ json: { ...detailResponse(), offer, candidate } });
+    return route.fulfill({ json: { ...detailResponse(), offer, candidate: offer.candidates[0] } });
   });
   await page.goto(searchPath);
   const cards = page.locator('.offer-list > article');
   await expect(cards).toHaveCount(12);
-  await expect(cards.first()).toHaveAccessibleName('Area 17');
+  await expect(cards.first()).toHaveAccessibleName('Area 02');
   await page.getByLabel('Sort by').selectOption('price');
   await expect(cards.first()).toHaveAccessibleName('Area 01');
   await expect(cards.last()).toHaveAccessibleName('Area 12');
-  await cards.first().getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await expect(cards.first().getByRole('heading', { name: 'Hotel 01A', exact: true })).toBeVisible();
   const pagination = page.getByRole('navigation', { name: 'Results pages', exact: true });
   await pagination.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(cards).toHaveCount(12);
   await expect(cards.first()).toHaveAccessibleName('Area 13');
   await expect(cards.last()).toHaveAccessibleName('Area 24');
   await expect(page.getByRole('heading', { name: '25 Express offers', exact: true })).toBeFocused();
-  expect(new URL(page.url()).searchParams.get('page')).toBe('2');
-  await cards.first().getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  await cards.first().getByRole('link', { name: /View hotel details.*Hotel 13A/ }).click();
-  await expect(page.getByRole('heading', { name: 'Hotel 13A', exact: true })).toBeVisible();
-  await expect.poll(() => details).toBe(1);
+  await cards.first().getByRole('link', { name: 'View likely hotel: Hotel 13', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Hotel 13', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Back to results/ }).click();
   await expect(cards.first()).toHaveAccessibleName('Area 13');
   await expect(page.getByLabel('Sort by')).toHaveValue('price');
   expect(new URL(page.url()).searchParams.get('page')).toBe('2');
-  await expect(cards.first().getByRole('heading', { name: 'Hotel 13A', exact: true })).toBeVisible();
-  await expect(cards.first().getByRole('link', { name: /View hotel details.*Hotel 13A/ })).toBeFocused();
+  await expect(cards.first().getByRole('link', { name: 'View likely hotel: Hotel 13', exact: true })).toBeFocused();
   await pagination.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(cards).toHaveCount(1);
   await expect(cards.first()).toHaveAccessibleName('Area 25');
   await expect(pagination.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
   await page.getByLabel('Sort by').selectOption('evidence');
   await expect(cards).toHaveCount(12);
-  await expect(cards.first()).toHaveAccessibleName('Area 17');
+  await expect(cards.first()).toHaveAccessibleName('Area 02');
   expect(new URL(page.url()).searchParams.get('page')).toBe('1');
   expect(searches).toBe(1);
   expect(details).toBe(1);
@@ -482,39 +464,28 @@ test('cached comparisons remain visible during a refresh and after an update fai
     await expect(page.getByText('Updating hotel deals', { exact: true })).toBeVisible();
     await expect(page.locator('.results-updating .search-mark')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Hotel search progress', exact: true })).toHaveCount(0);
-    await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Updating offer…', exact: true })).toBeDisabled();
+    await expect(page.locator('.quote-price')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toBeVisible();
   } finally {
     release();
   }
   await expect(page.getByText('$129', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('region', { name: 'Hotel search results', exact: true })).toHaveAttribute('aria-busy', 'false');
-  await expect(page.getByRole('link', { name: /View original Express offer/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ })).toBeVisible();
   await openTripEditor(page);
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'The hotel provider is unavailable', exact: true })).toBeVisible();
   await expect(page.getByText('$129', { exact: false }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   expect(searches).toBe(3);
 });
 
-test('previews and property photos lead while the numerical comparison stays available on demand', async ({ page }) => {
+test('a likely hotel keeps property photos and available facts without ranked comparisons', async ({ page }, testInfo) => {
   const data = searchResponse();
   const offer = data.offers[0];
-  offer.clues = {
-    guestRating: { kind: 'minimum', value: 8 },
-    reviewCount: { kind: 'range', min: 700, max: 800 },
-    amenities: { codes: ['SPOOL', 'FINTRNT'] },
-  };
   const candidate = offer.candidates[0];
-  candidate.stars = null;
   candidate.thumbnailUrl = 'https://mobileimg.priceline.com/browser-fixture/juniper.webp';
-  candidate.amenities = ['SPOOL', 'FINTRNT', 'FITSPA'];
-  candidate.evidence = {
-    supporting: [], missing: ['Feature coverage is incomplete'],
-    comparisons: { neighborhood: 'match', stars: 'unknown', guestRating: 'match', reviewCount: 'match', amenities: 'unknown' },
-  };
   const photos = ['one', 'two', 'three'].map(name => `https://mobileimg.priceline.com/browser-fixture/${name}.webp`);
   await page.route('https://mobileimg.priceline.com/browser-fixture/**', route => route.fulfill({
     path: fileURLToPath(new URL('../../frontend/static/media/stay-hero.webp', import.meta.url)),
@@ -525,86 +496,56 @@ test('previews and property photos lead while the numerical comparison stays ava
     details: { ...detailResponse().details, images: photos },
   } }));
   await page.goto(searchPath);
-  const preview = page.getByRole('link', { name: 'View possible hotel: Juniper House', exact: true });
-  await expect(preview).toBeVisible();
+  const preview = page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true });
   await expect.poll(() => preview.getByRole('img', { name: 'Juniper House', exact: true }).evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
-  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
-  const comparison = page.getByRole('table', { name: 'Express offer compared with Juniper House', exact: true });
-  await expect(comparison).toHaveCount(0);
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  const checkComparison = async () => {
-    await expect(comparison).toBeVisible();
-    await expect(comparison.getByRole('columnheader')).toHaveText(['Clue', 'Express offer', 'This hotel']);
-    const hotelClass = comparison.getByRole('row', { name: /Hotel class/ });
-    await expect(hotelClass.getByRole('cell').nth(0)).toHaveText('4 stars');
-    await expect(hotelClass.getByRole('cell').nth(1).locator('span').first()).toHaveText('Not supplied');
-    const score = comparison.getByRole('row', { name: /Guest score/ });
-    await expect(score.getByRole('cell').nth(0)).toHaveText('8+ / 10');
-    await expect(score.getByRole('cell').nth(1)).toContainText('8.7 / 10');
-    await expect(score.getByRole('cell').nth(1)).toContainText('Agrees');
-    const reviews = comparison.getByRole('row', { name: /Reviews/ });
-    await expect(reviews.getByRole('cell').nth(0)).toHaveText('700–800');
-    await expect(reviews.getByRole('cell').nth(1)).toContainText('742');
-    const features = comparison.getByRole('row', { name: /Features/ });
-    await expect(features.getByRole('cell').nth(0)).toHaveText('Pool · Free internet');
-    await expect(features.getByRole('cell').nth(1)).toContainText('Fitness center');
-    await expect(features.getByRole('cell').nth(1)).toContainText('Not assessed');
-  };
-  await checkComparison();
-  await page.getByRole('link', { name: /View hotel details.*Juniper House/ }).click();
-  await expect(page.getByText('One of 2 hotels matching this offer', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Why .*match/ })).toHaveCount(0);
+  await preview.click();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: /Juniper House, property photograph/ })).toHaveCount(3);
   await expect.poll(() => page.locator('.detail-gallery img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
-  await expect(comparison).toHaveCount(0);
-  const property = await page.locator('.detail-property-preview').boundingBox();
-  const explanation = await page.locator('.detail-evidence').boundingBox();
-  expect(property.y).toBeLessThan(explanation.y);
-  await page.locator('.detail-evidence > summary').click();
-  await checkComparison();
-  await page.setViewportSize({ width: 320, height: 900 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole('heading', { name: 'About the property', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Listed amenities', exact: true })).toBeVisible();
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (testInfo.project.name === 'chromium') await page.screenshot({ path: testInfo.outputPath(`likely-hotel-${width}.png`), fullPage: true });
+  }
 });
 
-test('a large ambiguous match group reveals eight more hotels locally and retains them on return', async ({ page }) => {
+test('an ambiguous offer opens a total-only view and preserves the original itinerary', async ({ page }, testInfo) => {
   const data = searchResponse();
   const offer = data.offers[0];
-  const original = offer.candidates[0];
-  offer.unassessedCount = 0;
-  data.coverage = { ...data.coverage, offersFound: 1, namedHotelsChecked: 20, unassessedHotels: 0 };
-  offer.candidates = Array.from({ length: 20 }, (_, index) => ({
-    ...original,
-    hotelId: `ambiguous-hotel-${String(index + 1).padStart(2, '0')}`,
-    name: `Hotel ${String(index + 1).padStart(2, '0')}`,
-  }));
-  let searches = 0;
-  const details = [];
-  await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: data }); });
+  offer.resolution = { status: 'unresolved', reason: 'ambiguous' };
+  offer.candidates = [];
+  const requests = [];
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
   await page.route('**/api/v1/deal', route => {
-    const input = route.request().postDataJSON();
-    details.push(input);
-    return route.fulfill({ json: { ...detailResponse(), offer, candidate: offer.candidates.find(item => item.hotelId === input.hotelId) } });
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: {
+      ...detailResponse(), offer, candidate: null, details: null,
+      detailStatus: 'not_requested', quoteStatus: 'unavailable',
+    } });
   });
   await page.goto(searchPath);
-  await expect(page.getByRole('link', { name: /View possible hotel:/ })).toHaveCount(2);
-  await expect(page.getByText('+18 more possible hotels in the comparison', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Why these matches?', exact: true }).click();
-  const rows = page.locator('.candidate-row');
-  await expect(rows).toHaveCount(8);
-  await expect(rows.last()).toHaveAccessibleName('Hotel match: Hotel 08');
-  await page.getByRole('button', { name: 'Show 8 more hotels', exact: true }).click();
-  await expect(rows).toHaveCount(16);
-  await expect(rows.last()).toHaveAccessibleName('Hotel match: Hotel 16');
-  expect(searches).toBe(1);
-  await page.getByRole('link', { name: /View hotel details.*Hotel 16/ }).click();
-  await expect(page.getByRole('heading', { name: 'Hotel 16', exact: true })).toBeVisible();
-  await expect(page.getByText('One of 20 hotels matching this offer', { exact: true })).toBeVisible();
-  await expect.poll(() => details.length).toBe(1);
-  expect(details[0]).toEqual({ ...context, offerId: offer.offerId, hotelId: 'ambiguous-hotel-16' });
+  await expect(page.getByText('We couldn’t identify this hotel.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(0);
+  await page.getByRole('link', { name: /Check total price/ }).click();
+  await expect(page.getByRole('heading', { name: 'Your Express offer', exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.has('hotelId')).toBe(false);
+  await expect(page.getByText('A complete total is unavailable.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry total price', exact: true })).toBeEnabled();
+  await expect(page.locator('.detail-property-preview, .detail-property-section, .detail-retail')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', offer.handoffUrl);
+  expect(requests).toEqual([{ ...context, offerId: offer.offerId }]);
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (testInfo.project.name === 'chromium') await page.screenshot({ path: testInfo.outputPath(`offer-only-${width}.png`), fullPage: true });
+  }
+  const accessibility = await auditAccessibility(page);
+  expect(accessibility.violations).toEqual([]);
   await page.getByRole('link', { name: /Back to results/ }).click();
-  await expect(rows).toHaveCount(16);
-  await expect(page.getByRole('button', { name: 'Show 4 more hotels', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /View hotel details.*Hotel 16/ })).toBeFocused();
-  expect(searches).toBe(1);
+  await expect(page.getByRole('link', { name: /Check total price/ })).toBeFocused();
 });
 
 test('fee-inclusive totals and advertised discounts keep their basis and expire before the offer', async ({ page }, testInfo) => {
@@ -613,6 +554,7 @@ test('fee-inclusive totals and advertised discounts keep their basis and expire 
   const trip = { ...context, rooms: 2, adults: 4 };
   const detail = detailResponse();
   detail.context = trip;
+  detail.quoteStatus = 'available';
   detail.expiresAt = new Date(now + 300000).toISOString();
   detail.offerExpiresAt = new Date(now + 300000).toISOString();
   detail.offer = {
@@ -650,7 +592,7 @@ test('fee-inclusive totals and advertised discounts keep their basis and expire 
   await expect(row('Room price for the stay').locator('dd')).toHaveText('$476');
   await expect(row('Taxes & fees for the stay').locator('dd')).toHaveText('$54');
   await expect(row('Quoted total').locator('dd')).toHaveText('$530');
-  const handoff = page.getByRole('link', { name: /View original Express offer/ });
+  const handoff = page.getByRole('link', { name: /View original Express offer|Check current price on Priceline/ });
   await expect(handoff).toHaveAttribute('href', detail.offer.handoffUrl);
   if (testInfo.project.name === 'chromium') {
     const viewport = page.viewportSize();

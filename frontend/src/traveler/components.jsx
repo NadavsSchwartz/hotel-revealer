@@ -43,7 +43,7 @@ export function Quote({
       ? 'Taxes and fees included'
       : quote?.taxesFees === 'excluded'
         ? 'Before taxes and fees'
-        : 'Additional taxes and fees may apply';
+        : 'Taxes and fees are not confirmed';
   return (
     <section
       className={`quote ${compact ? 'quote-compact' : ''}`}
@@ -81,96 +81,6 @@ export function Quote({
   );
 }
 
-const amenityLabels = {
-  FINTRNT: 'Free internet', SPOOL: 'Pool', SPA: 'Spa', PETALLOW: 'Pets allowed',
-  RESTRNT: 'Restaurant', FITSPA: 'Fitness center', FPRKING: 'Free parking',
-  CASINO: 'Casino', HOTTUB: 'Hot tub', NSMKFAC: 'Non-smoking rooms',
-  HANDFAC: 'Accessible facilities', FAMFRIEND: 'Family-friendly facilities',
-};
-const numericValue = (value, suffix = '') => typeof value === 'number' && Number.isFinite(value)
-  ? `${value.toLocaleString('en-US')}${suffix}` : 'Not supplied';
-function numericClue(clue, suffix = '') {
-  if (!clue || clue.kind === 'unknown') return 'Not supplied';
-  if (clue.kind === 'range') return `${numericValue(clue.min)}–${numericValue(clue.max)}${suffix}`;
-  return `${numericValue(clue.value)}${clue.kind === 'minimum' ? '+' : ''}${suffix}`;
-}
-function amenityList(codes) {
-  if (!Array.isArray(codes) || !codes.length) return 'Not supplied';
-  const labels = codes.map(code => amenityLabels[code]).filter(Boolean);
-  const additional = codes.length - labels.length;
-  return [...labels, ...(additional ? [`${additional} other listed ${additional === 1 ? 'feature' : 'features'}`] : [])].join(' · ');
-}
-
-export function Evidence({ candidate, offer }) {
-  const supporting = candidate.evidence?.supporting || [];
-  const missing = candidate.evidence?.missing || [];
-  const readable = (item) =>
-    typeof item === 'string'
-      ? item.replaceAll('_', ' ')
-      : item?.label || item?.description || 'Evidence unavailable';
-  const comparisons = candidate.evidence?.comparisons;
-  if (offer?.clues && comparisons) {
-    const rows = [
-      ['neighborhood', 'Area', offer.neighborhoodName || 'Not supplied', candidate.neighborhoodName || 'Not supplied'],
-      ['stars', 'Hotel class', numericValue(offer.stars, ' stars'), numericValue(candidate.stars, ' stars')],
-      ['guestRating', 'Guest score', numericClue(offer.clues.guestRating, ' / 10'), candidate.guestRating == null ? 'Not supplied' : `${numericValue(candidate.guestRating)} / 10`],
-      ['reviewCount', 'Reviews', numericClue(offer.clues.reviewCount), numericValue(candidate.reviewCount)],
-      ['amenities', 'Features', amenityList(offer.clues.amenities?.codes), amenityList(candidate.amenities)],
-    ];
-    return <div className="evidence-comparison">
-      <table className="evidence-matrix">
-        <caption className="sr-only">Express offer compared with {candidate.name}</caption>
-        <thead><tr><th scope="col">Clue</th><th scope="col">Express offer</th><th scope="col">This hotel</th></tr></thead>
-        <tbody>{rows.map(([family, label, offered, hotel]) => <tr key={family}>
-          <th scope="row">{label}</th><td>{offered}</td>
-          <td><span>{hotel}</span><span className={`clue-status ${comparisons[family] === 'match' ? 'clue-status-match' : ''}`}>{comparisons[family] === 'match' ? 'Agrees' : 'Not assessed'}</span></td>
-        </tr>)}</tbody>
-      </table>
-      {missing.length > 0 && <p className="evidence-note">Some listing information could not be compared. Missing information does not rule this hotel out.</p>}
-    </div>;
-  }
-  return (
-    <div className="evidence-columns">
-      <section>
-        <p className="evidence-label">
-          <span aria-hidden="true">+</span> Supporting evidence
-        </p>
-        {supporting.length ? (
-          <ul>
-            {supporting.map((item, index) => (
-              <li key={index}>{readable(item)}</li>
-            ))}
-          </ul>
-        ) : (
-          <p>No supporting evidence supplied.</p>
-        )}
-      </section>
-      <section>
-        <p className="evidence-label">
-          <span aria-hidden="true">−</span> Missing evidence
-        </p>
-        {missing.length ? (
-          <ul>
-            {missing.map((item, index) => (
-              <li key={index}>{readable(item)}</li>
-            ))}
-          </ul>
-        ) : (
-          <p>No gaps reported in these clues.</p>
-        )}
-      </section>
-    </div>
-  );
-}
-
-export function Tier({ tier }) {
-  return (
-    <span className={`tier ${tier === 'supported' ? 'tier-supported' : ''}`} title={tier === 'supported' ? 'The area, hotel class, guest score, review count and listed features agree.' : 'Some listing clues agree; other information could not be assessed.'}>
-      {tier === 'supported' ? 'Strong match' : 'Possible match'}
-    </span>
-  );
-}
-
 export function Stars({ value }) {
   return (
     <span>
@@ -195,11 +105,18 @@ export function useExpired(expiresAt) {
   const expiry = Date.parse(expiresAt || '');
   useEffect(() => {
     if (!Number.isFinite(expiry) || expiry <= Date.now()) return undefined;
+    const update = () => setExpiredAt(expiry <= Date.now() ? expiry : null);
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
     const timer = setTimeout(
-      () => setExpiredAt(expiry),
+      update,
       Math.min(expiry - Date.now() + 10, 2147483647),
     );
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
   }, [expiry]);
   return (
     !Number.isFinite(expiry) || expiry <= Date.now() || expiredAt === expiry
@@ -378,30 +295,24 @@ export function StaleNotice({ onRefresh, refreshing = false, disabled = false })
     <div className="stale-notice" role="status">
       <div>
         <strong>{refreshing ? 'Updating your offers…' : 'These quotes need a refresh.'}</strong>
-        <p>{refreshing ? 'Your previous comparison stays here while the latest offers load.' : 'Check the latest prices before opening an offer.'}</p>
+        <p>{refreshing ? 'Your previous results stay here while the latest offers load.' : 'Saved prices are hidden. Check current prices on Priceline or refresh these results.'}</p>
       </div>
       <Button onClick={onRefresh} disabled={refreshing || disabled}>{refreshing ? 'Updating…' : 'Refresh search'}</Button>
     </div>
   );
 }
 
-export function ProviderLink({ offer, stale, onRefresh, refreshing = false, refreshDisabled = false }) {
+export function ProviderLink({ offer, stale, unavailable = false, refreshing = false }) {
   const href = safeHref(offer?.handoffUrl, true);
+  const quote = offer?.quote;
+  const hasPrice = [quote?.nightlyCents, quote?.stayCents, quote?.totalTaxesFees === 'included' ? quote.totalCents : null]
+    .some(cents => Number.isSafeInteger(cents) && cents >= 0);
+  const currentPrice = stale || unavailable || refreshing || !hasPrice;
   return (
     <div className="provider-handoff">
-      {refreshing ? <Button disabled>Updating offer…</Button> : stale ? (
-        <>
-          <Button onClick={onRefresh} disabled={!onRefresh || refreshDisabled}>Refresh Express offers</Button>
-          <p>The saved quote has expired. Check the latest offer to continue.</p>
-        </>
-      ) : href ? (
-        <a
-          className="button-link"
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View original Express offer <span aria-hidden="true">↗</span>
+      {href ? (
+        <a className="button-link" href={href} target="_blank" rel="noopener noreferrer">
+          {currentPrice ? 'Check current price on Priceline' : 'View original Express offer'} <span aria-hidden="true">↗</span>
           <span className="sr-only"> (opens a new tab)</span>
         </a>
       ) : (
@@ -410,7 +321,7 @@ export function ProviderLink({ offer, stale, onRefresh, refreshing = false, refr
           <p>The provider did not supply a usable link to this offer.</p>
         </>
       )}
-      {!stale && !refreshing && href && <p>Final price and booking terms on Priceline.</p>}
+      {href && <p>Final price and booking terms on Priceline.</p>}
     </div>
   );
 }

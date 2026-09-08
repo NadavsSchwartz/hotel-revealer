@@ -9,7 +9,7 @@ export default function Home({ draftRef }) {
       <section className="room-scene" aria-labelledby="home-title">
         <div className="room-introduction">
           <h1 id="home-title" tabIndex="-1">Find the hotel<br />behind the deal.</h1>
-          <p className="room-description">Search Priceline Express Deals by destination and dates. Review the hotel, then book on Priceline.</p>
+          <p className="room-description">Search Priceline Express Deals by destination and dates. Explore a likely hotel, check the total price, then continue to Priceline.</p>
         </div>
         <section className="room-reception" id="unboxed-search" aria-labelledby="search-title">
           <h2 id="search-title" tabIndex="-1">Your trip</h2>
@@ -27,18 +27,18 @@ export default function Home({ draftRef }) {
       <section className="room-example room-content" id="reveal-example" aria-labelledby="reveal-title">
         <div className="room-example-intro">
           <h2 id="reveal-title" tabIndex="-1">A great rate is only half the story.</h2>
-          <p>See the hotel behind an Express Deal, then decide if it’s the right stay for you.</p>
+          <p>When the deal information points to one hotel, explore it before deciding. Some offers remain unidentified.</p>
         </div>
         <div className="room-reveal-preview">
           <div className="room-hidden-offer">
             <p className="room-preview-label">Priceline Express Deal</p>
             <h3>A stay without a name.</h3>
-            <p className="room-hidden-name">Before the reveal <span aria-hidden="true">↓</span></p>
+            <p className="room-hidden-name">Hotel name withheld <span aria-hidden="true">↓</span></p>
           </div>
           <div className="room-revealed-hotel">
             <p className="room-preview-label">Hotel Revealer</p>
-            <h3>A hotel you can explore.</h3>
-            <p>A name and details to help you decide.</p>
+            <h3>A likely hotel to explore.</h3>
+            <p>An inferred name and available details to help you decide.</p>
           </div>
         </div>
       </section>
@@ -48,8 +48,8 @@ export default function Home({ draftRef }) {
           <h2 id="method-title" tabIndex="-1">Search. Reveal. Decide.</h2>
           <ol className="room-steps">
             <li><h3>Start with your stay.</h3><p>Choose your destination, dates and travelers to find Priceline Express Deals for your trip.</p></li>
-            <li><h3>See behind the offer.</h3><p>See one hotel for each deal we can identify, with its details alongside the original offer.</p></li>
-            <li><h3>Make the choice yours.</h3><p>Prices and availability can change. Review the current total, fees and cancellation terms, then book on Priceline.</p></li>
+            <li><h3>See behind the offer.</h3><p>See one likely hotel when the deal information identifies a single match. Otherwise, the hotel remains unidentified.</p></li>
+            <li><h3>Make the choice yours.</h3><p>Open any offer to request a total price, including taxes and fees when available. Review the final price and terms on Priceline.</p></li>
           </ol>
         </div>
       </section>

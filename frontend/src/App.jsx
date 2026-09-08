@@ -33,14 +33,14 @@ function Policy({ privacy }) {
       <h1 tabIndex="-1">
         {privacy ? 'Privacy, plainly.' : 'Before you use this.'}
       </h1>
-      <p className="policy-date">Last updated September 7, 2026</p>
+      <p className="policy-date">Last updated September 8, 2026</p>
       {privacy ? (
         <>
           <h2>What your search uses</h2>
           <p>
             Your destination, dates, room and adult counts, children’s ages,
             and selected offer and hotel IDs are sent to this
-            application’s server when you search or open a candidate. The
+            application’s server when you search or open an offer. The
             necessary trip details are sent to Priceline to retrieve listings
             and hotel information.
           </p>
@@ -51,10 +51,10 @@ function Policy({ privacy }) {
           </p>
           <h2>What stays in your browser</h2>
           <p>
-            Trip details and candidate IDs appear in the page address. Your open
-            comparisons, sort choice, and scroll position are kept in this tab’s
+            Trip details and selected offer and hotel IDs appear in the page address. Your
+            sort choice, page and scroll position are kept in this tab’s
             session storage. Your unfinished search and results are held in
-            application memory so you can return to your comparison.
+            application memory so you can return to your results.
           </p>
           <p>
             This application does not require an account and does not include
@@ -84,21 +84,22 @@ function Policy({ privacy }) {
         <>
           <h2 id="how-it-works">A comparison tool, not a booking service</h2>
           <p>
-            Hotel Revealer helps compare an unnamed Express offer with possible
-            named hotels using the available listing clues. It does not sell
+            Hotel Revealer uses an unnamed Express offer’s listing information
+            to infer one likely hotel when the matching rules identify a single hotel. It does not sell
             rooms, accept payment, or make reservations.
           </p>
-          <h2>Candidates are uncertain</h2>
+          <h2>A likely hotel is an inference</h2>
           <p>
-            A Strong match has matching evidence across the guest rating,
-            review count, and amenity clue groups, in addition to the required
-            location and star checks. A Possible match has less supporting
-            evidence. Neither label verifies the hidden hotel’s identity. A
-            hotel missing required evidence may remain unassessed.
+            “Likely hotel” means one hotel met the matching rules for the retrieved
+            deal information. The name is inferred, not verified or guaranteed.
+            When several hotels fit, required information is missing, no hotel fits,
+            or the search is incomplete, the offer remains unidentified.
           </p>
           <p>
-            Retrieved listings may be incomplete. No candidate, rate, saving,
-            availability, or inventory coverage is guaranteed. A separate retail
+            You can still open an unidentified offer to check its total price.
+            Listing rates may exclude taxes and fees; complete totals are requested
+            when you open an offer and may be unavailable. No rate, saving,
+            availability or inventory coverage is guaranteed. A separate retail
             quote may describe a different room or booking policy.
           </p>
           <h2>Check the original offer</h2>
@@ -159,8 +160,8 @@ function PageBehavior() {
     previousPath.current = location.pathname;
     const titles = {
       '/': 'Find the hotel behind the deal.',
-      '/results': 'Your hotel shortlist',
-      '/deal': 'Candidate details',
+      '/results': 'Your Express deals',
+      '/deal': 'Offer details and price',
       '/privacy': 'Privacy',
       '/terms': 'Terms of use',
       '/credits': 'Data & credits',
@@ -264,7 +265,7 @@ export default function App() {
               element={
                 <React.Suspense
                   fallback={
-                    <RouteLoading message="Loading your candidate comparison…" />
+                    <RouteLoading message="Loading your offer…" />
                   }
                 >
                   <Details />

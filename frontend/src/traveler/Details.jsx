@@ -13,11 +13,9 @@ import {
 import { detailKey, loadDetail, selectDetailView, selectSearchCooldown } from './state.js';
 import {
   ErrorNotice,
-  Evidence,
   ProviderLink,
   Quote,
   Stars,
-  Tier,
   TripSummary,
   useExpired,
 } from './components.jsx';
@@ -66,11 +64,11 @@ export default function Details() {
   const { context: requestedContext, errors } = validateContext(input);
   const params = new URLSearchParams(location.search);
   const offerId = params.get('offerId') || '';
-  const hotelId = params.get('hotelId') || '';
+  const hotelId = params.has('hotelId') ? params.get('hotelId') : null;
   const valid =
     Object.keys(errors).length === 0 &&
     validIdentifier(offerId, MAX_OFFER_ID_LENGTH) &&
-    validIdentifier(hotelId);
+    (hotelId === null || validIdentifier(hotelId));
   const key = detailKey(requestedContext, offerId, hotelId);
   const request = useSelector((state) => state.detail);
   const search = useSelector((state) => state.searches[contextKey(requestedContext)]);
@@ -109,7 +107,7 @@ export default function Details() {
 
   useEffect(() => {
     if (valid) dispatch(loadDetail(context, offerId, hotelId));
-    // Candidate selection, not incidental history state, owns this request.
+    // The offer and optional hotel identity own this request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, valid, dispatch]);
 
@@ -137,10 +135,10 @@ export default function Details() {
       </Link>
       {!valid ? (
         <div className="empty-panel" role="alert">
-          <h1>This hotel link is incomplete</h1>
+          <h1>This offer link is incomplete</h1>
           <p>
-            This page needs a valid destination, travel dates, Express offer, and
-            hotel ID.
+            This page needs a valid destination, travel dates and Express offer.
+            A hotel ID, when included, must also be valid.
           </p>
           <Link className="button-link" to="/">
             Start a search
@@ -149,10 +147,9 @@ export default function Details() {
       ) : (
         <>
           <header className="detail-heading">
-            <p className="eyebrow">Possible hotel</p>
-            <h1 tabIndex="-1">{candidate?.name || 'Your hotel match'}</h1>
-            {candidate && <Tier tier={candidate.tier} />}
-            {candidate && offer?.candidates?.length > 1 && <p className="detail-location">One of {offer.candidates.length} hotels matching this offer</p>}
+            <p className="eyebrow">{candidate ? 'Likely hotel' : 'Express offer'}</p>
+            <h1 tabIndex="-1">{candidate?.name || 'Your Express offer'}</h1>
+            {candidate && <p className="detail-location">The hotel name is inferred from the deal information, and is not guaranteed.</p>}
             <p className="detail-location">
               {candidate?.neighborhoodName && `${candidate.neighborhoodName} · `}
               {context.cityName}
@@ -160,17 +157,17 @@ export default function Details() {
           </header>
           <p className="sr-only" role="status" aria-live="polite">
             {loading
-              ? 'Loading hotel details.'
+              ? hotelId ? 'Loading hotel details and total price.' : 'Checking the total price.'
               : error
-                ? 'Hotel details could not be loaded.'
+                ? 'This offer could not be updated.'
                 : data
-                  ? `Details loaded for ${candidate.name}. Candidate identity remains unverified.`
+                  ? candidate ? `Details loaded for ${candidate.name}.` : 'Original offer loaded.'
                   : ''}
           </p>
           {loading && (
             <div className="detail-loading" aria-busy="true">
               <span className="detail-progress-dot" aria-hidden="true" />
-              <p>Loading hotel details…</p>
+              <p>{hotelId ? 'Loading hotel details and total price…' : 'Checking the total price…'}</p>
             </div>
           )}
           {error && (
@@ -210,24 +207,21 @@ export default function Details() {
                     {offer.neighborhoodName && `${offer.neighborhoodName} · `}
                     <Stars value={offer.stars} />
                   </p>
-                  <Quote quote={offer.quote} expired={Boolean(offer.quoteExpiresAt) && priceStale} onRefresh={retry} refreshing={loading} refreshDisabled={coolingDown} />
+                  <Quote quote={offer.quote} expired={priceStale} onRefresh={retry} refreshing={loading} refreshDisabled={coolingDown} />
+                  {data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
+                    <p>A complete total is unavailable. Check the current price on Priceline or try again.</p>
+                    <Button onClick={retry} disabled={loading || coolingDown}>Retry total price</Button>
+                  </div>}
                   <TripSummary context={context} />
                   {!bindingRejected && candidate && (
                     <p className="detail-qualification">
                       Property photos show this hotel. Room details are on the original offer.
                     </p>
                   )}
-                  {stale && (
-                    <div className="inline-stale">
-                      <strong>This quote is out of date.</strong>
-                    </div>
-                  )}
-                  {bindingRejected ? (
-                    <p className="detail-binding-status" role="status">
-                      Choose a hotel from refreshed results to continue.
-                    </p>
-                  ) : (
-                    <ProviderLink offer={offer} stale={stale} onRefresh={refreshOffers} refreshDisabled={coolingDown} />
+                  {bindingRejected && <p className="detail-binding-status" role="status">This hotel match is no longer available. You can still check the original offer on Priceline.</p>}
+                  <ProviderLink offer={offer} stale={stale || priceStale} unavailable={data?.quoteStatus === 'unavailable'} refreshing={loading} />
+                  {!hotelId && data?.offer?.resolution?.status === 'matched' && data.offer.candidates?.length === 1 && (
+                    <p className="detail-qualification"><Link to={searchUrl(context, '/deal', { offerId, hotelId: data.offer.candidates[0].hotelId })} state={location.state}>View the likely hotel</Link></p>
                   )}
                 </>
               ) : (
@@ -271,20 +265,7 @@ export default function Details() {
                   <p>The Express offer and available hotel clues are still shown.</p>
                 </div>
               )}
-              {candidate && (
-                <details className="detail-evidence">
-                  <summary>
-                    <h2>Why this match?</h2>
-                    <span aria-hidden="true">+</span>
-                  </summary>
-                  <div className="detail-evidence-content">
-                    <p>One possible hotel among those checked for this offer.</p>
-                    <Tier tier={candidate.tier} />
-                    <Evidence candidate={candidate} offer={offer} />
-                  </div>
-                </details>
-              )}
-              {data && (
+              {candidate && data && (
                 <section className="detail-retail">
                   <div className="detail-retail-heading">
                     <span className="eyebrow">A separate option</span>

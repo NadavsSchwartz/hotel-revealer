@@ -8,7 +8,7 @@ test('mobile results show a hotel and its price without the full search form tak
   data.offers[0].quote.advertisedDiscount = { percent: 80, source: 'Priceline' };
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
   await page.goto(`/results?${new URLSearchParams(data.context)}`);
-  const hotel = page.getByRole('link', { name: 'View possible hotel: The STRAT Hotel, Casino & Tower', exact: true });
+  const hotel = page.getByRole('link', { name: 'View likely hotel: The STRAT Hotel, Casino & Tower', exact: true });
   await expect(hotel).toBeVisible();
   await page.evaluate(async () => { await document.fonts.ready; });
   await page.screenshot({ path: testInfo.outputPath('mobile-results.png'), fullPage: true });

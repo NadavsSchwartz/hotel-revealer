@@ -11,13 +11,12 @@ export function searchResponse(overrides = {}) {
   const candidate = {
     hotelId: 'hotel-one', name: 'Juniper House', neighborhoodName: 'Downtown', stars: 4,
     guestRating: 8.7, reviewCount: 742, amenities: ['POOL', 'WIFI'], thumbnailUrl: null,
-    tier: 'partial', evidence: { supporting: ['Same neighborhood', 'Matching star category', 'Pool advertised'], missing: ['Review count masking is unverified'] },
   };
   const offer = {
     offerId: 'offer-one', neighborhoodName: 'Downtown', stars: 4,
-    quote: { nightlyCents: 11900, stayCents: 23800, currency: 'USD', taxesFees: 'unknown' },
+    quote: { nightlyCents: 11900, stayCents: 23800, currency: 'USD', nightlyBasis: 'per-room', stayBasis: 'all-rooms', roomCount: 1, taxesFees: 'unknown' },
     handoffUrl: `https://www.priceline.com/relax/at/express/example/offer-one/from/${context.checkIn.replaceAll('-', '')}/to/${context.checkOut.replaceAll('-', '')}/rooms/1/adults/2?cur=USD`,
-    candidates: [candidate, { ...candidate, hotelId: 'hotel-two', name: 'Desert House' }], unassessedCount: 1,
+    resolution: { status: 'matched' }, candidates: [candidate],
   };
   return {
     context, retrievedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 300000).toISOString(),
@@ -29,8 +28,8 @@ export function searchResponse(overrides = {}) {
 export function detailResponse() {
   const search = searchResponse();
   return { context, retrievedAt: search.retrievedAt, expiresAt: search.expiresAt,
-    offer: search.offers[0], candidate: search.offers[0].candidates[0], detailStatus: 'unavailable',
-    details: { description: 'Candidate hotel information for comparison.', images: [], amenities: ['Pool', 'Wi-Fi'], address: 'Downtown, Las Vegas', retailQuote: null },
+    offer: search.offers[0], candidate: search.offers[0].candidates[0], detailStatus: 'unavailable', quoteStatus: 'unavailable',
+    details: { description: 'Hotel information for this likely match.', images: [], amenities: ['Pool', 'Wi-Fi'], address: 'Downtown, Las Vegas', retailQuote: null },
   };
 }
 
