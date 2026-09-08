@@ -48,14 +48,15 @@ website/bundle research, the selected request shape and its limits.
 | Initial Las Vegas listing probe | `listing-probe.json` and its summary: HTTP 200 JSON, 10 retail rows, 2,346 ms, 7,919 bytes; no recorded challenge |
 | Combined 100-row search | `listing-combined.json` and its summary: 98 named hotels and 2 Express offers out of 371 reported rows, 2,976 ms, 83,936 bytes |
 | Combined 500-row search | `listing-large.json` and its summary: all 371 reported rows, comprising 271 named hotels and 100 Express offers, 4,583 ms, 331,538 bytes |
-| Multi-room price basis | `family-page.json`: two rooms, four adults, child age 7, three nights. Per-room nightly price × nights × rooms agrees with provider stay amounts subject to whole-currency display rounding |
+| Historical multi-room base arithmetic | `family-page.json`: two rooms, four adults, requested child age 7, three nights. Base arithmetic agrees subject to display rounding, but the old plain-age API encoding was incorrect; this does not verify child occupancy |
 | Tel Aviv listing probe | `tel-aviv-page.json`: one Express offer and 99 named hotels. Provider city country code was `IS`, not GeoNames ISO `IL` |
 | Coordinate-only route | `coordinate-only-summary.json`: HTTP 200 with provider error 498, “Null exact match or null matched city”; no recorded challenge. This did not establish a usable coordinate-only search |
 | Named-hotel details | `detail-probe.json`, plus the actual app flow described below, establish separate retail detail retrieval; they do not verify hidden hotel identity |
 | Listing discounts | `pricing-listings.json`: the combined query returns provider `displaySavingsPct`; this adds no per-offer detail request |
-| Original-offer total | `original-total-display-s.json`: the preferred Express room rate quotes USD 66 nightly, USD 198 base stay and USD 439.02 `grandTotal`; its summary `rateIdentifier` selects that exact room rate |
-| Modern total semantics | `modern-total.json`: the current `sopqHotelDetails.price` response reports USD 439.02 and explicitly describes it as including taxes and fees; this corroborates the legacy detail amount for that offer/context |
-| Family original-offer total | `family-original-total.json`, captured 2026-09-08 03:40:21 UTC: September 21–24, two rooms, four adults and child age 7. The matched preferred rate quotes USD 66 nightly, USD 396 base stay and USD 873.06 total. The same saved opaque offer later displayed as unavailable on Priceline; this verifies API amounts, not current bookability or a successful family handoff |
+| Historical one-room total agreement | `original-total-display-s.json` and `modern-total.json`: both quote USD 66 nightly, USD 198 base stay and USD 439.02 total; the modern response explicitly includes taxes and fees. Agreement for this one-room probe did not validate the legacy total for multiple rooms |
+| Superseded legacy family total | `family-original-total.json`, captured 2026-09-08 03:40:21 UTC: USD 66 nightly, USD 396 base stay and USD 873.06 legacy total. Old child encoding and the later-discovered legacy multi-room fee defect prevent treating this as validated family pricing; the saved offer also later displayed as unavailable on Priceline |
+| Modern family total | `modern-family-total.json`, captured 2026-09-08 03:54:59 UTC: September 21–24, two rooms, four adults and child age 7 encoded as `{age:'1-7'}`. Root and matching room rate report USD 4 nightly, USD 24 base stay and USD 375.90 total, explicitly including taxes and fees; reported property fees are USD 339.78 |
+| Corrected child-age listing request | `ordinal-children-listing.json`, captured 2026-09-08 03:57:14 UTC: `children:['1-7']` returns 67 Express offers and 213 named hotels. The compared Express row reports USD 4 nightly, USD 24 base stay and 80% advertised base-rate discount, consistent with modern pricing |
 
 The two combined Las Vegas probes used September 21–24, 2026, one room, two adults,
 USD and the same request options. The 500-row probe retrieved that snapshot in one
@@ -93,37 +94,44 @@ or `unknown` values. Known contradictions exclude a candidate; matching values
 remain evidence for a possible hotel, not an identity confirmation.
 
 Listing quotes may include `advertisedDiscount:{percent,source:'Priceline'}` from
-`displaySavingsPct`. Selected original quotes use the matching room rate's
-`savingPct`. These are provider-reported base-rate discounts; they are not savings
+`displaySavingsPct`. Selected original quotes use only the modern root nightly
+`savingsPercentage`. These are provider-reported base-rate discounts; they are not savings
 derived from a candidate's retail rate or discounts on a fee-inclusive total.
 In the recorded Las Vegas probe, the base-rate discount was 61%, while the modern
 total response reported 42%. Priceline's [savings disclosure](https://www.priceline.com/partner/savings-day)
 also permits an average-based estimated retail comparator. Missing/invalid
 discounts are omitted. The app does not promise “you save” a computed amount.
 
-Opening a candidate requests named details and the original opaque quote in one
-HTTP request containing two `hotelDetails` resolver calls. The `details` alias
-uses only the named `hotelID`; `original` uses only the opaque `pclnID`, with the
-same dates, rooms, adults, child ages and currency. The app does not fetch room
-details for every result. An original quote is accepted only for USD,
-`status:AVAILABLE`, and exactly one Express room rate whose identifier matches
-`ratesSummary.rateIdentifier`. Other rooms and the candidate's retail quote never
-supply its total.
+Opening a candidate sends one HTTP request with two root GraphQL resolver calls.
+The `details:hotelDetails` alias uses only the named `hotelID`; the modern
+`original:sopqHotelDetails` alias uses only the opaque `pclnId`, with the same
+dates, rooms, adults, child ages and USD currency. The app does not fetch room
+details for every result or derive original totals from candidate retail rates.
 
-For multi-room original quotes, the adapter additionally requires exact base
-arithmetic in cents: nightly amount × calendar nights × rooms. The family probe
-above satisfies USD 66 × 3 × 2 = USD 396; its USD 873.06 total came directly from
-the provider and is not twice the earlier one-room USD 439.02 total. Any base
-mismatch, even one cent, preserves the listing fallback without an inclusive
-quote. There is no rounding tolerance or total multiplication. This conservative
-guard can omit a quote when provider rounding differs; it does not verify every
-room allocation or change single-room handling.
+The legacy original `hotelDetails.grandTotal` path and preferred-summary-rate
+selection were removed. A later two-room STRAT comparison exposed a legacy total
+of USD 198.10 versus a modern total of USD 375.90, with missing second-room
+property fees despite plausible base arithmetic. The earlier one-room agreement
+and family arithmetic checks did not establish complete multi-room fees.
 
-After the family API response, opening that same saved opaque offer on Priceline
-showed “Looks like this hotel is no longer available.” The capture therefore
-corroborates the API's quoted amount and base arithmetic only. A fresh family
-search, details retrieval and successful provider-page handoff remain unverified;
-the API's `AVAILABLE` status did not establish browser bookability in this check.
+The modern parser requires `$` prefixes on root `MIN_PRICE` and `GRAND_TOTAL`,
+an explicit description that the total includes taxes and fees, and exactly one
+identified room rate whose `AVERAGE_NIGHTLY_RATE` and `TOTAL` equal both root
+amounts. That rate's `EXCLUSIVE_PER_STAY` supplies the base stay. Amounts must be
+positive exact decimal cents; fractional cents are rejected rather than rounded
+into agreement. For all room counts, base cents must exactly equal nightly cents
+× calendar nights × rooms. Even a one-cent mismatch leaves the listing fallback.
+The provider total is never multiplied and property fees are never inferred.
+Conservative matching can omit a total when rounding or multiple rates prevent
+an exact match; it does not establish every room allocation.
+
+Child encoding was also corrected: legacy listing/named-detail calls use
+one-based ordinal-age strings, such as `['1-0','2-7']`, and modern occupancy uses
+`[{age:'1-0'},{age:'2-7'}]`. Public context stays `[0,7]` and handoff URLs use
+plain ages `/children/0,7`. The old `['7']` API request returned different
+inventory and a USD 3 nightly/USD 18 base quote for the compared offer; the
+corrected `['1-7']` request returns USD 4/USD 24, agreeing with modern pricing.
+Earlier plain-age API probes are therefore historical, not child-occupancy proof.
 
 When valid, the original quote adds `totalCents` and `totalTaxesFees:'included'`
 to `offer.quote`; its separate nightly and stay base amounts use
@@ -131,8 +139,10 @@ to `offer.quote`; its separate nightly and stay base amounts use
 amount, corroborated by the modern response's explicit tax/fee description. A
 separate rendered website check showed USD 418.77 for the linked offer. Those
 amounts did not agree, and the cause was not established; neither this field nor
-the handoff link guarantees an identical website or final checkout price. The
-modern schema was used to verify semantics, not added as another runtime call.
+the handoff link guarantees an identical website or final checkout price. A saved
+legacy family offer also subsequently displayed as unavailable. The corrected
+modern implementation's fresh family search/details/provider-handoff journey is
+still awaiting verification; these API probes alone do not establish bookability.
 
 If original pricing is missing, invalid, ambiguous or unavailable, no inclusive
 total is invented and the listing quote remains. Named details can still be

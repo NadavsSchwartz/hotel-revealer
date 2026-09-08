@@ -36,6 +36,11 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   children aged 0–17 (0 represents under one). Every child requires an age.
   Omitted occupancy defaults to one room/two adults/no children; explicit invalid
   values are rejected. Room allocation is not yet modeled.
+  Public context and handoff URLs retain plain ages. The adapter encodes each
+  child as a one-based ordinal plus age: `[0,7]` becomes `['1-0','2-7']` for
+  legacy listing/named-detail requests and `[{age:'1-0'},{age:'2-7'}]` for the
+  modern original-offer request. Plain-age API strings were incorrect and are
+  superseded; `/children/0,7` remains the correct handoff URL format.
 - Both dates must be within 365 days of local today, checkout follows check-in,
   and stays are at most 30 calendar nights. Server validation permits one day of
   grace at both UTC boundaries to accommodate the client’s local calendar date.
@@ -122,18 +127,23 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   rows per page. The coordinator permits at most three pages. Incomplete retrieval
   stays explicit; retrieved pagination completeness is not exhaustive inventory.
 - Listing discounts come from `displaySavingsPct` without another provider request.
-  Opening details sends one HTTP request with two GraphQL `hotelDetails` resolver
-  calls: `details` uses the named `hotelID`; `original` uses only the opaque
-  `pclnID`. Both use the same travel context. This does not fetch room totals for
-  every search result or use candidate retail rates to price the original offer.
-  The original response must be USD and `AVAILABLE`, and its summary
-  `rateIdentifier` must select exactly one Express room rate. Only that rate's
-  `grandTotal`, base amounts and `savingPct` are considered. Rate order, lowest
-  guessed amount and other rooms' totals are not substitutes.
-  For more than one room, base-stay cents must exactly equal nightly cents × the
-  shared calendar-night count × rooms. Any mismatch, including one cent, leaves
-  the listing quote unchanged. This conservative check adds no rounding tolerance
-  and never multiplies the provider's total; single-room behavior is unchanged.
+  Opening details sends one HTTP request with two root GraphQL resolver calls:
+  `details:hotelDetails` uses the named `hotelID`; `original:sopqHotelDetails` uses
+  only the opaque `pclnId`. Both use the same travel context. Room totals are not
+  fetched for every search result, and candidate retail rates never price the
+  original offer. Legacy original `hotelDetails.grandTotal` was removed after a
+  multi-room probe undercounted property fees despite correct base arithmetic.
+  The modern original response must follow a USD request, return `$` currency
+  prefixes for root `MIN_PRICE` and `GRAND_TOTAL`, and explicitly describe the
+  total as including taxes and fees. Exactly one identified room rate must match
+  both root amounts through `AVERAGE_NIGHTLY_RATE` and `TOTAL`. Its
+  `EXCLUSIVE_PER_STAY` supplies the base stay. Decimal amounts must convert to
+  exact positive cents; fractional-cent rounding cannot create a match.
+  For every room count, base-stay cents must exactly equal nightly cents × the
+  shared calendar-night count × rooms. Any ambiguity or mismatch, including one
+  cent, leaves the listing quote unchanged. There is no rounding tolerance or
+  multiplication of the provider total. The quote's optional discount comes only
+  from the root nightly `savingsPercentage`, not the total's savings percentage.
   Named detail availability and original quote availability are independent:
   missing original pricing leaves the listing quote; missing named details can
   return `detailStatus:'unavailable'` while retaining a valid original total.

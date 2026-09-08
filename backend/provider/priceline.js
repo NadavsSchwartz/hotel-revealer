@@ -37,11 +37,11 @@ const LISTINGS_QUERY = `query HotelRevealerListings(
 }`;
 
 const DETAILS_QUERY = `query HotelRevealerDetails(
-  $hotelID: ID, $offerId: ID, $checkIn: String, $checkOut: String, $roomsCount: Int,
-  $currencyCode: String, $appCode: String, $adults: Int, $children: [String],
+  $hotelID: ID, $originalStringOfferId: String!, $checkIn: String!, $checkOut: String!, $roomsCount: Int!,
+  $currencyCode: String!, $appCode: String, $adults: Int, $children: [String],
   $responseOptions: String, $includePrepaidFeeRates: Boolean,
   $multiOccDisplay: Boolean, $multiOccRates: Boolean,
-  $originalResponseOptions: String, $rateDisplayOption: String, $paymentRateMerge: Boolean
+  $adultsString: String!, $childrenAges: [ChildInput]
 ) {
   details: hotelDetails(
     hotelID: $hotelID, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
@@ -57,18 +57,31 @@ const DETAILS_QUERY = `query HotelRevealerDetails(
       ratesSummary { minPrice minCurrencyCode }
     }
   }
-  original: hotelDetails(
-    pclnID: $offerId, checkIn: $checkIn, checkOut: $checkOut, roomsCount: $roomsCount,
-    currencyCode: $currencyCode, appCode: $appCode, adults: $adults, children: $children,
-    responseOptions: $originalResponseOptions, includePrepaidFeeRates: $includePrepaidFeeRates,
-    multiOccDisplay: $multiOccDisplay, multiOccRates: $multiOccRates,
-    rateDisplayOption: $rateDisplayOption, paymentRateMerge: $paymentRateMerge
-  ) {
-    errorMessage
-    hotel {
-      ratesSummary { minCurrencyCode rateIdentifier status }
-      transformedRooms {
-        roomRates { rateIdentifier price grandTotal totalPriceExcludingTaxesAndFeePerStay programName savingPct }
+  original: sopqHotelDetails(pclnId: $originalStringOfferId, context: { appCode: "DESKTOP" }) {
+    nightly: price(
+      hotelRequest: {
+        checkIn: $checkIn, checkOut: $checkOut, currencyCode: $currencyCode,
+        occupancy: { adults: $adultsString, children: $childrenAges }, roomCount: $roomsCount,
+        dealInfo: { unlockDeals: true, includePrepaidFeeRates: true, rateDisplayOption: FLAT }
+      }, pclnId: $originalStringOfferId, priceType: MIN_PRICE
+    ) { amount currencyPrefix savingsPercentage }
+    total: price(
+      hotelRequest: {
+        checkIn: $checkIn, checkOut: $checkOut, currencyCode: $currencyCode,
+        occupancy: { adults: $adultsString, children: $childrenAges }, roomCount: $roomsCount,
+        dealInfo: { unlockDeals: true, includePrepaidFeeRates: true, rateDisplayOption: FLAT }
+      }, pclnId: $originalStringOfferId, priceType: GRAND_TOTAL
+    ) { amount currencyPrefix description }
+    rooms(pclnId: $originalStringOfferId, hotelRequest: {
+      checkIn: $checkIn, checkOut: $checkOut, currencyCode: $currencyCode,
+      occupancy: { adults: $adultsString, children: $childrenAges }, roomCount: $roomsCount,
+      dealInfo: { unlockDeals: true, includePrepaidFeeRates: true, rateDisplayOption: FLAT }
+    }) {
+      rates {
+        rateIdentifier
+        nightly: price(priceType: AVERAGE_NIGHTLY_RATE) { amount }
+        base: price(priceType: EXCLUSIVE_PER_STAY) { amount }
+        total: price(priceType: TOTAL) { amount }
       }
     }
   }
@@ -133,7 +146,7 @@ function tripVariables(context) {
     checkIn: context.checkIn.replaceAll('-', ''),
     checkOut: context.checkOut.replaceAll('-', ''),
     adults: context.adults,
-    children: context.childrenAges.map(String),
+    children: context.childrenAges.map((age, index) => `${index + 1}-${age}`),
     currencyCode: context.currency,
     appCode: 'DESKTOP',
     includePrepaidFeeRates: true,
@@ -221,33 +234,37 @@ function adaptListing(row, context) {
   };
 }
 
+function modernPriceCents(amount) {
+  // Current price fields are decimal strings. Do not round distinct fractional-cent rates into a match.
+  if (typeof amount !== 'string' || !/^\d+(?:\.\d{1,2})?$/.test(amount)) return null;
+  const [whole, fraction = ''] = amount.split('.');
+  const value = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function originalQuote(original, context) {
-  const hotel = original?.hotel;
-  const summary = hotel?.ratesSummary;
-  if (!isRecord(original) || original.errorMessage || !isRecord(hotel) || !isRecord(summary) ||
-      summary.status !== 'AVAILABLE' || summary.minCurrencyCode !== 'USD' ||
-      typeof summary.rateIdentifier !== 'string' || !summary.rateIdentifier || summary.rateIdentifier.length > 4096 ||
-      !Array.isArray(hotel.transformedRooms)) return null;
-  const matches = hotel.transformedRooms.flatMap(room => Array.isArray(room?.roomRates) ? room.roomRates : [])
-    .filter(rate => isRecord(rate) && rate.rateIdentifier === summary.rateIdentifier);
-  // A preferred identifier must select exactly one rate; never guess by room order.
-  if (matches.length !== 1 || typeof matches[0].programName !== 'string' ||
-      matches[0].programName.toUpperCase() !== 'EXPRESS_DEAL') return null;
-  const rate = matches[0];
+  if (!isRecord(original) || context.currency !== 'USD' || original.nightly?.currencyPrefix !== '$' ||
+      original.total?.currencyPrefix !== '$' || !Array.isArray(original.rooms) ||
+      typeof original.total?.description !== 'string' || !/includes taxes\s*(?:&|and)\s*fees/i.test(original.total.description)) return null;
+  const nightlyCents = modernPriceCents(original.nightly.amount);
+  const totalCents = modernPriceCents(original.total.amount);
+  if (nightlyCents === null || totalCents === null) return null;
+  const matches = original.rooms.flatMap(room => Array.isArray(room?.rates) ? room.rates : [])
+    .filter(rate => isRecord(rate) && typeof rate.rateIdentifier === 'string' && rate.rateIdentifier.length > 0 &&
+      rate.rateIdentifier.length <= 4096 && modernPriceCents(rate.nightly?.amount) === nightlyCents &&
+      modernPriceCents(rate.total?.amount) === totalCents);
+  // Match the advertised nightly and complete total to exactly one current rate.
+  if (matches.length !== 1) return null;
+  const stayCents = modernPriceCents(matches[0].base?.amount);
+  const expectedBase = nightlyCents * nightCount(context.checkIn, context.checkOut) * context.rooms;
+  if (stayCents === null || !Number.isSafeInteger(expectedBase) || stayCents !== expectedBase) return null;
   const quote = normalizeQuote({
-    minPrice: rate.price, displayPricePerStay: rate.totalPriceExcludingTaxesAndFeePerStay,
-    grandTotal: rate.grandTotal, minCurrencyCode: summary.minCurrencyCode,
+    nightlyCents, stayCents, totalCents, currency: 'USD',
     roomCount: context.rooms, nightlyBasis: 'per-room', stayBasis: 'all-rooms',
     taxesFees: 'excluded', totalTaxesFees: 'included',
-    advertisedDiscount: { percent: rate.savingPct, source: 'Priceline' },
+    advertisedDiscount: { percent: original.nightly.savingsPercentage, source: 'Priceline' },
   });
-  if (quote.totalCents == null) return null;
-  if (context.rooms > 1) {
-    const expectedBase = quote.nightlyCents * nightCount(context.checkIn, context.checkOut) * context.rooms;
-    // Confirm the all-room base instead of multiplying a possibly per-room total.
-    if (!Number.isSafeInteger(expectedBase) || quote.stayCents !== expectedBase) return null;
-  }
-  return quote;
+  return quote.totalCents == null ? null : quote;
 }
 
 function detailsAlias(parsed, alias) {
@@ -319,11 +336,11 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
 
     async hotelDetails({ context, offerId, hotelId, signal }) {
       // One HTTP request contains two resolver calls with separate opaque/named IDs.
+      const trip = tripVariables(context);
       const parsed = await request('HotelRevealerDetails', DETAILS_QUERY, {
-        ...tripVariables(context), hotelID: hotelId, offerId, roomsCount: context.rooms,
+        ...trip, hotelID: hotelId, originalStringOfferId: offerId, roomsCount: context.rooms,
         responseOptions: 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES',
-        originalResponseOptions: 'RATE_SUMMARY,DETAILED_ROOM,RATE_CHARGES_DETAIL,RATE_IMPORTANT_INFO',
-        rateDisplayOption: 'S', paymentRateMerge: false,
+        adultsString: String(context.adults), childrenAges: trip.children.map(age => ({ age })),
       }, signal, true);
       const details = detailsAlias(parsed, 'details');
       const selectedQuote = originalQuote(detailsAlias(parsed, 'original'), context);

@@ -57,7 +57,7 @@ test('one public listing request retains dates, all occupants, and canonical des
   assert.equal(request.signal, controller.signal);
   assert.equal(request.payload.operationName, 'HotelRevealerListings');
   assert.deepEqual(request.payload.variables, {
-    checkIn: '20260921', checkOut: '20260924', adults: 3, children: ['0', '7'],
+    checkIn: '20260921', checkOut: '20260924', adults: 3, children: ['1-0', '2-7'],
     roomCount: 2, currencyCode: 'USD', appCode: 'DESKTOP',
     includePrepaidFeeRates: true, multiOccDisplay: true, multiOccRates: true,
     locationID: 'Las Vegas, Nevada, United States', first: 500, offset: 0,
@@ -218,20 +218,26 @@ test('one detail transport keeps named hotel and original opaque IDs in separate
   assert.equal(requests.length, 1);
   const { variables, query } = requests[0].payload;
   assert.equal(variables.hotelID, '49205');
-  assert.equal(variables.offerId, 'original-opaque-id');
+  assert.equal(variables.originalStringOfferId, 'original-opaque-id');
   assert.equal(variables.roomsCount, 2);
   assert.equal(variables.adults, 3);
-  assert.deepEqual(variables.children, ['0', '7']);
+  assert.deepEqual(variables.children, ['1-0', '2-7']);
+  assert.equal(variables.adultsString, '3');
+  assert.deepEqual(variables.childrenAges, [{ age: '1-0' }, { age: '2-7' }]);
   assert.equal(variables.checkIn, '20260921');
   assert.equal(variables.checkOut, '20260924');
   assert.equal(variables.responseOptions, 'CUSTOM_DESC,RATE_SUMMARY,HOTEL_IMAGES');
-  assert.doesNotMatch(query.slice(query.indexOf('details: hotelDetails'), query.indexOf('original: hotelDetails')), /pclnID/);
-  assert.match(query.slice(query.indexOf('original: hotelDetails')), /pclnID: \$offerId/);
-  assert.doesNotMatch(query.slice(query.indexOf('original: hotelDetails')), /hotelID/);
-  assert.equal((query.match(/: hotelDetails\(/g) || []).length, 2);
-  assert.equal(variables.originalResponseOptions, 'RATE_SUMMARY,DETAILED_ROOM,RATE_CHARGES_DETAIL,RATE_IMPORTANT_INFO');
-  assert.equal(variables.rateDisplayOption, 'S');
-  assert.equal(variables.paymentRateMerge, false);
+  assert.doesNotMatch(query.slice(query.indexOf('details: hotelDetails'), query.indexOf('original: sopqHotelDetails')), /pclnId/i);
+  assert.match(query.slice(query.indexOf('original: sopqHotelDetails')), /pclnId: \$originalStringOfferId/);
+  assert.doesNotMatch(query.slice(query.indexOf('original: sopqHotelDetails')), /hotelID/);
+  assert.equal((query.match(/: hotelDetails\(/g) || []).length, 1);
+  assert.equal((query.match(/: sopqHotelDetails\(/g) || []).length, 1);
+  assert.match(query, /\$childrenAges: \[ChildInput\]/);
+  assert.match(query, /priceType: GRAND_TOTAL/);
+  assert.match(query, /priceType: EXCLUSIVE_PER_STAY/);
+  assert.equal(variables.originalResponseOptions, undefined);
+  assert.equal(variables.rateDisplayOption, undefined);
+  assert.equal(variables.paymentRateMerge, undefined);
   assert.doesNotMatch(requests[0].body, /guestReviews|bookings|authToken|cguid/i);
   assert.doesNotMatch(query, /REVIEWS|BOOKINGS/);
   assert.deepEqual(result, {
@@ -254,85 +260,88 @@ test('missing details are rejected while absent optional display fields remain u
   });
 });
 
-const preferredRate = () => ({ rateIdentifier: 'preferred-rate', price: 66, grandTotal: 439.02,
-  totalPriceExcludingTaxesAndFeePerStay: 198, programName: 'Express_Deal', savingPct: 61 });
-const originalDetails = () => ({ errorMessage: null, hotel: {
-  ratesSummary: { minCurrencyCode: 'USD', rateIdentifier: 'preferred-rate', status: 'AVAILABLE' },
-  transformedRooms: [
-    { roomRates: [{ ...preferredRate(), rateIdentifier: 'other-rate', price: 86, grandTotal: 509.31 }] },
-    { roomRates: [preferredRate()] },
+const modernRate = () => ({ rateIdentifier: 'matching-rate', nightly: { amount: '4.00' },
+  base: { amount: '24.00' }, total: { amount: '375.90' } });
+const originalDetails = () => ({
+  nightly: { amount: '4.00', currencyPrefix: '$', savingsPercentage: '80.0' },
+  total: { amount: '375.90', currencyPrefix: '$', description: 'Total: $375.90 includes taxes & fees', savingsPercentage: '42.0' },
+  rooms: [
+    { rates: [{ rateIdentifier: 'other-rate', nightly: { amount: '6.00' }, base: { amount: '36.00' }, total: { amount: '400.00' } }] },
+    { rates: [modernRate()] },
   ],
-} });
-const pricingContext = { ...context, rooms: 1, adults: 2, childrenAges: [] };
+});
+const pricingContext = { ...context, rooms: 2, adults: 4, childrenAges: [7] };
 const quoteRequest = adapter => adapter.hotelDetails({ context: pricingContext, hotelId: '49205', offerId: 'original-opaque-id' });
 
-test('selected-offer quote uses the matching preferred rate rather than the first room', async () => {
+test('modern family total selects the unique rate matching advertised nightly and total prices', async () => {
+  // Shape and amounts: modern-family-total.json, 2026-09-08T03:54:59Z,
+  // 2 rooms, 4 adults, child7, Sep21–24. Root savings fields are separate advertised values.
   const { adapter, requests } = setup(() => jsonResponse({ data: { details: { hotel: {} }, original: originalDetails() } }));
   const result = await quoteRequest(adapter);
-  assert.deepEqual(result.originalQuote, { nightlyCents: 6600, stayCents: 19800, totalCents: 43902,
-    currency: 'USD', taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 1,
-    nightlyBasis: 'per-room', stayBasis: 'all-rooms', advertisedDiscount: { percent: 61, source: 'Priceline' } });
+  assert.deepEqual(result.originalQuote, { nightlyCents: 400, stayCents: 2400, totalCents: 37590,
+    currency: 'USD', taxesFees: 'excluded', totalTaxesFees: 'included', roomCount: 2,
+    nightlyBasis: 'per-room', stayBasis: 'all-rooms', advertisedDiscount: { percent: 80, source: 'Priceline' } });
   assert.equal(result.originalQuote.propertyFeesCents, undefined);
-  assert.equal(requests.length, 1);
-});
-
-test('observed two-room preferred rate corroborates all-room base and retains the supplied total', async () => {
-  // From the 2026-09-08 family-original-total.json probe: 2 rooms, 4 adults,
-  // one child aged 7, Sep 21–24; 66 × 3 × 2 = 396 base, API total 873.06.
-  const original = originalDetails();
-  Object.assign(original.hotel.transformedRooms[1].roomRates[0], {
-    totalPriceExcludingTaxesAndFeePerStay: 396, grandTotal: 873.06,
-  });
-  const { adapter, requests } = setup(() => jsonResponse({ data: { details: { hotel: {} }, original } }));
-  const result = await adapter.hotelDetails({ context: { ...pricingContext, rooms: 2, adults: 4, childrenAges: [7] },
-    hotelId: '46745', offerId: 'original-family-offer' });
-  assert.equal(result.originalQuote.nightlyCents, 6600);
-  assert.equal(result.originalQuote.stayCents, 39600);
-  assert.equal(result.originalQuote.totalCents, 87306);
-  assert.equal(result.originalQuote.roomCount, 2);
-  assert.equal(result.originalQuote.stayBasis, 'all-rooms');
   assert.equal(requests.length, 1);
   assert.equal(requests[0].payload.variables.roomsCount, 2);
   assert.equal(requests[0].payload.variables.adults, 4);
-  assert.deepEqual(requests[0].payload.variables.children, ['7']);
+  assert.equal(requests[0].payload.variables.adultsString, '4');
+  assert.deepEqual(requests[0].payload.variables.children, ['1-7']);
+  assert.deepEqual(requests[0].payload.variables.childrenAges, [{ age: '1-7' }]);
 });
 
-test('multiroom original totals require an exact all-room base without guessing rounding tolerance', async () => {
-  for (const [base, total] of [[198, 439.02], [396.01, 873.06], [395.99, 873.06]]) {
+test('modern one-room quotes use current root prices and an empty child occupancy', async () => {
+  const original = originalDetails();
+  original.nightly = { amount: '66.00', currencyPrefix: '$', savingsPercentage: '61.0' };
+  original.total = { amount: '439.02', currencyPrefix: '$', description: 'Total: $439.02 includes taxes & fees' };
+  original.rooms = [{ rates: [{ rateIdentifier: 'single-room-rate', nightly: { amount: '66.00' },
+    base: { amount: '198.00' }, total: { amount: '439.02' } }] }];
+  const { adapter, requests } = setup(() => jsonResponse({ data: { details: { hotel: {} }, original } }));
+  const result = await adapter.hotelDetails({ context: { ...pricingContext, rooms: 1, adults: 2, childrenAges: [] },
+    hotelId: '49205', offerId: 'original-opaque-id' });
+  assert.equal(result.originalQuote.nightlyCents, 6600);
+  assert.equal(result.originalQuote.stayCents, 19800);
+  assert.equal(result.originalQuote.totalCents, 43902);
+  assert.deepEqual(requests[0].payload.variables.children, []);
+  assert.deepEqual(requests[0].payload.variables.childrenAges, []);
+});
+
+test('modern all-room base is corroborated exactly without multiplying totals or inventing rounding tolerance', async () => {
+  for (const base of ['12.00', '24.01', '23.99']) {
     const original = originalDetails();
-    Object.assign(original.hotel.transformedRooms[1].roomRates[0], {
-      totalPriceExcludingTaxesAndFeePerStay: base, grandTotal: total,
-    });
+    original.rooms[1].rates[0].base.amount = base;
     const { adapter } = setup(() => jsonResponse({ data: { original, details: { hotel: {
       ratesSummary: { minPrice: '128.90', minCurrencyCode: 'USD' },
     } } } }));
-    const result = await adapter.hotelDetails({ context: { ...pricingContext, rooms: 2, adults: 4, childrenAges: [7] },
-      hotelId: '46745', offerId: 'original-family-offer' });
+    const result = await quoteRequest(adapter);
     assert.equal(result.originalQuote, null);
     assert.equal(result.retailQuote.minPrice, '128.90');
   }
 });
 
-test('unsafe or unassociated original totals leave named details available without guessing', async () => {
-  const invalid = [null, { errorMessage: 'Unavailable' }, { hotel: {} }];
-  for (const changes of [
-    { rateIdentifier: 'missing-rate' }, { minCurrencyCode: 'EUR' }, { status: 'SOLD_OUT' },
+test('malformed, ambiguous, or unassociated modern totals leave named details available', async () => {
+  const invalid = [null, {}, { hotel: { ratesSummary: { minCurrencyCode: 'USD', rateIdentifier: 'legacy-rate' } } }];
+  for (const mutate of [
+    original => { original.nightly.currencyPrefix = '€'; },
+    original => { original.total.currencyPrefix = 'USD'; },
+    original => { original.total.description = 'Taxes and fees excluded'; },
+    original => { original.nightly.amount = '4.001'; },
+    original => { original.nightly.amount = 4; },
+    original => { original.nightly.amount = '0.00'; },
+    original => { original.total.amount = '9007199254740992'; },
+    original => { original.total.amount = 'NaN'; },
+    original => { original.total.amount = '376.00'; },
+    original => { original.rooms[1].rates[0].nightly.amount = '5.00'; },
+    original => { original.rooms[1].rates[0].total.amount = '374.00'; },
+    original => { original.rooms[1].rates[0].rateIdentifier = null; },
+    original => { original.rooms[1].rates[0].base.amount = null; },
+    original => { original.total.amount = '23.00'; original.rooms[1].rates[0].total.amount = '23.00'; },
+    original => { original.rooms.push({ rates: [modernRate()] }); },
   ]) {
     const original = originalDetails();
-    Object.assign(original.hotel.ratesSummary, changes);
+    mutate(original);
     invalid.push(original);
   }
-  for (const changes of [
-    { grandTotal: 197 }, { grandTotal: Number.MAX_SAFE_INTEGER }, { grandTotal: 'NaN' },
-    { price: null }, { totalPriceExcludingTaxesAndFeePerStay: null }, { programName: 'RETAIL' },
-  ]) {
-    const original = originalDetails();
-    Object.assign(original.hotel.transformedRooms[1].roomRates[0], changes);
-    invalid.push(original);
-  }
-  const duplicate = originalDetails();
-  duplicate.hotel.transformedRooms.push({ roomRates: [preferredRate()] });
-  invalid.push(duplicate);
   for (const original of invalid) {
     const { adapter } = setup(() => jsonResponse({ data: { original, details: { hotel: {
       ratesSummary: { minPrice: '128.90', minCurrencyCode: 'USD' },
@@ -342,6 +351,15 @@ test('unsafe or unassociated original totals leave named details available witho
     assert.equal(result.retailQuote.minPrice, '128.90');
     assert.equal(result.available, undefined);
   }
+});
+
+test('modern original discounts come only from the root nightly savings percentage', async () => {
+  const original = originalDetails();
+  delete original.nightly.savingsPercentage;
+  const { adapter } = setup(() => jsonResponse({ data: { original, details: { hotel: {} } } }));
+  const result = await quoteRequest(adapter);
+  assert.equal(result.originalQuote.totalCents, 37590);
+  assert.equal(result.originalQuote.advertisedDiscount, undefined);
 });
 
 test('a partial GraphQL failure in the optional original quote preserves named data', async () => {
@@ -362,7 +380,7 @@ test('a valid original quote remains usable when the independent named resolver 
   }));
   const result = await quoteRequest(adapter);
   assert.equal(result.available, false);
-  assert.equal(result.originalQuote.totalCents, 43902);
+  assert.equal(result.originalQuote.totalCents, 37590);
   assert.deepEqual(result.images, []);
 });
 
