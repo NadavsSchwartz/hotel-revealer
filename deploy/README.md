@@ -1,8 +1,9 @@
 # VPS deployment preparation
 
 This is a single Linux VPS deployment: Node serves the built React application
-and API; Caddy terminates HTTPS. The current application has no live provider
-adapter. `/health` checks process health and never contacts a hotel provider.
+and API; Caddy terminates HTTPS. Normal startup uses the public Priceline adapter.
+`/health` reports process and provider state without contacting the provider.
+See [live integration evidence and limits](../docs/LIVE_ACCESS.md).
 Hostinger managed Node hosting cannot run these Docker/VPS scripts; it requires
 its own platform setup. No host has been provisioned or released by this work.
 
@@ -54,8 +55,10 @@ ports, so keep the cloud firewall and loopback-only app port in place.
    DNS to this VPS. This file is parsed as data, not executed as shell.
 4. Create root-owned mode-600 `/etc/hotel-revealer/image-repository` containing
    exactly `ghcr.io/OWNER/REPOSITORY` in lowercase, without a tag or digest.
-5. Keep root-only `/etc/hotel-revealer/runtime.env` empty for the current disabled
-   provider. Any future approved credentials stay here, outside Git and CI.
+5. Review root-only `/etc/hotel-revealer/runtime.env`. The installer initializes
+   new files with `HOTEL_PROVIDER=priceline` and preserves existing files.
+   Set `HOTEL_PROVIDER=disabled` to explicitly disable live access; an absent
+   selection defaults to `priceline`. Any credentials stay here, outside Git and CI.
    Compose reads literal `KEY=value` lines; do not add shell quotes or commands.
 6. For a private GHCR package, configure a dedicated read-only package credential
    in root's Docker credential configuration on the host, without placing it in
@@ -81,7 +84,8 @@ application image in the local Docker cache. There is no automatic image prune.
 - Set the production environment's allowed branch to `main` and require operator
   review before a public release. Protect main and the workflow/deployment files.
 
-CI runs lint, domain/API tests, the build and Chromium/Firefox/WebKit journeys.
+CI sets `HOTEL_PROVIDER=disabled` for lint, domain/API tests, the build and
+Chromium/Firefox/WebKit journeys.
 It then builds the image and tests its UI, `/health`, nonroot process, read-only
 root and persistent state mount with external container networking disabled.
 Only a manual **Release VPS** workflow saves that tested image and passes it to a
@@ -103,7 +107,7 @@ sudo /usr/local/sbin/hotel-revealer-release ghcr.io/OWNER/REPOSITORY@sha256:DIGE
 ```
 
 The command above uses placeholders that validation rejects until replaced.
-After release, verify public HTTPS, static assets, the disabled-provider user
+After release, verify public HTTPS, static assets, the configured provider's user
 journey, a planned failed-image rollback, and reboot recovery. Measure memory,
 CPU and disk before claiming this host is sufficient. Docker/cloud/SSH/TLS/reboot
 execution remains unverified locally; shell/YAML parsing and fake-command release
@@ -132,6 +136,20 @@ verify reboots when updates require them. Logs are bounded (Docker local logs
 30 MiB per service, journald 100 MiB disk/50 MiB runtime). Watch disk use manually
 and remove only explicitly reviewed obsolete image digests after preserving
 current/rollback images and persistent volumes.
+
+Run `npm run measure:capacity` with the pinned Node/npm toolchain to measure the
+existing local capacity scenario. It uses a synthetic provider and makes no hotel
+provider requests; results are written under ignored `output/verification/`.
+`npm run measure:capacity -- --bursts-only` runs the smaller shared/cached burst
+scenario. Local measurements do not establish the VPS memory or CPU capacity.
+
+Dependabot checks the root npm workspace and GitHub Actions weekly for minor and
+patch version updates, with at most two open version-update PRs per ecosystem.
+Security updates retain GitHub's separate behavior and limits. Updates require
+review; there is no automerge. Coordinate Node/npm and image-pin changes manually
+across the runtime, workflows and deployment validation; they are not covered by
+these version-update checks. Keep documented dependency exceptions in place.
+See the [Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 
 Implementation references verified 2026-09-07:
 [Docker installation](https://docs.docker.com/engine/install/ubuntu/),

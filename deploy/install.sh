@@ -18,5 +18,6 @@ if [[ ! -e /etc/hotel-revealer/compose.env ]]; then
 fi
 if [[ ! -e /etc/hotel-revealer/runtime.env ]]; then
   install -o root -g root -m 600 /dev/null /etc/hotel-revealer/runtime.env
+  printf '%s\n' 'HOTEL_PROVIDER=priceline' > /etc/hotel-revealer/runtime.env
 fi
-printf '%s\n' 'Installed release scripts. Set root-only compose.env and image-repository before releasing. Provider access remains unconfigured.'
+printf '%s\n' 'Installed release scripts. Set root-only compose.env and image-repository, and review runtime.env before releasing. New runtime.env files select the live Priceline adapter; existing files are preserved.'
