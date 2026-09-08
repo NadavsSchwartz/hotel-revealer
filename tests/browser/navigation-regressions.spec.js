@@ -37,13 +37,13 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await expect(page).toHaveURL(/\/#how-it-works$/);
   await expect(page.locator('#method-title')).toBeFocused();
   await expect(page.locator('#how-it-works')).toBeInViewport();
-  await page.getByRole('link', { name: /See how it works/ }).click();
+  await page.getByRole('link', { name: 'Read the full terms', exact: true }).click();
   await expect(page).toHaveURL(/\/terms#how-it-works$/);
   await expect(page.getByRole('heading', { name: 'A comparison tool, not a booking service', exact: true })).toBeFocused();
   await page.goBack();
   await expect(page.locator('#method-title')).toBeFocused();
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
-  await page.getByRole('link', { name: /Start your search/ }).click();
+  await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
   await expect(page.locator('#search-title')).toBeFocused();
 });
 

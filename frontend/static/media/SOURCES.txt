@@ -20,3 +20,6 @@ and resize to 720px wide. Encoded with existing Sharp 0.35.4 tooling:
 AVIF quality 48/effort 6, WebP quality 76/effort 6. No runtime image dependency.
 Bodoni Moda italic: The Bodoni Moda Project Authors; SIL Open Font License,
 retained at ../fonts/bodoni-LICENSE.txt. Imagery is inspiration, not a real offer.
+
+room-stay.webp: the existing Christian Lambert pool photograph, resized from
+sketches/afterlight/assets/atlas-inspiration.webp to 900x1125, WebP quality 76.

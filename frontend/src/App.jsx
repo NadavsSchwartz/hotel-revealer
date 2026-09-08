@@ -141,9 +141,10 @@ function Credits() {
       <h2>Destinations</h2>
       <p>Destination names come from <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>, adapted under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
       <h2>Photography</h2>
-      <p>Homepage photography by <a href="https://unsplash.com/photos/vmIWr0NnpCQ" target="_blank" rel="noreferrer">Christian Lambert on Unsplash</a>, used under the <a href="https://unsplash.com/license" target="_blank" rel="noreferrer">Unsplash License</a>. This image is travel inspiration and does not represent a hotel match or available offer.</p>
+      <p>The homepage terrace is an original generated scene created for Hotel Revealer. The pool photograph is by <a href="https://unsplash.com/photos/vmIWr0NnpCQ" target="_blank" rel="noreferrer">Christian Lambert on Unsplash</a>, used under the <a href="https://unsplash.com/license" target="_blank" rel="noreferrer">Unsplash License</a>. Both images are travel inspiration and do not represent a hotel result or available offer. The homepage reveal example uses a fictional hotel and details.</p>
       <h2>Typography</h2>
       <p>Manrope by Mikhail Sharanda and Mirko Velimirovic is distributed under the <a href="/fonts/OFL.txt">SIL Open Font License</a>.</p>
+      <p>Bodoni Moda by The Bodoni Moda Project Authors is distributed under the <a href="/fonts/bodoni-LICENSE.txt">SIL Open Font License</a>.</p>
     </article>
   );
 }
@@ -232,7 +233,7 @@ export default function App() {
         <nav aria-label="Main navigation">
           {!isHome && <Link to="/">Hotels</Link>}
           <Link to="/#how-it-works">How it works</Link>
-          {isHome ? <Link to="/terms">Before you book</Link> : <span className="currency">USD</span>}
+          {isHome ? <Link to="/#questions">Before you book</Link> : <span className="currency">USD</span>}
         </nav>
       </header>
       <PageBehavior />
