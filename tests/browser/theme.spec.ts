@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
-import { mockOffers, openTripEditor, searchPath } from './fixtures.ts';
+import { mockOffers, openTripEditor, present, searchPath } from './fixtures.ts';
 
 async function expectReadable(page: Page, stage: string) {
   await page.evaluate(async () => {
@@ -13,6 +13,29 @@ async function expectReadable(page: Page, stage: string) {
     id, nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })),
   })), stage).toEqual([]);
 }
+
+test('the versioned favicon serves the displayed brand and survives navigation and reload', async ({ page }) => {
+  await page.goto('/');
+  const icon = page.locator('link[rel="icon"]');
+  await expect(icon).toHaveCount(1);
+  const href = present(await icon.getAttribute('href'));
+  expect(href).toMatch(/^\/assets\/favicon-[\w-]+\.svg$/);
+  const response = await page.request.get(href);
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('image/svg+xml');
+  const favicon = await page.evaluate(source => {
+    const svg = new DOMParser().parseFromString(source, 'image/svg+xml').documentElement;
+    return { viewBox: svg.getAttribute('viewBox'), paths: [...svg.querySelectorAll('path')].map(path => path.getAttribute('d')) };
+  }, await response.text());
+  const brand = page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).locator('svg');
+  await expect(brand.locator('path')).toHaveCount(2);
+  expect(favicon.viewBox).toBe(await brand.getAttribute('viewBox'));
+  expect(favicon.paths).toEqual(await brand.locator('path').evaluateAll(paths => paths.map(path => path.getAttribute('d'))));
+  await page.getByRole('link', { name: 'Privacy', exact: true }).click();
+  await expect(icon).toHaveAttribute('href', href);
+  await page.reload();
+  await expect(icon).toHaveAttribute('href', href);
+});
 
 test('theme follows the system until a keyboard choice and persists across navigation and reload', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
