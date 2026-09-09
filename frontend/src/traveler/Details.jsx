@@ -82,7 +82,6 @@ export default function Details() {
     valid &&
     (!request.key || request.key !== key || request.status === 'loading');
   const stale = useExpired(expiresAt);
-  const detailsStale = useExpired(data?.expiresAt);
   const priceStale = useExpired(offer?.quoteExpiresAt || expiresAt);
   const cooldownExpired = useExpired(cooldown);
   const coolingDown = Boolean(cooldown && !cooldownExpired);
@@ -117,9 +116,6 @@ export default function Details() {
   const thumbnail = safeHref(candidate?.thumbnailUrl);
   if (!images.length && thumbnail) images.push(thumbnail);
   const amenities = data?.details?.amenities || [];
-  const retailQuote = data?.details?.retailQuote;
-  const hasRetailPrice = [retailQuote?.nightlyCents, retailQuote?.stayCents, retailQuote?.totalCents]
-    .some(value => Number.isSafeInteger(value) && value >= 0);
   const address = typeof data?.details?.address === 'string'
     ? data.details.address.trim()
     : null;
@@ -267,28 +263,6 @@ export default function Details() {
                   <strong>Additional hotel details are unavailable</strong>
                   <p>The Express offer and available hotel clues are still shown.</p>
                 </div>
-              )}
-              {candidate && hasRetailPrice && (
-                <section className="detail-retail">
-                  <div className="detail-retail-heading">
-                    <span className="eyebrow">A separate option</span>
-                    <h2>Named hotel retail price</h2>
-                  </div>
-                  {detailsStale ? (
-                    <>
-                      <p role="status">The retail price is out of date.</p>
-                      <Button onClick={retry} disabled={loading || coolingDown}>Refresh retail price</Button>
-                    </>
-                  ) : (
-                    <>
-                      <Quote quote={retailQuote} title="Separate retail quote" />
-                      <p>
-                        A separately named listing. Its room, cancellation policy,
-                        and inclusions may differ from the Express offer.
-                      </p>
-                    </>
-                  )}
-                </section>
               )}
             </div>
           </div>}

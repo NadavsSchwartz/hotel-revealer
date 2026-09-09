@@ -97,6 +97,9 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   details,detailStatus:'available'|'unavailable'|'not_requested',
   quoteStatus:'available'|'unavailable'}`. Named details contain
   `{description,images:[],amenities:[],address,retailQuote:null|object}`.
+  Details displays only the original Express quote and its refresh action. The
+  separate named-hotel retail panel is retired; `retailQuote` remains in the wire
+  response for compatibility and is not used to price the Express offer.
   Offer-only responses have `candidate:null`, `details:null`, and
   `detailStatus:'not_requested'`, even if the revalidated offer is now matched.
   That view links explicitly to the hotel-detail view. A missing retail rate does

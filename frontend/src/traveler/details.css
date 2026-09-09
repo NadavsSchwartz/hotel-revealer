@@ -189,7 +189,7 @@
   border: 0;
 }
 
-.detail-page :is(.detail-quote-panel, .detail-retail) .quote > .eyebrow {
+.detail-page .detail-quote-panel .quote > .eyebrow {
   display: none;
 }
 
@@ -287,7 +287,7 @@
   border-top: 1px solid var(--line);
 }
 
-.detail-page :is(.detail-property-section, .detail-retail) h2 {
+.detail-page .detail-property-section h2 {
   margin: 0 0 18px;
   font-family: Manrope, sans-serif;
   font-size: 28px;
@@ -420,68 +420,6 @@
   gap: 24px;
 }
 
-.detail-page .detail-retail {
-  margin-top: 34px;
-  padding: 24px;
-  background: var(--surface-muted);
-  border-radius: var(--radius-card);
-}
-
-.detail-page .detail-retail-heading > .eyebrow {
-  margin-bottom: 9px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: 1px;
-}
-
-.detail-page .detail-retail h2 {
-  margin-bottom: 14px;
-  font-size: 28px;
-}
-
-.detail-page .detail-retail .quote {
-  padding: 0;
-  margin: 0 0 18px;
-  border: 0;
-}
-
-.detail-page .detail-retail .quote-price {
-  font-size: 30px;
-  font-weight: 650;
-  letter-spacing: -1px;
-}
-
-.detail-page .detail-retail .quote-price > span {
-  font-family: inherit;
-  font-size: 13px;
-  letter-spacing: 0;
-}
-
-.detail-page .detail-retail > p,
-.detail-page .detail-retail :is(.quote-stay, .quote-taxes) {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.75;
-}
-
-.detail-page .detail-retail > p:last-child {
-  margin: 0;
-}
-
-.detail-page .detail-retail .ant-btn {
-  min-height: 44px;
-  height: auto;
-  padding: 10px 16px;
-  border: 1px solid #a9b29b;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--blue);
-  white-space: normal;
-  font-size: 14px;
-  font-weight: 650;
-}
-
 .detail-page .detail-loading {
   display: flex;
   align-items: center;
@@ -610,10 +548,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .detail-page .detail-retail {
-    margin-top: 28px;
-    padding: 20px;
-  }
 }
 
 @media (max-width: 360px) {

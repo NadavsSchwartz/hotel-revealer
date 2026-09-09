@@ -318,8 +318,8 @@ test('expired candidate metadata preserves a fresh offer until the offer itself 
   const handoff = page.getByRole('link', { name: /Check (current )?price on Priceline/ });
   await expect(handoff).toBeVisible();
   await expect(handoff).toHaveAttribute('href', detail.offer.handoffUrl);
-  await expect(page.getByText('The retail price is out of date.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Refresh retail price', exact: true })).toBeEnabled();
+  await expect(page.locator('.detail-retail')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Refresh retail price', exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Separate retail quote', exact: true })).toHaveCount(0);
   await expect(page.getByText('$159', { exact: false })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Original Express quote', exact: true })).toContainText('$119');

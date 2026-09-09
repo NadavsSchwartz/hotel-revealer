@@ -118,9 +118,8 @@ test('retained detail data honors cooldown across every price refresh and return
   await page.clock.fastForward(301000);
   await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();
-  for (const name of ['Refresh total price', 'Refresh retail price']) {
-    await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
-  }
+  await expect(page.getByRole('button', { name: 'Refresh total price', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Refresh retail price', exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Back to results/ }).click();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();

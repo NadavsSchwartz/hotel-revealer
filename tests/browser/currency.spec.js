@@ -106,7 +106,8 @@ test('currency requests new prices, updates every quote and handoff, and follows
   await page.getByLabel('Sort by').selectOption('rating');
   await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
   await expect(page.locator('.detail-quote-panel .quote-price')).toContainText('€256');
-  await expect(page.locator('.detail-retail .quote-price')).toContainText('€356');
+  await expect(page.locator('.detail-retail')).toHaveCount(0);
+  await expect(page.locator('.quote-price')).toHaveCount(1);
   await page.locator('.detail-quote-panel').getByText('Price breakdown', { exact: true }).click();
   await expect(page.locator('.detail-quote-panel .quote-breakdown')).toContainText('€38');
   await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', /cur=EUR$/);
@@ -119,9 +120,11 @@ test('currency requests new prices, updates every quote and handoff, and follows
   expect(details).toHaveLength(1);
   await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
   await expect(page.locator('.detail-quote-panel .quote-price')).toContainText('£256');
-  await expect(page.locator('.detail-retail .quote-price')).toContainText('£356');
+  await expect(page.locator('.detail-retail')).toHaveCount(0);
+  await expect(page.locator('.quote-price')).toHaveCount(1);
   await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', /cur=GBP$/);
   expect(details.at(-1)).toEqual({ ...context, currency: 'GBP', offerId: 'offer-GBP', hotelId: 'hotel-one' });
+  await page.screenshot({ path: testInfo.outputPath('original-offer-only-gbp.png'), fullPage: true });
   await page.goBack();
   await expect(page.getByLabel('Sort by')).toHaveValue('rating');
   await page.goBack();
