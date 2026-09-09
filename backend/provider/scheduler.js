@@ -20,12 +20,14 @@ export class ProviderScheduler {
     this.closed = false;
   }
 
-  run(task, { deadline }) {
+  run(task, { deadline, holdWork }) {
     if (this.closed) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
     if (deadline <= this.clock.now()) return Promise.reject(new ServiceError('DEADLINE_EXCEEDED'));
     if (this.queue.length >= this.maxWaiting) return Promise.reject(new ServiceError('PROVIDER_BUSY'));
     return new Promise((resolve, reject) => {
-      const entry = { task, deadline, resolve, reject, settled: false, controller: new AbortController() };
+      let finish = () => {};
+      if (holdWork) holdWork(new Promise(done => { finish = done; }));
+      const entry = { task, deadline, resolve, reject, finish, settled: false, controller: new AbortController() };
       entry.timer = this.clock.setTimeout(() => {
         entry.controller.abort();
         this.settle(entry, new ServiceError('DEADLINE_EXCEEDED'));
@@ -43,6 +45,7 @@ export class ProviderScheduler {
     this.clock.clearTimeout(entry.timer);
     if (error) entry.reject(error);
     else entry.resolve(value);
+    if (this.active !== entry) entry.finish();
   }
 
   pump() {
@@ -89,6 +92,7 @@ export class ProviderScheduler {
       // Keep the active slot until the adapter and control-state work settle.
       // An adapter that ignores AbortSignal must never create overlapping calls.
       this.active = null;
+      entry.finish();
       this.pump();
     }
   }

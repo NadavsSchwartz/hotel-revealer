@@ -10,6 +10,7 @@ const errors = {
   PROVIDER_RESPONSE_INVALID: [502, 'The hotel provider returned an unsupported response.'],
   PROVIDER_DESTINATION_UNSUPPORTED: [422, 'The hotel provider could not locate this destination. Try a nearby city.'],
   INVALID_SELECTION: [404, 'This candidate is no longer available for this offer and stay.'],
+  SELECTION_UNAVAILABLE: [404, 'This original offer could not be recovered. Return to results to choose an offer.'],
   SERVICE_DRAINING: [503, 'The service is restarting. Please try again shortly.'],
   INVALID_REQUEST: [400, 'Check the city, dates, and selection and try again.'],
   REQUEST_TOO_LARGE: [413, 'The request is too large.'],

@@ -200,8 +200,6 @@ test('details require the current context relationship and missing retail stays 
     return { description: 'Hotel information', retailQuote: null, originalQuote: originalQuote() };
   } } });
   await service.search(futureContext);
-  await assert.rejects(service.detail({ ...selection, hotelId: 'wrong-hotel' }), { code: 'INVALID_SELECTION' });
-  assert.equal(calls.length, 1);
   const request = service.detail(selection);
   await clock.advance(1_000);
   const result = await request;
@@ -429,6 +427,117 @@ test('a newer search with rotated opaque IDs does not revoke an earlier issued o
   assert.equal(calls.find(([type]) => type === 'detail')[1].offerId, selection.offerId);
 });
 
+test('an incomplete same-offer search preserves issued inference and independently refreshes its quote', async () => {
+  let partial = false;
+  const { service, clock } = setup({ adapter: {
+    async listingsPage({ cursor }) {
+      if (cursor) throw new ProviderFailure('unavailable');
+      return { listings: partial ? [listingRows()[0]] : listingRows(), nextCursor: partial ? 'later' : null };
+    },
+    async hotelDetails() { return { originalQuote: originalQuote() }; },
+  } });
+  const initial = await service.search(futureContext);
+  await clock.advance(301_000);
+  partial = true;
+  const search = service.search(futureContext);
+  await clock.advance(1000);
+  const incomplete = await search;
+  assert.equal(incomplete.coverage.status, 'partial');
+  assert.equal(incomplete.offers[0].resolution.reason, 'incomplete_search');
+  const request = service.detail(selection);
+  await clock.advance(1000);
+  const result = await request;
+  assert.equal(result.candidate.hotelId, selection.hotelId);
+  assert.equal(result.quoteStatus, 'available');
+  assert.equal(result.offerExpiresAt, initial.expiresAt);
+});
+
+test('missing facts in an otherwise complete search do not contradict a previously issued hotel', async () => {
+  let searches = 0;
+  const { service, clock } = setup({ adapter: {
+    async listingsPage() {
+      const rows = listingRows();
+      if (++searches > 1) rows[1].name = null;
+      return { listings: rows, nextCursor: null };
+    },
+    async hotelDetails() { return { originalQuote: originalQuote() }; },
+  } });
+  await service.search(futureContext);
+  await clock.advance(301000);
+  const incomplete = await service.search(futureContext);
+  assert.equal(incomplete.coverage.status, 'complete');
+  assert.equal(incomplete.offers[0].resolution.reason, 'missing_facts');
+  const request = service.detail(selection);
+  await clock.advance(1000);
+  const result = await request;
+  assert.equal(result.candidate.hotelId, selection.hotelId);
+  assert.equal(result.quoteStatus, 'available');
+});
+
+test('cold detail timeout leaves shared discovery and its owned admission work alive for a search subscriber', async () => {
+  let resolvePage;
+  const held = new Set();
+  const holdWork = operation => {
+    held.add(operation);
+    operation.finally(() => held.delete(operation)).catch(() => {});
+  };
+  const { service, clock } = setup({ adapter: {
+    listingsPage() { return new Promise(resolve => { resolvePage = resolve; }); },
+  } });
+  const detail = assert.rejects(service.detail(selection, { holdWork }), { code: 'DEADLINE_EXCEEDED' });
+  await clock.advance(1000);
+  const search = service.search(futureContext);
+  await clock.advance(9000);
+  await detail;
+  assert.ok(held.size > 0, 'shared discovery remains owned after the detail caller stops waiting');
+  await clock.advance(2000);
+  resolvePage({ listings: listingRows(), nextCursor: null });
+  assert.equal((await search).coverage.status, 'complete');
+  await flush();
+  assert.equal(held.size, 0);
+});
+
+test('an adapter ignoring cancellation retains admission ownership through its eventual settlement', async () => {
+  let resolvePage;
+  const held = new Set();
+  const holdWork = operation => {
+    held.add(operation);
+    operation.finally(() => held.delete(operation)).catch(() => {});
+  };
+  const { service, clock } = setup({ adapter: {
+    listingsPage() { return new Promise(resolve => { resolvePage = resolve; }); },
+  } });
+  const request = assert.rejects(service.search(futureContext, { holdWork }), { code: 'DEADLINE_EXCEEDED' });
+  await clock.advance(20000);
+  await request;
+  assert.equal(held.size, 1, 'only the still-running adapter and outcome persistence remain held');
+  resolvePage({ listings: listingRows(), nextCursor: null });
+  await flush();
+  assert.equal(held.size, 0);
+});
+
+test('shared discovery started by details preserves partial coverage at its own twenty-second deadline', async () => {
+  let calls = 0;
+  const { service, clock } = setup({ adapter: {
+    async listingsPage({ signal }) {
+      if (++calls === 1) return { listings: listingRows(), nextCursor: 'later' };
+      return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+    },
+  } });
+  const startedAt = clock.now();
+  const detail = assert.rejects(service.detail(selection), { code: 'DEADLINE_EXCEEDED' });
+  await clock.advance(1000);
+  const search = service.search(futureContext);
+  await clock.advance(9000);
+  await detail;
+  await clock.advance(10000);
+  const result = await search;
+  assert.equal(clock.now() - startedAt, 20000);
+  assert.equal(result.coverage.status, 'partial');
+  assert.equal(result.coverage.pagesFetched, 1);
+  assert.equal(result.offers.length, 1);
+});
+
 test('issued-offer retention expires thirty minutes after retrieval despite cached searches and quote refreshes', async () => {
   let searches = 0;
   const { service, clock, calls } = setup({ adapter: {
@@ -450,12 +559,12 @@ test('issued-offer retention expires thirty minutes after retrieval despite cach
   assert.equal((await service.detail(selection)).offer.quoteExpiresAt, refreshed.offer.quoteExpiresAt);
   assert.equal(searches, 1);
   await clock.advance(1001);
-  await assert.rejects(service.detail(selection), { code: 'INVALID_SELECTION' });
+  await assert.rejects(service.detail(selection), { code: 'SELECTION_UNAVAILABLE' });
   assert.equal(searches, 2);
   assert.equal(calls.filter(([type]) => type === 'detail').length, 2);
 });
 
-test('an issued binding cannot authorize another candidate, currency, or itinerary', async () => {
+test('an issued offer cannot authorize another currency or itinerary', async () => {
   let searches = 0;
   let details = 0;
   const { service, clock } = setup({ adapter: {
@@ -463,11 +572,10 @@ test('an issued binding cannot authorize another candidate, currency, or itinera
     async hotelDetails() { details += 1; return { originalQuote: originalQuote() }; },
   } });
   await service.search(futureContext);
-  await assert.rejects(service.detail({ ...selection, hotelId: 'wrong-hotel' }), { code: 'INVALID_SELECTION' });
   assert.equal(searches, 1);
   for (const change of [{ currency: 'EUR' }, { adults: 3 }, { rooms: 2 }, { childrenAges: [0] },
     { destinationId: 'geonames:293397' }, { checkOut: addCalendarDays(futureContext.checkOut, 1) }]) {
-    const rejected = assert.rejects(service.detail({ ...selection, ...change }), { code: 'INVALID_SELECTION' });
+    const rejected = assert.rejects(service.detail({ ...selection, ...change }), { code: 'SELECTION_UNAVAILABLE' });
     await clock.advance(1000);
     await rejected;
   }
@@ -475,7 +583,7 @@ test('an issued binding cannot authorize another candidate, currency, or itinera
   assert.equal(searches, 7);
 });
 
-test('a newer same-offer candidate contradiction rejects even a still-fresh cached original total', async () => {
+test('a newer same-offer contradiction withdraws the hotel while preserving a fresh original total', async () => {
   for (const replaceCandidate of [false, true]) {
     let searches = 0;
     let details = 0;
@@ -496,7 +604,12 @@ test('a newer same-offer candidate contradiction rejects even a still-fresh cach
     await clock.advance(1001);
     await service.search(futureContext);
     assert.ok(Date.parse(detail.offer.quoteExpiresAt) > clock.now());
-    await assert.rejects(service.detail(selection), { code: 'INVALID_SELECTION' });
+    const updated = await service.detail(selection);
+    assert.equal(updated.candidate, null);
+    assert.equal(updated.details, null);
+    assert.equal(updated.detailStatus, 'unavailable');
+    assert.equal(updated.quoteStatus, 'available');
+    assert.deepEqual(updated.offer.quote, detail.offer.quote);
     assert.equal(details, 1);
   }
 });
@@ -517,19 +630,18 @@ test('in-flight named and quote-only details honor newer same-offer matching evi
     const search = service.search(futureContext);
     await flush();
     const pending = service.detail(request);
-    const result = request.hotelId ? assert.rejects(pending, { code: 'INVALID_SELECTION' }) : pending;
     await flush();
     const rows = listingRows();
     rows[1].hotelId = 'hotel-2';
     resolveSearch({ listings: rows, nextCursor: null });
     await search;
     await clock.advance(1000);
-    const detail = await result;
-    if (!request.hotelId) {
-      assert.equal(detail.candidate, null);
-      assert.equal(detail.offer.candidates[0].hotelId, 'hotel-2');
-      assert.deepEqual(detail.offer.quote, originalQuote());
-    }
+    const detail = await pending;
+    assert.equal(detail.candidate, null);
+    assert.equal(detail.details, null);
+    assert.equal(detail.detailStatus, request.hotelId ? 'unavailable' : 'not_requested');
+    assert.equal(detail.offer.candidates[0].hotelId, 'hotel-2');
+    assert.deepEqual(detail.offer.quote, originalQuote());
   }
 });
 
@@ -860,9 +972,11 @@ test('optional detail failures preserve the usable offer, do not cache errors, a
   await clock.advance(1_000);
   const [a, b] = await Promise.all([first, second]);
   assert.equal(a.detailStatus, 'unavailable');
+  assert.deepEqual(a.refreshError, { code: 'PROVIDER_UNAVAILABLE' });
   assert.equal(a.offer.handoffUrl, 'https://www.priceline.com/original-offer');
   assert.deepEqual(a, b);
   assert.deepEqual(a.details, { description: null, images: [], amenities: [], address: null, retailQuote: null });
+  assert.equal(JSON.stringify(a).includes('private details failure'), false);
   assert.equal(count, 1);
   const again = service.detail(selection);
   await clock.advance(1_000);
@@ -1084,9 +1198,16 @@ test('offer-only pricing validates offer membership and coalesces separately fro
   const named = service.detail({ ...offerOnly, hotelId });
   await clock.advance(1_000);
   assert.equal((await named).candidate.hotelId, hotelId);
-  await assert.rejects(service.detail({ ...offerOnly, offerId: 'other-offer' }), { code: 'INVALID_SELECTION' });
-  await assert.rejects(service.detail({ ...offerOnly, hotelId: 'other-hotel' }), { code: 'INVALID_SELECTION' });
-  assert.equal(calls.filter(([kind]) => kind === 'detail').length, 2);
+  await assert.rejects(service.detail({ ...offerOnly, offerId: 'other-offer' }), { code: 'SELECTION_UNAVAILABLE' });
+  const unsupported = service.detail({ ...offerOnly, hotelId: 'other-hotel' });
+  await clock.advance(1000);
+  const original = await unsupported;
+  assert.equal(original.candidate, null);
+  assert.equal(original.details, null);
+  assert.equal(original.detailStatus, 'unavailable');
+  assert.equal(original.quoteStatus, 'available');
+  assert.equal(calls.at(-1)[1].hotelId, undefined, 'an arbitrary hotel ID cannot authorize a named lookup');
+  assert.equal(calls.filter(([kind]) => kind === 'detail').length, 3);
 });
 
 test('unresolved offers keep quote-only fallback and original handoff on expected pricing failure', async () => {
@@ -1166,7 +1287,7 @@ test('offer-only revalidation rejects an opaque offer from a different itinerary
     async hotelDetails() { details += 1; return {}; },
   } });
   await service.search(futureContext);
-  const rejected = assert.rejects(service.detail({ ...futureContext, rooms: 2, offerId: 'offer-1' }), { code: 'INVALID_SELECTION' });
+  const rejected = assert.rejects(service.detail({ ...futureContext, rooms: 2, offerId: 'offer-1' }), { code: 'SELECTION_UNAVAILABLE' });
   await clock.advance(1000);
   await rejected;
   assert.equal(details, 0);

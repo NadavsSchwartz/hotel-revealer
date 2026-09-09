@@ -98,7 +98,7 @@ test('a partial search without a hotel match has a useful empty state and no off
   await expect(page.getByRole('link', { name: /Check.*Priceline|View likely hotel:/ })).toHaveCount(0);
 });
 
-test('a rejected relationship invalidates cached matches and returns to a fresh search', async ({ page }) => {
+test('an unrecoverable selection preserves results and offers an explicit fresh search', async ({ page }) => {
   const refreshed = searchResponse();
   refreshed.offers[0].offerId = 'refreshed-offer';
   refreshed.offers[0].handoffUrl = refreshed.offers[0].handoffUrl.replace('/offer-one/', '/refreshed-offer/');
@@ -108,27 +108,71 @@ test('a rejected relationship invalidates cached matches and returns to a fresh 
   const pending = new Promise(resolve => { release = resolve; });
   await page.route('**/api/v1/hotelDeals', async route => {
     searches++;
-    if (searches > 1) await pending;
+    if (searches === 2) {
+      await pending;
+      return route.fulfill({ status: 502, json: { error: { code: 'PROVIDER_UNAVAILABLE' } } });
+    }
     await route.fulfill({ json: searches === 1 ? searchResponse() : refreshed });
   });
-  await page.route('**/api/v1/deal', route => route.fulfill({ status: 409, json: { error: { code: 'INVALID_SELECTION' } } }));
+  await page.route('**/api/v1/deal', route => route.fulfill({ status: 404, json: { error: { code: 'SELECTION_UNAVAILABLE' } } }));
   await page.goto(searchPath);
   await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'This offer could not be recovered', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
   await expect(page.getByRole('link', { name: /Back to results/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Return to results', exact: true }).click();
+  await page.getByRole('link', { name: /Back to results/ }).click();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
+  expect(searches).toBe(1);
+  await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'This offer could not be recovered', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Find current deals', exact: true }).click();
   try {
     await expect.poll(() => searches).toBe(2);
-    await expect(page.getByRole('region', { name: 'Hotel search progress', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Updating…', exact: true })).toBeDisabled();
+    await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   } finally {
     release();
   }
+  await expect(page.getByRole('heading', { name: 'The hotel provider is unavailable', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View likely hotel: Cedar House', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
-  expect(searches).toBe(2);
+  expect(searches).toBe(3);
+});
+
+test('a withdrawn hotel inference keeps independently available original pricing and handoff', async ({ page }) => {
+  const detail = detailResponse();
+  detail.offer.resolution = { status: 'unresolved', reason: 'no_match' };
+  detail.offer.candidates = [];
+  detail.offer.quote = { ...detail.offer.quote, totalCents: 28000, totalTaxesFees: 'included', taxesFees: 'excluded' };
+  detail.candidate = null;
+  detail.details = null;
+  detail.quoteStatus = 'available';
+  await page.route('**/api/v1/deal', route => route.fulfill({ json: detail }));
+  await page.goto(`/deal?${new URLSearchParams({ ...context, offerId: 'offer-one', hotelId: 'hotel-one' })}`);
+  await expect(page.getByRole('heading', { name: 'Your Express offer', exact: true })).toBeVisible();
+  await expect(page.getByText('We couldn’t verify the selected hotel.', { exact: false })).toBeVisible();
+  await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$280 total');
+  await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', detail.offer.handoffUrl);
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
+});
+
+test('a malformed detail retry preserves the last valid hotel and original offer', async ({ page }) => {
+  let calls = 0;
+  await mockOffers(page);
+  await page.route('**/api/v1/deal', route => route.fulfill({ json: ++calls === 1 ? detailResponse() : { malformed: true } }));
+  await page.goto(searchPath);
+  await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Retry total price', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'We could not verify this response', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
+  await page.getByRole('link', { name: /Back to results/ }).click();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
 });
 
 test('cooldown disables retry until its time and then recovers', async ({ page }) => {
@@ -209,7 +253,7 @@ test('upstream labels are plain text and offsite handoff URLs are rejected', asy
   await expect(page.getByRole('link', { name: `View likely hotel: ${hostileName}`, exact: true })).toBeVisible();
   await expect(page.locator('img[src="x"]')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Original offer unavailable' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Original offer link unavailable' })).toBeDisabled();
 });
 
 test('unsupported occupancy URLs cannot silently become a different trip', async ({ page }) => {

@@ -68,7 +68,8 @@ test('direct-link same-selection refresh retains known property data and origina
   assert.equal(state.detail.data, data);
   assert.equal(view(state).candidate.name, 'Known hotel');
   assert.equal(view(state).expiresAt, data.offerExpiresAt);
-  for (const code of ['PROVIDER_UNAVAILABLE', 'NETWORK_ERROR', 'DEADLINE_EXCEEDED', 'PROVIDER_COOLDOWN']) {
+  for (const code of ['PROVIDER_UNAVAILABLE', 'NETWORK_ERROR', 'DEADLINE_EXCEEDED', 'PROVIDER_COOLDOWN',
+    'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DISABLED', 'PROVIDER_NOT_CONFIGURED']) {
     const failed = rejectSelection(state, 2, code);
     assert.equal(failed.detail.status, 'error');
     assert.equal(view(failed).data, data);
@@ -83,7 +84,7 @@ test('changing selection or receiving a binding rejection clears retained detail
   const changed = travelerReducer(ready, { type: 'detail/start', key: detailKey(trip, offerId, 'hotel-2'),
     tripKey, offerId, hotelId: 'hotel-2', requestId: 3 });
   assert.equal(changed.detail.data, null);
-  for (const code of ['INVALID_SELECTION', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DISABLED', 'PROVIDER_NOT_CONFIGURED']) {
+  for (const code of ['INVALID_SELECTION', 'SELECTION_UNAVAILABLE']) {
     const failed = rejectSelection(startDetail(ready, 3), 3, code);
     assert.equal(failed.detail.data, null);
     assert.equal(view(failed).candidate, null);
@@ -94,14 +95,15 @@ test('changing selection or receiving a binding rejection clears retained detail
   }
 });
 
-test('newer search membership withholds old details immediately and a later exact revalidation can restore them', () => {
+test('newer same-offer evidence withdraws an unsupported hotel without rejecting its original quote', () => {
   let state = succeedDetail(startDetail(cacheSearch(undefined, trip, 1), 2), 2);
   const removed = shortlist();
   removed.offers[0].candidates = [{ hotelId: 'hotel-2', name: 'Different hotel' }];
   state = cacheSearch(state, trip, 3, removed);
-  assert.equal(state.detail.data, null);
+  assert.equal(state.detail.data.details, null);
   assert.equal(view(state).candidate, null);
-  assert.equal(view(state).bindingRejected, true);
+  assert.equal(view(state).bindingRejected, false);
+  assert.equal(view(state).offer.offerId, offerId);
   state = startDetail(state, 4);
   assert.equal(view(state).candidate, null);
   const fresh = { ...loadedDetail(), offerExpiresAt: '2027-01-01T00:06:00.000Z' };
@@ -113,18 +115,35 @@ test('newer search membership withholds old details immediately and a later exac
   assert.equal(view(state).data, fresh, 'refresh does not erase the successful newer detail binding');
 });
 
-test('detail completion begun before a newer excluding search settles loading without resurrecting the candidate', () => {
-  let state = startDetail(cacheSearch(undefined, trip, 1), 2);
-  const removed = shortlist();
-  removed.offers = [];
-  state = cacheSearch(state, trip, 3, removed);
-  state = succeedDetail(state, 2);
-  assert.equal(state.detail.status, 'error');
-  assert.equal(state.detail.error.code, 'INVALID_SELECTION');
-  assert.equal(state.searches[tripKey], removed);
-  assert.equal(view(state).data, null);
-  assert.equal(view(state).candidate, null);
-  assert.equal(view(state).offer, null);
+test('newer search omissions and partial inference do not reject successful original-offer details', () => {
+  for (const status of ['complete', 'partial']) {
+    for (const omit of [true, false]) {
+      if (!omit && status === 'complete') continue;
+      let state = startDetail(cacheSearch(undefined, trip, 1), 2);
+      const newer = { ...shortlist(), coverage: { status }, offers: omit ? [] : [
+        { offerId, resolution: { status: 'unresolved', reason: 'incomplete_search' }, candidates: [] },
+      ] };
+      state = cacheSearch(state, trip, 3, newer);
+      state = succeedDetail(state, 2);
+      assert.equal(state.detail.status, 'success');
+      assert.equal(state.searches[tripKey], newer);
+      assert.equal(view(state).candidate.hotelId, hotelId);
+      assert.equal(view(state).offer.offerId, offerId);
+    }
+  }
+});
+
+test('missing facts from a complete search preserve completed and in-flight hotel evidence', () => {
+  const missing = { ...shortlist(), offers: [{ offerId,
+    resolution: { status: 'unresolved', reason: 'missing_facts' }, candidates: [] }] };
+  for (const completed of [false, true]) {
+    let state = startDetail(cacheSearch(undefined, trip, 1), 2);
+    if (completed) state = succeedDetail(state, 2);
+    state = cacheSearch(state, trip, 3, missing);
+    if (!completed) state = succeedDetail(state, 2);
+    assert.equal(view(state).candidate.hotelId, hotelId);
+    assert.equal(view(state).bindingRejected, false);
+  }
 });
 
 test('retained details never inherit a newer search expiry, and absent Redux data waits for revalidation', () => {
@@ -137,12 +156,12 @@ test('retained details never inherit a newer search expiry, and absent Redux dat
   assert.deepEqual(view(empty), { data: null, offer: null, candidate: null, expiresAt: undefined, bindingRejected: false });
 });
 
-test('invalid selection removes only its original trip shortlist without mutating prior state', () => {
+test('unrecoverable selection preserves its original trip shortlist and unrelated results', () => {
   let state = cacheSearch(undefined, trip, 1);
   state = cacheSearch(state, otherTrip, 2);
   state = startDetail(state, 3);
   const rejected = rejectSelection(state, 3);
-  assert.equal(rejected.searches[tripKey], undefined);
+  assert.equal(rejected.searches, state.searches);
   assert.equal(rejected.searches[contextKey(otherTrip)], state.searches[contextKey(otherTrip)]);
   assert.ok(state.searches[tripKey]);
   assert.equal(rejected.detail.error.code, 'INVALID_SELECTION');
@@ -189,7 +208,7 @@ test('a legitimate search and detail retry restore data after a rejected selecti
   assert.equal(rejectSelection(state, 2), state);
 });
 
-test('server rejection carries trip identity and invalidates its cached shortlist', async (t) => {
+test('server rejection carries trip identity and preserves its cached shortlist', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: false, json: async () => ({ error: { code: 'INVALID_SELECTION' } }),
   }));
@@ -198,7 +217,7 @@ test('server rejection carries trip identity and invalidates its cached shortlis
   assert.equal(state.detail.tripKey, tripKey);
   assert.equal(state.detail.key, key);
   assert.equal(state.detail.error.code, 'INVALID_SELECTION');
-  assert.equal(state.searches[tripKey], undefined);
+  assert.ok(state.searches[tripKey]);
 });
 
 test('detail response still requires exact offer and candidate identities', async (t) => {
@@ -221,10 +240,61 @@ test('detail response still requires exact offer and candidate identities', asyn
       assert.equal(state.detail.data, reply);
       assert.ok(state.searches[tripKey]);
     } else {
-      assert.equal(state.detail.error.code, 'INVALID_SELECTION');
-      assert.equal(state.searches[tripKey], undefined);
+      assert.equal(state.detail.error.code, 'PROVIDER_RESPONSE_INVALID');
+      assert.ok(state.searches[tripKey]);
     }
   }
+});
+
+test('malformed or mismatched retries preserve the last valid same-selection details and shortlist', async t => {
+  let reply;
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => reply }));
+  const data = loadedDetail();
+  for (const invalid of [null, { ...data, offer: { ...data.offer, offerId: 'other-offer' } },
+    { ...data, candidate: { hotelId: 'other-hotel' } },
+    { ...data, candidate: null, details: null, detailStatus: 'unavailable' }]) {
+    reply = invalid;
+    let state = succeedDetail(startDetail(cacheSearch(undefined, trip, 1), 2), 2, data);
+    const searches = state.searches;
+    await loadDetail(trip, offerId, hotelId)(action => { state = travelerReducer(state, action); });
+    assert.equal(state.detail.error.code, 'PROVIDER_RESPONSE_INVALID');
+    assert.equal(state.detail.data, data);
+    assert.equal(state.searches, searches);
+    assert.equal(view(state).bindingRejected, false);
+  }
+});
+
+test('a named request accepts original pricing after its hotel inference is withdrawn', async t => {
+  const original = { ...loadedDetail(), candidate: null, details: null, detailStatus: 'unavailable',
+    quoteStatus: 'available', offer: { ...shortlist().offers[0],
+      resolution: { status: 'unresolved', reason: 'no_match' }, candidates: [] } };
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => original }));
+  let state = cacheSearch(undefined, trip, 1);
+  await loadDetail(trip, offerId, hotelId)(action => { state = travelerReducer(state, action); });
+  assert.equal(state.detail.status, 'success');
+  assert.equal(view(state).offer.offerId, offerId);
+  assert.equal(view(state).candidate, null);
+  assert.equal(state.detail.data.quoteStatus, 'available');
+});
+
+test('a classified successful fallback preserves same-hotel metadata and the original quote expiry only', async t => {
+  const previous = loadedDetail();
+  previous.offer = { ...previous.offer, quote: { totalCents: 27000, currency: 'USD' }, quoteExpiresAt: '2027-01-01T00:01:00.000Z' };
+  let reply = { ...loadedDetail(), details: { description: null, images: [], amenities: [], address: null, retailQuote: null },
+    expiresAt: '2027-01-01T00:02:00.000Z', detailStatus: 'unavailable', refreshError: { code: 'PROVIDER_UNAVAILABLE' } };
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => reply }));
+  let state = succeedDetail(startDetail(cacheSearch(undefined, trip, 1), 2), 2, previous);
+  await loadDetail(trip, offerId, hotelId)(action => { state = travelerReducer(state, action); });
+  assert.equal(state.detail.status, 'success');
+  assert.equal(state.detail.data.details, previous.details);
+  assert.equal(state.detail.data.offer.quote, previous.offer.quote);
+  assert.equal(state.detail.data.offer.quoteExpiresAt, previous.offer.quoteExpiresAt);
+  const withdrawn = { ...reply.offer, resolution: { status: 'unresolved', reason: 'no_match' }, candidates: [] };
+  reply = { ...reply, offer: withdrawn, candidate: null, details: null };
+  await loadDetail(trip, offerId, hotelId)(action => { state = travelerReducer(state, action); });
+  assert.equal(state.detail.data.candidate, null);
+  assert.equal(state.detail.data.details, null, 'failed refresh cannot revive a withdrawn hotel');
+  assert.equal(state.detail.data.offer.quoteExpiresAt, previous.offer.quoteExpiresAt);
 });
 
 for (const code of ['PROVIDER_COOLDOWN', 'PROVIDER_UNAVAILABLE', 'PROVIDER_BUSY']) test(`${code} cooldown survives other-trip success and suppresses retries before abort/start or fetch`, async t => {
@@ -410,14 +480,14 @@ test('named rejection hides the identity but preserves a separately validated op
   original.offers[0].providerUrl = 'https://www.priceline.com/express/offer';
   let state = startDetail(cacheSearch(undefined, trip, 1, original), 2);
   state = rejectSelection(state, 2);
-  assert.equal(state.searches[tripKey], undefined);
+  assert.equal(state.searches[tripKey], original);
   assert.equal(view(state).candidate, null);
   assert.equal(view(state).offer, original.offers[0]);
   assert.equal(view(state).expiresAt, original.expiresAt);
   assert.equal(view(state).bindingRejected, true);
 });
 
-test('offer-only membership survives hotel changes but a newer removed offer rejects an old response', () => {
+test('offer-only details survive hotel changes and newer discovery omissions', () => {
   const offerOnlyKey = detailKey(trip, offerId, null);
   const start = (state, requestId) => travelerReducer(state, {
     type: 'detail/start', key: offerOnlyKey, tripKey, offerId, hotelId: null, requestId,
@@ -435,9 +505,9 @@ test('offer-only membership survives hotel changes but a newer removed offer rej
   state = start(state, 4);
   state = cacheSearch(state, trip, 5, { ...shortlist(), offers: [] });
   state = succeedDetail(state, 4, data);
-  assert.equal(state.detail.status, 'error');
-  assert.equal(selected(state).offer, null);
-  assert.equal(selected(state).data, null);
+  assert.equal(state.detail.status, 'success');
+  assert.equal(selected(state).offer.offerId, offerId);
+  assert.equal(selected(state).data, data);
 });
 
 test('a newer unresolved search withdraws offer-only hotel hints while preserving completed or in-flight quotes', () => {

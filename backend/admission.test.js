@@ -10,6 +10,7 @@ import { futureContext, listingRows } from './provider/test-helpers.js';
 import { createClientLimiter } from './admission.js';
 import { createProviderService } from './provider/service.js';
 import { createMemoryStateStore } from './provider/state.js';
+import { ServiceError } from './provider/errors.js';
 
 function controlledService({ admit = false } = {}) {
   const calls = [];
@@ -70,6 +71,23 @@ function assertBusy(response) {
 }
 
 const caddyHeaders = client => ({ 'X-Hotel-Revealer-Client-IP': `203.0.113.${client}` });
+
+test('completed timeout responses retain capacity until their owned shared work settles', { timeout: 5000 }, async t => {
+  const releases = [];
+  const service = {
+    async search(input, { holdWork }) {
+      holdWork(new Promise(resolve => releases.push(resolve)));
+      throw new ServiceError('DEADLINE_EXCEEDED');
+    },
+  };
+  const app = await serve(t, { service, releaseAll() { releases.forEach(resolve => resolve()); } });
+  for (let index = 0; index < 4; index += 1) assert.equal((await app.start().response).status, 504);
+  assertBusy(await app.start().response);
+  releases[0]();
+  assert.equal((await app.start().response).status, 504);
+  assert.equal(releases.length, 5);
+  assertBusy(await app.start().response);
+});
 
 test('one client can hold four shared/cache-like operations while another can use the other four global slots', { timeout: 5000 }, async t => {
   const controlled = controlledService();

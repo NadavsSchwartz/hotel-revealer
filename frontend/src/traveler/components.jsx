@@ -159,11 +159,15 @@ const errorCopy = {
   ],
   PROVIDER_RESPONSE_INVALID: [
     'We could not verify this response',
-    'The hotel information was incomplete or inconsistent. Please try a fresh search.',
+    'The hotel information was incomplete or inconsistent. Please try again.',
   ],
   INVALID_SELECTION: [
-    'This match needs a fresh search',
-    'The offer has changed since this comparison. Return to your results to check the latest hotel matches.',
+    'This offer could not be recovered',
+    'Return to your results to choose an offer. Your other results are preserved.',
+  ],
+  SELECTION_UNAVAILABLE: [
+    'This offer could not be recovered',
+    'Return to your results to choose an offer. Your other results are preserved.',
   ],
   NETWORK_ERROR: [
     'We could not connect',
@@ -256,10 +260,11 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
   const unavailable =
     error?.code === 'PROVIDER_NOT_CONFIGURED' ||
     error?.code === 'PROVIDER_DISABLED';
-  const returnToResults = ['INVALID_SELECTION', 'INVALID_OFFER_ID', 'INVALID_HOTEL_ID', 'PROVIDER_RESPONSE_INVALID'].includes(error?.code);
+  const returnToResults = ['INVALID_SELECTION', 'SELECTION_UNAVAILABLE', 'INVALID_OFFER_ID', 'INVALID_HOTEL_ID'].includes(error?.code);
   const editSearch = error?.code?.startsWith('INVALID_') || ['PROVIDER_DESTINATION_UNSUPPORTED', 'PAST_CHECK_IN', 'CHECK_IN_TOO_FAR', 'CHECK_OUT_TOO_FAR', 'STAY_TOO_LONG', 'UNSUPPORTED_CONTEXT', 'INSUFFICIENT_ADULTS'].includes(error?.code);
   const action = returnToResults ? onReturn || onRetry : editSearch ? onEdit : !unavailable ? onRetry : null;
-  const actionLabel = returnToResults ? (onReturn ? 'Return to results' : 'Refresh search') : editSearch ? 'Edit search' : remaining > 0 ? `Try again in ${remaining}s` : 'Try again';
+  const actionLabel = error?.code === 'SELECTION_UNAVAILABLE' ? 'Find current deals'
+    : returnToResults ? (onReturn ? 'Return to results' : 'Refresh search') : editSearch ? 'Edit search' : remaining > 0 ? `Try again in ${remaining}s` : 'Try again';
   return (
     <section className="notice-panel" aria-label="Search status">
       <div className={`ui-notice${unavailable ? ' ui-notice-info' : ''}`} role="alert">
@@ -311,7 +316,7 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
         </a>
       ) : (
         <>
-          <button type="button" className="ui-button" disabled>Original offer unavailable</button>
+          <button type="button" className="ui-button" disabled>Original offer link unavailable</button>
           {!compact && <p>The provider did not supply a usable link to this offer.</p>}
         </>
       )}

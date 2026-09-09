@@ -67,7 +67,7 @@ export default function Details() {
     detail: request, search, key, offerId, hotelId,
   });
   const context = data?.context || search?.context || requestedContext;
-  const error = request.key === key ? request.error ?? request.data?.backoff : null;
+  const error = request.key === key ? request.error ?? request.data?.backoff ?? request.data?.refreshError : null;
   const priceUpdateFailed = offer && !bindingRejected && !error?.retryAt &&
     ['DEADLINE_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'NETWORK_ERROR'].includes(error?.code);
   const loading =
@@ -176,6 +176,9 @@ export default function Details() {
               onReturn={refreshOffers}
             />
           )}
+          {data && hotelId && !candidate && <p className="detail-coverage-notice" role="status">
+            We couldn’t verify the selected hotel. You can still check the original Express offer below.
+          </p>}
           {(candidate || offer) && <div className={`detail-layout${candidate ? '' : ' detail-layout-unverified'}`}>
             {candidate && (
               <div className="detail-property-preview">

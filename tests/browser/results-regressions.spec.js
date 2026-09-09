@@ -145,6 +145,6 @@ test('result cards keep one fee-aware booking note, including when the offer lin
       await expect(page.locator('.quote-price')).toHaveText('$279 total');
       await expect(page.locator('.offer-booking .quote-stay')).not.toContainText('Taxes & fees included');
     }
-    if (!link) await expect(page.getByRole('button', { name: 'Original offer unavailable' })).toBeDisabled();
+    if (!link) await expect(page.getByRole('button', { name: 'Original offer link unavailable' })).toBeDisabled();
   }
 });

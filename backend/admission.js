@@ -80,6 +80,7 @@ export function createHotelAdmission({ clientIdentity = 'socket', now } = {}) {
     // is shared. At most eight active identities can occupy this map.
     clientOperations.set(key, (clientOperations.get(key) ?? 0) + 1);
     let servicePending = false;
+    let heldWork = 0;
     let released = false;
     const release = () => {
       if (released) return;
@@ -92,12 +93,19 @@ export function createHotelAdmission({ clientIdentity = 'socket', now } = {}) {
       res.off('close', releaseIfSettled);
       req.off('aborted', releaseIfSettled);
     };
-    const releaseIfSettled = () => { if (!servicePending) release(); };
+    const releaseIfSettled = () => { if (!servicePending && !heldWork) release(); };
     req.hotelAdmission = {
       dispatch() { servicePending = true; },
       settle() {
         servicePending = false;
-        if (res.writableFinished || res.destroyed) release();
+        if (res.writableFinished || res.destroyed) releaseIfSettled();
+      },
+      holdWork(operation) {
+        heldWork += 1;
+        Promise.resolve(operation).finally(() => {
+          heldWork -= 1;
+          if (res.writableFinished || res.destroyed) releaseIfSettled();
+        }).catch(() => {});
       },
       admitUpstream() { admitClient(key); },
     };

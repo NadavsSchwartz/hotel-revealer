@@ -22,7 +22,7 @@ async function mockPhoto(page) {
   }));
 }
 
-test('a failed same-selection price refresh retains property information and a fresh original handoff', async ({ page }) => {
+test('a successful fallback envelope after a failed refresh retains property information and original handoff', async ({ page }) => {
   const now = Date.now();
   await page.clock.install({ time: now });
   const data = populatedDetail(now);
@@ -33,7 +33,9 @@ test('a failed same-selection price refresh retains property information and a f
   await page.route('**/api/v1/deal', async route => {
     if (++calls === 1) return route.fulfill({ json: data });
     await pending;
-    return route.fulfill({ status: 503, json: { error: { code: 'PROVIDER_UNAVAILABLE' } } });
+    return route.fulfill({ json: { ...data, offer: searchResponse().offers[0],
+      detailStatus: 'unavailable', quoteStatus: 'unavailable', refreshError: { code: 'PROVIDER_UNAVAILABLE' },
+      details: { description: null, images: [], amenities: [], address: null, retailQuote: null } } });
   });
   await page.goto(detailPath);
   const heading = page.getByRole('heading', { name: 'Juniper House', exact: true });
@@ -61,7 +63,7 @@ test('a failed same-selection price refresh retains property information and a f
   expect(calls).toBe(2);
 });
 
-test('a rejected selection offers one fresh-search recovery instead of retrying the rejected price', async ({ page }) => {
+test('an unrecoverable selection offers one fresh-search recovery with factual messaging', async ({ page }) => {
   const now = Date.now();
   await page.clock.install({ time: now });
   const data = populatedDetail(now);
@@ -69,23 +71,23 @@ test('a rejected selection offers one fresh-search recovery instead of retrying 
   let calls = 0;
   await page.route('**/api/v1/deal', route => ++calls === 1
     ? route.fulfill({ json: data })
-    : route.fulfill({ status: 404, json: { error: { code: 'INVALID_SELECTION' } } }));
+    : route.fulfill({ status: 404, json: { error: { code: 'SELECTION_UNAVAILABLE' } } }));
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: searchResponse() }));
   await page.goto(detailPath);
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await page.clock.fastForward(61000);
   await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'This offer could not be recovered', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Refresh total price|Retry total price|Try again/ })).toHaveCount(0);
   await expect(page.locator('.quote-price')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', data.offer.handoffUrl);
-  await page.getByRole('button', { name: 'Return to results', exact: true }).click();
+  await page.getByRole('button', { name: 'Find current deals', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   expect(calls).toBe(2);
 });
 
-test('browser Forward cannot restore a candidate excluded by newer results while detail validation is pending', async ({ page }) => {
+test('browser Forward withdraws a contradicted hotel while preserving independent original-offer pricing', async ({ page }) => {
   const now = Date.now();
   const initial = searchResponse({ expiresAt: new Date(now - 1000).toISOString() });
   const refreshed = searchResponse();
@@ -100,7 +102,9 @@ test('browser Forward cannot restore a candidate excluded by newer results while
   await page.route('**/api/v1/deal', async route => {
     if (++details === 1) return route.fulfill({ json: firstDetail });
     await pending;
-    return route.fulfill({ status: 409, json: { error: { code: 'INVALID_SELECTION' } } });
+    return route.fulfill({ json: { ...firstDetail,
+      offer: { ...firstDetail.offer, resolution: refreshed.offers[0].resolution, candidates: refreshed.offers[0].candidates },
+      candidate: null, details: null, detailStatus: 'unavailable' } });
   });
   await page.goto(searchPath);
   await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
@@ -118,7 +122,8 @@ test('browser Forward cannot restore a candidate excluded by newer results while
     await expect(page.getByRole('img', { name: /property photograph/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
   } finally { release(); }
-  await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
+  await expect(page.getByText('We couldn’t verify the selected hotel.', { exact: false })).toBeVisible();
+  await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$270 total');
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', refreshed.offers[0].handoffUrl);
   expect(searches).toBe(2);

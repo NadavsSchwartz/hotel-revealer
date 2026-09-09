@@ -1,8 +1,9 @@
 import { contextKey } from './context.js';
 import { validIdentifier } from '../../../shared/identifiers.js';
 
-const bindingErrors = new Set(['INVALID_SELECTION', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DISABLED', 'PROVIDER_NOT_CONFIGURED']);
+const bindingErrors = new Set(['INVALID_SELECTION', 'SELECTION_UNAVAILABLE']);
 const unresolvedReasons = new Set(['no_match', 'ambiguous', 'missing_facts', 'incomplete_search']);
+const refreshFailureCodes = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED']);
 
 export function validResolution(offer) {
   if (!Array.isArray(offer?.candidates)) return false;
@@ -18,12 +19,17 @@ function selectionIn(search, offerId, hotelId) {
   const offer = Array.isArray(search?.offers)
     ? search.offers.find(item => item?.offerId === offerId && validResolution(item)) : null;
   const candidate = Array.isArray(offer?.candidates) ? offer.candidates.find(item => item?.hotelId === hotelId) : null;
-  return { offer: offer || null, candidate: candidate || null, valid: Boolean(hotelId == null ? offer : candidate) };
+  return { offer: offer || null, candidate: candidate || null };
 }
 
-function detailWithResolution(data, offer) {
-  return { ...data, offer: { ...data.offer, resolution: offer.resolution, candidates: offer.candidates } };
+function detailWithResolution(data, offer, hotelId) {
+  const candidate = hotelId == null ? null : offer.candidates.find(item => item.hotelId === hotelId) ?? null;
+  return { ...data, offer: { ...data.offer, resolution: offer.resolution, candidates: offer.candidates }, candidate,
+    ...(!candidate && hotelId != null ? { details: null, detailStatus: 'unavailable' } : {}) };
 }
+
+const usableEvidence = (search, offer) => search?.coverage.status === 'complete' && offer &&
+  !['missing_facts', 'incomplete_search'].includes(offer.resolution.reason);
 
 export function selectSearchCooldown(state, key, now = Date.now()) {
   const retryAt = state?.searchCooldowns?.[key]?.retryAt;
@@ -47,11 +53,15 @@ export function selectDetailView({ detail, search, key, offerId, hotelId }) {
   const current = detail.key === key ? detail : null;
   const data = current?.data;
   const stored = selectionIn(search, offerId, hotelId);
-  const excluded = Boolean(search && !stored.valid && !(data && current.dataSearch === search));
-  const bindingRejected = Boolean(current?.bindingRejected || excluded);
+  const bindingRejected = Boolean(current?.bindingRejected);
   if (data && !bindingRejected) {
     return { data, offer: data.offer, candidate: hotelId == null ? null : data.candidate,
       expiresAt: data.offerExpiresAt || data.expiresAt, bindingRejected: false };
+  }
+  if (current?.offer) {
+    const candidate = current.offer.candidates.find(item => item.hotelId === hotelId) ?? null;
+    return { data: null, offer: current.offer, candidate: bindingRejected ? null : candidate,
+      expiresAt: current.offerExpiresAt, bindingRejected };
   }
   if (search) {
     return { data: null, offer: stored.offer, candidate: bindingRejected ? null : stored.candidate,
@@ -69,7 +79,6 @@ const initialState = {
     key: null,
     tripKey: null,
     searchAtStart: null,
-    dataSearch: null,
     offerId: null,
     hotelId: null,
     offer: null,
@@ -104,13 +113,13 @@ export function travelerReducer(state = initialState, action) {
     const keys = Object.keys(searches);
     if (keys.length > 5) delete searches[keys[0]];
     let detail = state.detail;
-    if (detail.tripKey === action.key && detail.offerId) {
+    if (detail.tripKey === action.key && detail.offerId && action.data.coverage.status === 'complete') {
       const stored = selectionIn(action.data, detail.offerId, detail.hotelId);
-      const data = detail.hotelId == null && detail.data && stored.offer
-        ? detailWithResolution(detail.data, stored.offer) : detail.data;
-      detail = { ...detail, offer: stored.offer, offerExpiresAt: stored.offer ? action.data.expiresAt : undefined,
-        data,
-        ...(!stored.valid ? { data: null, dataSearch: null, bindingRejected: true } : {}) };
+      if (usableEvidence(action.data, stored.offer)) {
+        const data = detail.data ? detailWithResolution(detail.data, stored.offer, detail.hotelId) : null;
+        detail = { ...detail, offer: data?.offer ?? stored.offer,
+          offerExpiresAt: data ? detail.offerExpiresAt : action.data.expiresAt, data };
+      }
     }
     return {
       ...state,
@@ -134,20 +143,17 @@ export function travelerReducer(state = initialState, action) {
     const sameSelection = state.detail.key === action.key;
     const searchAtStart = state.searches[action.tripKey];
     const stored = selectionIn(searchAtStart, action.offerId, action.hotelId);
-    const excluded = Boolean(searchAtStart && !stored.valid &&
-      !(sameSelection && state.detail.data && state.detail.dataSearch === searchAtStart));
-    const bindingRejected = excluded || (sameSelection && state.detail.bindingRejected);
+    const bindingRejected = sameSelection && state.detail.bindingRejected;
     return {
       ...state,
       detail: {
         key: action.key,
         tripKey: action.tripKey,
         searchAtStart,
-        dataSearch: sameSelection && !bindingRejected ? state.detail.dataSearch : null,
         offerId: action.offerId,
         hotelId: action.hotelId ?? null,
-        offer: searchAtStart ? stored.offer : sameSelection ? state.detail.offer : null,
-        offerExpiresAt: searchAtStart ? searchAtStart.expiresAt : sameSelection ? state.detail.offerExpiresAt : undefined,
+        offer: sameSelection ? state.detail.offer : stored.offer,
+        offerExpiresAt: sameSelection ? state.detail.offerExpiresAt : searchAtStart?.expiresAt,
         bindingRejected,
         requestId: action.requestId,
         status: 'loading',
@@ -162,20 +168,23 @@ export function travelerReducer(state = initialState, action) {
   ) {
     const search = state.searches[state.detail.tripKey];
     const stored = selectionIn(search, state.detail.offerId, state.detail.hotelId);
-    const newerSearch = search && search !== state.detail.searchAtStart;
-    if (newerSearch && !stored.valid) {
-      // An older detail operation cannot contradict a search completed since it began.
-      return { ...state, detail: { ...state.detail, searchAtStart: null, dataSearch: null, data: null,
-        status: 'error', error: { code: 'INVALID_SELECTION' }, bindingRejected: true } };
+    const newerEvidence = search !== state.detail.searchAtStart && usableEvidence(search, stored.offer);
+    // Only explicit same-offer evidence can replace an inference. Search
+    // membership and incomplete discovery say nothing about an issued quote.
+    let data = newerEvidence
+      ? detailWithResolution(action.data, stored.offer, state.detail.hotelId) : action.data;
+    const previous = state.detail.data;
+    if (data.refreshError && previous) {
+      data = { ...data,
+        ...(data.candidate && data.candidate.hotelId === previous.candidate?.hotelId ? { details: previous.details } : {}),
+        ...(previous.offer.quoteExpiresAt ? { offer: { ...data.offer,
+          quote: previous.offer.quote, quoteExpiresAt: previous.offer.quoteExpiresAt } } : {}),
+      };
     }
-    // A quote-only response may keep its price, but cannot restore a hotel hint
-    // that a search completed after this request began has replaced.
-    const data = newerSearch && state.detail.hotelId == null
-      ? detailWithResolution(action.data, stored.offer) : action.data;
     return {
       ...state,
       searchCooldowns: recordCooldown(state.searchCooldowns, action),
-      detail: { ...state.detail, searchAtStart: null, dataSearch: search, status: 'success', data,
+      detail: { ...state.detail, searchAtStart: null, status: 'success', data,
         offer: data.offer, offerExpiresAt: data.offerExpiresAt || data.expiresAt,
         error: null, bindingRejected: false },
     };
@@ -184,28 +193,11 @@ export function travelerReducer(state = initialState, action) {
     action.type === 'detail/error' &&
     state.detail.requestId === action.requestId
   ) {
-    let searches = state.searches;
-    const { tripKey, searchAtStart } = state.detail;
-    if (
-      action.error.code === 'INVALID_SELECTION' &&
-      searchAtStart && state.searches[tripKey] === searchAtStart
-    ) {
-      // A rejection invalidates the shortlist used for this selection, but a
-      // search that completed after detail/start owns its newer cache entry.
-      searches = { ...state.searches };
-      delete searches[tripKey];
-    }
-    const retainOffer = !bindingErrors.has(action.error.code) ||
-      (action.error.code === 'INVALID_SELECTION' && state.detail.hotelId != null);
     return {
       ...state,
-      searches,
       searchCooldowns: recordCooldown(state.searchCooldowns, action),
       detail: { ...state.detail, searchAtStart: null, status: 'error', error: action.error,
-        offer: retainOffer ? state.detail.offer : null,
-        offerExpiresAt: retainOffer ? state.detail.offerExpiresAt : undefined,
         data: bindingErrors.has(action.error.code) ? null : state.detail.data,
-        dataSearch: bindingErrors.has(action.error.code) ? null : state.detail.dataSearch,
         bindingRejected: state.detail.bindingRejected || bindingErrors.has(action.error.code) },
     };
   }
@@ -277,13 +269,19 @@ function request(kind, path, input, key) {
       }
       if (kind === 'detail') {
         if (data.offer?.offerId !== input.offerId ||
-            (input.hotelId !== undefined && data.candidate?.hotelId !== input.hotelId)) {
-          throw controlledError('INVALID_SELECTION');
+            (data.candidate !== null && data.candidate?.hotelId !== input.hotelId)) {
+          throw controlledError('PROVIDER_RESPONSE_INVALID');
         }
         if (!validResolution(data.offer) || !['available', 'unavailable'].includes(data.quoteStatus) ||
+            (data.refreshError !== undefined && (!data.refreshError || Object.keys(data.refreshError).join(',') !== 'code' ||
+              !refreshFailureCodes.has(data.refreshError.code) || data.quoteStatus !== 'unavailable')) ||
             (input.hotelId === undefined
               ? data.candidate !== null || data.details !== null || data.detailStatus !== 'not_requested'
-              : !data.offer.candidates.some(candidate => candidate.hotelId === input.hotelId))) {
+              : data.candidate === null
+                ? data.details !== null || data.detailStatus !== 'unavailable' ||
+                  data.offer.candidates.some(candidate => candidate.hotelId === input.hotelId)
+                : !data.offer.candidates.some(candidate => candidate.hotelId === input.hotelId) ||
+                  !['available', 'unavailable'].includes(data.detailStatus))) {
           throw controlledError('PROVIDER_RESPONSE_INVALID');
         }
       }

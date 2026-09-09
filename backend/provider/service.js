@@ -120,7 +120,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
     afterDispatch: () => persistState(),
   });
 
-  async function call(method, parameters, deadline, metrics, admitUpstream) {
+  async function call(method, parameters, deadline, metrics, admitUpstream, holdWork) {
     // Cache hits and coalesced subscribers never enter here. Reject excessive
     // client work before it can occupy the shared upstream queue.
     await withDeadline(available(), deadline, clock);
@@ -152,10 +152,10 @@ export function createProviderService({ adapter = null, clock = realClock, state
         if (error instanceof ProviderFailure && error.kind === 'unavailable') throw new ServiceError('PROVIDER_UNAVAILABLE', { cause: error });
         throw error instanceof Error ? error : new Error('Non-Error provider failure', { cause: error });
       }
-    }, { deadline });
+    }, { deadline, holdWork });
   }
 
-  async function retrieveSearch(context, deadline, metrics, admitUpstream) {
+  async function retrieveSearch(context, deadline, metrics, admitUpstream, holdWork) {
     await withDeadline(available({ allowCooldown: true }), deadline, clock);
     const key = contextKey(context);
     const cached = searches.get(key);
@@ -172,7 +172,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
     let retrievedAt;
     do {
       try {
-        const page = await call('listingsPage', { context, cursor }, deadline, metrics, admitUpstream);
+        const page = await call('listingsPage', { context, cursor }, deadline, metrics, admitUpstream, holdWork);
         assertJsonSize(page);
         if (!page || !Object.hasOwn(page, 'listings') || !Object.hasOwn(page, 'nextCursor') ||
           (page.nextCursor !== null && (typeof page.nextCursor !== 'string' || !page.nextCursor || page.nextCursor.length > 2_048))) {
@@ -233,8 +233,11 @@ export function createProviderService({ adapter = null, clock = realClock, state
     metrics.pagesFetched = pagesFetched;
     const bytes = assertJsonSize(result);
     for (const offer of result.offers) {
+      const selectionKey = issuedOfferKey(context, offer.offerId);
+      // Missing observations cannot disprove a previously issued inference.
+      if ((result.coverage.status !== 'complete' || offer.resolution.reason === 'missing_facts') && issuedOffers.get(selectionKey)) continue;
       const issued = { offer, offerExpiresAt: result.expiresAt };
-      issuedOffers.set(issuedOfferKey(context, offer.offerId), issued, {
+      issuedOffers.set(selectionKey, issued, {
         bytes: assertJsonSize(issued), expiresAt: Date.parse(result.retrievedAt) + ISSUED_OFFER_TTL,
       });
     }
@@ -242,9 +245,9 @@ export function createProviderService({ adapter = null, clock = realClock, state
     return result;
   }
 
-  async function searchWork(context, deadline, metrics, admitUpstream) {
+  async function searchWork(context, deadline, metrics, admitUpstream, holdWork) {
     try {
-      const result = await retrieveSearch(context, deadline, metrics, admitUpstream);
+      const result = await retrieveSearch(context, deadline, metrics, admitUpstream, holdWork);
       if (metrics.searchCache === 'miss') {
         const unresolved = { no_match: 0, ambiguous: 0, missing_facts: 0, incomplete_search: 0 };
         let matched = 0;
@@ -269,13 +272,14 @@ export function createProviderService({ adapter = null, clock = realClock, state
     }
   }
 
-  function coalesce(flights, key, work) {
+  function coalesce(flights, key, work, holdWork) {
     const existing = flights.get(key);
     if (existing) return existing.then((value) => structuredClone(value));
     // Search owns deadline handling page by page, so it can return previous
     // successful pages when a later page reaches the deadline.
     const operation = Promise.resolve().then(work);
     flights.set(key, operation);
+    holdWork?.(operation);
     operation.finally(() => {
       if (flights.get(key) === operation) flights.delete(key);
     }).catch(() => {});
@@ -297,17 +301,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
   const newMetrics = () => ({ searchCache: 'not_checked', detailCache: 'not_checked', shared: false, upstreamCalls: 0, pagesFetched: 0, queueDepth: scheduler.queue.length });
 
   return {
-    search(input, { requestId, admitUpstream } = {}) {
+    search(input, { requestId, admitUpstream, holdWork } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const context = validateSearch(input, new Date(admittedAt));
       const deadline = admittedAt + 20_000;
       const metrics = newMetrics();
       metrics.shared = searchFlights.has(contextKey(context));
-      const request = coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics, admitUpstream));
+      const request = coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics, admitUpstream, holdWork), holdWork);
       return observe('search', request, admittedAt, metrics, requestId);
     },
-    detail(input, { requestId, admitUpstream } = {}) {
+    detail(input, { requestId, admitUpstream, holdWork } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const { offerId, hotelId, ...context } = validateDetail(input, new Date(admittedAt));
@@ -320,43 +324,50 @@ export function createProviderService({ adapter = null, clock = realClock, state
         const selectionKey = issuedOfferKey(context, offerId);
         let issued = issuedOffers.get(selectionKey);
         if (!issued) {
-          // Cold links still require server-observed matching evidence for this exact trip.
-          const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics, admitUpstream)), deadline, clock);
+          // City discovery owns its full search budget. This detail caller may
+          // stop waiting earlier without terminating another search subscriber.
+          const searchDeadline = clock.now() + 20_000;
+          const search = await withDeadline(coalesce(searchFlights, contextKey(context),
+            () => searchWork(context, searchDeadline, metrics, admitUpstream, holdWork), holdWork), deadline, clock);
           const offer = search.offers.find((item) => item.offerId === offerId);
           if (offer) issued = { offer, offerExpiresAt: search.expiresAt };
         }
         let offer = issued?.offer;
-        let candidate = hotelId === undefined ? null : offer?.candidates.find((item) => item.hotelId === hotelId);
-        if (!offer || (hotelId !== undefined && !candidate)) throw new ServiceError('INVALID_SELECTION');
+        let candidate = hotelId === undefined ? null : offer?.candidates.find((item) => item.hotelId === hotelId) ?? null;
+        if (!offer) throw new ServiceError('SELECTION_UNAVAILABLE');
         const cached = details.get(key);
         if (cached) {
           metrics.detailCache = 'hit';
           const cachedQuoteFresh = Date.parse(cached.offer?.quoteExpiresAt) > clock.now();
           const refreshedOffer = cachedQuoteFresh
             ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
-          const result = { ...cached, offer: refreshedOffer, candidate, quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: issued.offerExpiresAt };
+          const result = { ...cached, offer: refreshedOffer, candidate,
+            ...(!candidate && hotelId !== undefined ? { details: null, detailStatus: 'unavailable' } : {}),
+            quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: issued.offerExpiresAt };
           assertJsonSize(result);
           return result;
         }
         metrics.detailCache = 'miss';
         let normalizedDetails = null;
         let originalQuote = null;
-        let detailStatus = hotelId === undefined ? 'not_requested' : 'available';
+        let detailStatus = hotelId === undefined ? 'not_requested' : candidate ? 'available' : 'unavailable';
         let cacheable = true;
         let backoff = null;
+        let refreshError = null;
         try {
-          const rawDetails = await call('hotelDetails', { context, offerId, hotelId }, deadline, metrics, admitUpstream);
+          const rawDetails = await call('hotelDetails', { context, offerId, hotelId: candidate ? hotelId : undefined }, deadline, metrics, admitUpstream, holdWork);
           assertJsonSize(rawDetails);
           if (!rawDetails || typeof rawDetails !== 'object' || Array.isArray(rawDetails)) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
-          if (hotelId !== undefined) normalizedDetails = normalizeDetails(rawDetails);
+          if (candidate) normalizedDetails = normalizeDetails(rawDetails);
           originalQuote = normalizeOriginalQuote(rawDetails.originalQuote, context);
           if (hotelId !== undefined && rawDetails.available === false) detailStatus = 'unavailable';
         } catch (error) {
           if (!(error instanceof ServiceError) || !['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED'].includes(error.code)) throw error;
           metrics.failureCode = error.code;
+          refreshError = { code: error.code };
           backoff = backoffFor(error);
           cacheable = false;
-          if (hotelId !== undefined) {
+          if (candidate) {
             detailStatus = 'unavailable';
             normalizedDetails = { description: null, images: [], amenities: [], address: null, retailQuote: null };
           }
@@ -365,15 +376,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
         // A search completed while this quote was queued owns newer matching evidence.
         issued = issuedOffers.get(selectionKey) || issued;
         offer = issued.offer;
-        candidate = hotelId === undefined ? null : offer.candidates.find(item => item.hotelId === hotelId);
+        candidate = hotelId === undefined ? null : offer.candidates.find(item => item.hotelId === hotelId) ?? null;
         if (hotelId !== undefined && !candidate) {
-          throw new ServiceError('INVALID_SELECTION');
+          normalizedDetails = null;
+          detailStatus = 'unavailable';
         }
         const refreshedOffer = originalQuote
           ? { ...offer, quote: originalQuote, quoteExpiresAt: iso(retrievedAt + DETAIL_TTL) } : offer;
         const result = {
           context, retrievedAt: iso(retrievedAt), expiresAt: iso(retrievedAt + DETAIL_TTL), offerExpiresAt: issued.offerExpiresAt,
           ...(backoff ? { backoff } : {}),
+          ...(refreshError ? { refreshError } : {}),
           offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
           quoteStatus: originalQuote ? 'available' : 'unavailable',
         };
@@ -382,7 +395,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         // An explicit retry must be able to recover a previously unavailable total.
         if (cacheable && originalQuote && deadline > clock.now()) details.set(key, result, { bytes, expiresAt: retrievedAt + DETAIL_TTL });
         return result;
-      });
+      }, holdWork);
       return observe('detail', request, admittedAt, metrics, requestId);
     },
     async status() {

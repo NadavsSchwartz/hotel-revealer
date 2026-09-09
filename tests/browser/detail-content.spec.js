@@ -101,7 +101,7 @@ test('location and reviews link to the named property while amenities retain the
   expect(calls).toBe(1);
 });
 
-test('a retained gallery survives a smaller photo response and disappears with rejected hotel identity', async ({ page }) => {
+test('a retained gallery survives a smaller photo response and disappears with withdrawn hotel inference', async ({ page }) => {
   const now = Date.now();
   await page.clock.install({ time: now });
   const data = populated();
@@ -122,7 +122,9 @@ test('a retained gallery survives a smaller photo response and disappears with r
     if (calls === 3 || calls === 4) return route.fulfill({ json: { ...data,
       offer: { ...data.offer, quoteExpiresAt: new Date(now + calls * 60000).toISOString() },
       details: { ...data.details, images: calls === 3 ? [] : data.details.images.slice(0, 2) } } });
-    return route.fulfill({ status: 404, json: { error: { code: 'INVALID_SELECTION' } } });
+    return route.fulfill({ json: { ...data,
+      offer: { ...data.offer, resolution: { status: 'unresolved', reason: 'no_match' }, candidates: [] },
+      candidate: null, details: null, detailStatus: 'unavailable' } });
   });
   await page.goto(detailPath(data));
   await expect(page.getByRole('button', { name: 'View all 8 photos' })).toBeVisible();

@@ -36,10 +36,13 @@ test('expired queued work is removed and never dispatched', async () => {
   const first = scheduler.run(() => new Promise((resolve) => { release = resolve; }), { deadline: clock.now() + 20_000 });
   await flush();
   let dispatched = false;
-  const queued = scheduler.run(() => { dispatched = true; }, { deadline: clock.now() + 500 });
+  let held = true;
+  const queued = scheduler.run(() => { dispatched = true; }, { deadline: clock.now() + 500,
+    holdWork: operation => { operation.then(() => { held = false; }); } });
   const rejection = assert.rejects(queued, { code: 'DEADLINE_EXCEEDED' });
   await clock.advance(500);
   await rejection;
+  assert.equal(held, false, 'expired undispatched work releases its owner');
   release();
   await first;
   await clock.advance(1_000);
@@ -112,12 +115,16 @@ test('completion persistence keeps the active slot even after the admission dead
     if (completions === 1) await new Promise((resolve) => { finishPersistence = resolve; });
   } });
   let calls = 0;
-  const rejected = assert.rejects(scheduler.run(() => { calls += 1; }, { deadline: clock.now() + 100 }), { code: 'DEADLINE_EXCEEDED' });
+  let held = true;
+  const rejected = assert.rejects(scheduler.run(() => { calls += 1; }, { deadline: clock.now() + 100,
+    holdWork: operation => { operation.then(() => { held = false; }); } }), { code: 'DEADLINE_EXCEEDED' });
   const second = scheduler.run(() => { calls += 1; }, { deadline: clock.now() + 10_000 });
   await clock.advance(2_000);
   await rejected;
   assert.equal(calls, 1);
+  assert.equal(held, true, 'outcome persistence remains owned after the caller deadline');
   finishPersistence();
   await second;
   assert.equal(calls, 2);
+  assert.equal(held, false);
 });
