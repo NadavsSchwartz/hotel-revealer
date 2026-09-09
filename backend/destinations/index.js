@@ -48,10 +48,36 @@ catalog.cities = [];
 namesPerCountry.clear();
 const byId = new Map(entries.map(entry => [entry.destination.id, entry.destination]));
 const byCountry = new Map();
-for (const entry of entries) {
+const byPrefix = new Map();
+for (const [index, entry] of entries.entries()) {
   const code = entry.destination.countryCode;
   if (!byCountry.has(code)) byCountry.set(code, []);
-  byCountry.get(code).push(entry);
+  byCountry.get(code).push(index);
+  const prefixes = new Set(`${entry.names} ${entry.contextWords}`.split(/[ \n]+/)
+    .filter(word => word.length >= 2).map(word => word.slice(0, 2)));
+  for (const prefix of prefixes) {
+    if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
+    byPrefix.get(prefix).push(index);
+  }
+}
+
+function candidatesFor(cityKey, { country, region, partialCountries = new Set() } = {}) {
+  let indices = country ? byCountry.get(country) ?? [] : null;
+  // Every match contains each token prefix. The shortest list is enough;
+  // the existing ranker still checks full tokens and decides their order.
+  for (const token of cityKey.split(' ')) {
+    if (token.length < 2) continue;
+    const group = byPrefix.get(token.slice(0, 2)) ?? [];
+    if (!indices || group.length < indices.length) indices = group;
+  }
+  if (indices && partialCountries.size) {
+    const union = new Set(indices);
+    for (const code of partialCountries) for (const index of byCountry.get(code) ?? []) union.add(index);
+    indices = [...union].sort((a, b) => a - b);
+  }
+  const candidates = indices ? indices.map(index => entries[index]) : entries;
+  return country || region ? candidates.filter(entry =>
+    (!country || entry.destination.countryCode === country) && (!region || entry.regionCode === region)) : candidates;
 }
 
 export function getDestination(id) {
@@ -102,7 +128,7 @@ export function searchDestinations(query, { limit = 8, beforeScan } = {}) {
   if (key.length < 2) return [];
   const count = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 10)) : 8;
   const exactCountry = countryIds.get(key);
-  if (exactCountry) return (byCountry.get(exactCountry) ?? []).slice(0, count).map(e => e.destination);
+  if (exactCountry) return (byCountry.get(exactCountry) ?? []).slice(0, count).map(index => entries[index].destination);
   beforeScan?.();
 
   // A country suffix qualifies the city. Country-first queries use context tokens:
@@ -111,11 +137,11 @@ export function searchDestinations(query, { limit = 8, beforeScan } = {}) {
   const cityKey = qualifier ? key.slice(0, -qualifier.key.length - 1) : key;
   const partialCountries = new Set(!qualifier && key.length >= 3
     ? countryAliases.filter(({ key: alias }) => alias.startsWith(key)).map(({ code }) => code) : []);
-  const candidates = qualifier ? byCountry.get(qualifier.code) ?? [] : entries;
+  const candidates = candidatesFor(cityKey, { country: qualifier?.code, partialCountries });
   const results = rankDestinations(candidates, cityKey, count, partialCountries);
   if (results.length || !qualifier || qualifier.key.length !== 2) return results;
 
   // CA and IL can also mean California and Illinois. Keep country matches first;
   // only an empty country search permits an exact administrative-code fallback.
-  return rankDestinations(entries.filter(entry => entry.regionCode === qualifier.key), cityKey, count);
+  return rankDestinations(candidatesFor(cityKey, { region: qualifier.key }), cityKey, count);
 }

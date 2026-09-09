@@ -109,5 +109,22 @@ test('queries and results are bounded, deterministic, and tolerate malformed inp
   assert.equal(searchDestinations('United States', { limit: 100000 }).length, 10);
   assert.equal(searchDestinations('United States', { limit: NaN }).length, 8);
   assert.equal(searchDestinations('United States', { limit: 2 }).length, 2);
-  assert.deepEqual(searchDestinations('San'), searchDestinations('San'));
+});
+
+test('candidate indexing preserves ranked prefixes, context, Unicode and country fallbacks', () => {
+  for (const [query, ids] of [
+    ['san', ['2451778', '2282099', '5391811']],
+    ['new y', ['5128581', '2272790', '1642911']],
+    ['תל אביב', ['293397']],
+    ['東京', ['1850147']],
+    ['Isra', ['294615', '6278857', '281184']],
+    ['United', ['13680011', '4959799', '2643743']],
+    ['Los Angeles CA', ['5368361', '5344994', '5364571']],
+    ['Chicago IL', ['4887398', '4887463', '8436065']],
+    ['Richmond CA', ['6122085', '6122084', '6122091']],
+    ['a b', ['2293538', '2352778', '292968']],
+    ['Panama City Florida', ['4167694', '4167695']],
+  ]) {
+    assert.deepEqual(searchDestinations(query, { limit: 3 }).map(city => city.id), ids.map(id => `geonames:${id}`), query);
+  }
 });

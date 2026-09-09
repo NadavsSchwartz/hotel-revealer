@@ -133,7 +133,7 @@ async function runWorker() {
       },
     },
   });
-  const app = createApp({ service, logger: { info() {} } });
+  const app = createApp({ service, logger: { info() {} }, clientIdentity: 'caddy' });
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const timer = setInterval(() => {
@@ -185,7 +185,8 @@ async function runMeasurement() {
   const measuredAt = new Date().toISOString();
   const output = path.resolve(`output/verification/capacity-${measuredAt.replaceAll(/[:.]/g, '-')}`);
   await mkdir(output, { recursive: true });
-  const sourcePaths = ['backend/app.js', 'backend/provider/service.js', 'backend/provider/cache.js', 'backend/provider/scheduler.js',
+  const sourcePaths = ['backend/app.js', 'backend/admission.js', 'backend/controllers/hotelController.js', 'backend/destinations/index.js',
+    'backend/provider/size.js', 'backend/provider/service.js', 'backend/provider/cache.js', 'backend/provider/scheduler.js',
     'backend/domain/matching.js', 'backend/domain/normalization.js', 'scripts/measure-capacity.mjs'];
   const report = {
     measuredAt, measurementMode: burstsOnly ? 'shared-and-cached-bursts-only' : 'full-cache-and-queue-profile',
@@ -196,7 +197,7 @@ async function runMeasurement() {
     scope: 'Mac-local Node server process with the actual GeoNames dataset, real HTTP, production service/cache/scheduler, and a synthetic stub provider. The HTTP load driver is a separate process. No provider requests.',
     configuredAppBudgetBytes: appBudgetBytes,
     controls: { maxDataCallers, maxHealthCallers: 1, workerOldSpaceMiB: 384, rssStopThresholdMiB: 480,
-      maxAdmittedHotelRequests: 8,
+      maxAdmittedHotelRequests: 8, clients: 'Distinct synthetic client per HTTP request; per-client fairness is tested separately.',
       searchCacheEntries: 25, searchTtlMs: 300000, detailCacheEntries: 100, detailTtlMs: 60000,
       providerGapMs: 1000, maxProviderActive: 1, maxProviderWaiting: 4, searchDeadlineMs: 20000, detailDeadlineMs: 10000 },
     destinationDatasetBytes: (await stat(new URL('../data/destinations.json', import.meta.url))).size,
@@ -255,10 +256,13 @@ async function runMeasurement() {
     report.baseline = started.snapshot;
     lastSnapshot = started.snapshot;
     const base = `http://127.0.0.1:${started.port}`;
+    let clientNumber = 0;
     const post = async (route, input) => {
       const began = performance.now();
       try {
-        const response = await fetch(`${base}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const response = await fetch(`${base}${route}`, { method: 'POST', headers: {
+          'Content-Type': 'application/json', 'X-Hotel-Revealer-Client-IP': `203.0.113.${1 + clientNumber++ % 254}`,
+        },
           body: JSON.stringify(input), signal: AbortSignal.timeout(route.endsWith('/deal') ? 12000 : 22000) });
         const text = await response.text();
         const body = JSON.parse(text);
