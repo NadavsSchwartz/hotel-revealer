@@ -1,9 +1,9 @@
-import '../backend/env.js';
+import '../backend/env.ts';
 import { spawn } from 'node:child_process';
 
 const env = { ...process.env, NODE_ENV: 'development' };
 const children = [
-  spawn(process.execPath, ['--watch', 'backend/server.js'], {
+  spawn(process.execPath, ['--watch', 'backend/server.ts'], {
     stdio: 'inherit', env,
   }),
   spawn('npm', ['run', 'dev', '--workspace', 'frontend'], { stdio: 'inherit', env }),

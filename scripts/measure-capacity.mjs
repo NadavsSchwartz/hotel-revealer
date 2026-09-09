@@ -38,8 +38,8 @@ function assertControlledBurst(requests) {
 
 async function runWorker() {
   const [{ createApp }, { createProviderService }, { createMemoryStateStore }, domain, { MAX_JSON_BYTES }, { createSelectionStore }] = await Promise.all([
-    import('../backend/app.js'), import('../backend/provider/service.js'), import('../backend/provider/state.js'),
-    import('../backend/domain/index.js'), import('../backend/provider/size.js'), import('../backend/provider/selection-store.js'),
+    import('../backend/app.ts'), import('../backend/provider/service.ts'), import('../backend/provider/state.ts'),
+    import('../backend/domain/index.ts'), import('../backend/provider/size.ts'), import('../backend/provider/selection-store.ts'),
   ]);
   // If an accidental live adapter is introduced, fail before making its request.
   globalThis.fetch = () => { throw new Error('Capacity worker prohibits all external fetches.'); };
@@ -186,10 +186,10 @@ async function runMeasurement() {
   const measuredAt = new Date().toISOString();
   const output = path.resolve(`output/verification/capacity-${measuredAt.replaceAll(/[:.]/g, '-')}`);
   await mkdir(output, { recursive: true });
-  const sourcePaths = ['backend/app.js', 'backend/admission.js', 'backend/controllers/hotelController.js', 'backend/destinations/index.js',
-    'backend/provider/size.js', 'backend/provider/service.js', 'backend/provider/cache.js', 'backend/provider/scheduler.js',
-    'backend/provider/selection-store.js',
-    'backend/domain/matching.js', 'backend/domain/normalization.js', 'scripts/measure-capacity.mjs'];
+  const sourcePaths = ['backend/app.ts', 'backend/admission.ts', 'backend/controllers/hotelController.ts', 'backend/destinations/index.ts',
+    'backend/provider/size.ts', 'backend/provider/service.ts', 'backend/provider/cache.ts', 'backend/provider/scheduler.ts',
+    'backend/provider/selection-store.ts',
+    'backend/domain/matching.ts', 'backend/domain/normalization.ts', 'scripts/measure-capacity.mjs'];
   const report = {
     measuredAt, measurementMode: burstsOnly ? 'shared-and-cached-bursts-only' : 'full-cache-and-queue-profile',
     environment: { platform: os.platform(), release: os.release(), arch: os.arch(), node: process.version,

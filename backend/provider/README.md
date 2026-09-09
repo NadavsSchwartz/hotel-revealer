@@ -155,7 +155,7 @@ allowlisted again at the logging boundary.
 ## Offline verification
 
 ```sh
-node --test backend/app.test.js backend/provider/*.test.js
+node --test backend/app.test.ts backend/provider/*.test.ts
 ```
 
 Tests inject clocks, state storage, and provider adapters. The HTTP tests bind only

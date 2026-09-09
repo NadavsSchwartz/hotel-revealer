@@ -10,25 +10,29 @@ original offer, its current price, and the hotel inference remain separate.
 
 - **Conflicting evidence stays unknown.** Duplicate observations cannot restore a
   matching fact previously invalidated by a conflict. Raw matching values remain
-  separate from display normalization. See [normalization](backend/domain/normalization.js)
-  and [matching rules](backend/domain/matching.js).
+  separate from display normalization. See [normalization](backend/domain/normalization.ts)
+  and [matching rules](backend/domain/matching.ts).
 - **Provider work has explicit limits.** Admission, request sharing, a bounded
   queue, deadlines, and persisted cooldowns coordinate one upstream call at a time.
   Cache hits and shared followers avoid new upstream work. See the
-  [service](backend/provider/service.js) and [operating contract](backend/provider/README.md#budgets-caches-and-state).
+  [service](backend/provider/service.ts) and [operating contract](backend/provider/README.md#budgets-caches-and-state).
 - **Restart recovery preserves the original offer.** A bounded snapshot stores an
   exact trip/offer hash, optional provider city ID, and expiry. It can fetch a fresh
   original-offer quote and rebuild its handoff without reviving saved prices or a hotel inference.
-  See the [selection store](backend/provider/selection-store.js).
+  See the [selection store](backend/provider/selection-store.ts).
 - **Checks preserve independent evidence.** Differential tests retain the original
   matching implementation as a reference. Diagnostics allow only shipped source
   locations and controlled categories, excluding raw provider errors and trip data.
-  See the [matching study](scripts/matching-study/README.md) and [diagnostics](backend/diagnostics.js).
+  See the [matching study](scripts/matching-study/README.md) and [diagnostics](backend/diagnostics.ts).
 
 ## Architecture
 
 React and Redux provide the traveler workflow. One Express process serves the
-production build, local destination lookup, and hotel APIs.
+production build, local destination lookup, and hotel APIs. Application code and
+automated tests use TypeScript, with [shared contracts](shared/contracts.ts) for
+trip data and responses. Node 24 runs the backend with native type stripping;
+Vite builds browser TSX. Strict type checking is a separate CI gate. Types erase
+at runtime, so input, provider-response, and request-identity validation remain.
 
 ```mermaid
 flowchart TD
@@ -95,7 +99,8 @@ npx playwright install chromium firefox webkit
 npm run test:browser
 ```
 
-`check` runs the configured static checks, native tests, and production build.
+`check` runs strict type checking, ESLint, native tests, and the production build.
+Use `npm run typecheck` for the server, browser, and test configurations alone.
 Browser tests use that build and intercept their own API requests with synthetic
 fixtures; the production server has no fixture or demo endpoint. CI disables the
 live provider.

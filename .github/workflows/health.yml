@@ -24,4 +24,4 @@ jobs:
       - name: Check application and live provider health
         env:
           HEALTH_HOST: ${{ vars.HEALTH_HOST }}
-        run: node scripts/check-health.mjs
+        run: node scripts/check-health.mts

@@ -8,9 +8,15 @@ COPY frontend/package.json ./frontend/package.json
 RUN npm ci
 COPY frontend ./frontend
 COPY shared ./shared
-COPY data/destinations-legacy-public.json ./data/destinations-legacy-public.json
-COPY scripts/compress-build.mjs ./scripts/compress-build.mjs
-RUN npm run build
+COPY backend ./backend
+COPY tests ./tests
+COPY scripts ./scripts
+COPY data ./data
+COPY tsconfig*.json eslint.config.js ./
+RUN npm run typecheck && npm run build
+# Typecheck tests in the build stage, then keep only production TypeScript here.
+RUN find backend shared -type f ! -name '*.ts' -delete \
+    && find backend shared -type f \( -name '*.test.ts' -o -name 'test-helpers.ts' -o -name '*.d.ts' \) -delete
 
 FROM ${NODE_IMAGE} AS dependencies
 WORKDIR /app
@@ -24,8 +30,8 @@ ENV NODE_ENV=production PORT=5000 PROVIDER_STATE_FILE=/app/var/provider-state.js
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json ./package.json
-COPY backend ./backend
-COPY shared ./shared
+COPY --from=build /app/backend ./backend
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/frontend/dist ./frontend/dist
 COPY data ./data
 COPY scripts/reset-provider.mjs ./scripts/reset-provider.mjs
@@ -33,4 +39,4 @@ RUN mkdir -p /app/var && chown node:node /app/var
 USER node
 EXPOSE 5000
 HEALTHCHECK --interval=15s --timeout=4s --start-period=10s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:5000/health',{signal:AbortSignal.timeout(2500)}).then(r=>{if(r.status!==200)process.exit(1)}).catch(()=>process.exit(1))"]
-CMD ["node", "backend/server.js"]
+CMD ["node", "backend/server.ts"]

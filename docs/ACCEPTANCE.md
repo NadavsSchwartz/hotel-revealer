@@ -1,31 +1,55 @@
 # Acceptance evidence
 
-Updated 2026-09-09 UTC. This records observed evidence,
-not a blanket readiness claim. Local live search, candidate details and provider
-handoff have been exercised. Public release still needs the external verification
-below. Nadav removed the earlier provider-permission implementation gate; no
-permission or exception to the published terms has been established.
-The dated checkpoints below preserve their original evidence. Their test counts,
-Ant Design behavior and performance measurements apply to those revisions, not
-automatically to the current native-control and selected-offer recovery changes.
+Updated **2026-09-09 UTC**. This records observed evidence, not a blanket readiness
+claim. The current modernization results below supersede the earlier 278-native /
+420-browser summary. Historical sections retain the results and limitations of
+their original revisions; they are not repeated verification of the current tree.
 
-| Gate | Current status | Required evidence / remaining limit |
+## Modernization — 2026-09-09
+
+The migration starts at `6bf14b2`; dependency checkpoints culminated at `2cf7f32`.
+The TypeScript results below were captured from the subsequent working tree,
+before its checkpoint commit. Application code and automated tests are typed;
+shared contracts preserve editable versus validated trips, provider and public
+responses, and request-dependent identity checks. Runtime validation remains in
+place because TypeScript erases. Existing matching, request sharing, cancellation,
+recovery keys, pricing separation, and the single-process architecture remain.
+
+| Gate | Current result | Evidence and limit |
 | --- | --- | --- |
-| Domain correctness | Original-rule parity and current native tests passed | Raw types, ordered amenities/icons, duplicate limits and matching rules remain; Lifecycle tests distinguish missing observations from same-offer contradictions. Known live hotel outcomes remain absent |
-| Provider/API | Lifecycle and restart checks passed locally | Exact issued selection, fresh original quote, independent inference, shared-work admission and best-effort recovery snapshot; new restart proof uses the real service and synthetic provider, with no live request |
-| Production build | Passed: 278 native tests, lint and production build | Pinned Node 24.20.0/npm 11.19.0; integration-check.log against recovery revision d71e2b6 |
-| Browser journeys | 420/420 passed at 0ba5709 | 105 scenarios across Chromium, mobile Chromium, Firefox and WebKit, including native controls, restart recovery, retained shortlist and unavailable-selection recovery |
-| Automated accessibility | Current browser matrix passed without a destination-popup exception | The native combobox removed the rc-virtual-list holder and its rule exclusion. Popup/dialog checks pass normally; manual VoiceOver remains open and there is no blanket AA claim |
-| Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
-| Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Both local improvement targets met | Cold JavaScript −41.9%; representative lookup 2.6× faster. Measured memory/startup costs below; Linux cgroup and field/hosted performance remain unverified |
-| Security/privacy | Current dependency audits report zero findings; application checks remain scoped | Exact pins and lock identity in DEPENDENCY_REVIEW.md; recovery snapshot excludes raw trip/offer payloads, prices and hotel evidence. No blanket security claim |
-| Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
-| Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
-| Deployment / operations | Application-only release/reset preparation; real runtime gates open | Caddy bootstrap is separate from app upgrades. Docker image/reset/resource checks, host/TLS, real rollback/reboot and hardware/volume-loss durability remain unverified; simulated checks do not establish them |
-| Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+| Type coverage | Passed | 94 application/test/support source files covered, none uncovered; invalid-assignment and implicit-`any` probes rejected without writing probe files |
+| Static checks and native tests | Passed | Strict server/frontend/test configurations, lint, and 291/291 native tests; no skips or failures |
+| Production browser build | Passed | Vite production build and compressed assets generated; backend uses native Node 24 type stripping |
+| Browser journeys | Passed: 436/436 in 3.3 minutes | 109 scenarios across Chromium, mobile Chromium, Firefox, and WebKit; TypeScript specs run against the production build with synthetic API fixtures |
+| Presentation | Checked locally | Current homepage screenshot, rendered README/Mermaid, local links, and representative ignore rules; no live deployment link added |
+| Dependency audits | Passed: zero known findings | Full and production-only final reports match the lock identity in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md); this is an advisory check, not a blanket security claim |
+| Runtime packaging | Incomplete | Dockerfile/filtering received static review; Docker is unavailable locally, so image execution, reset persistence, non-root/read-only behavior, and resource limits remain unverified |
+| Performance | Final comparison pending | New modernization measurements must use the same runtime and fixtures; older improvements below are historical results |
+| Live provider / accuracy | No new proof | Earlier local flows are recorded below; known hotel outcomes, future provider compatibility, and permission remain unresolved |
+| Accessibility and devices | Partial | Automated browser checks passed; physical mobile, actual Edge/Safari, VoiceOver, and full manual accessibility signoff remain separate |
+| Human usability / hosted release | Open | First-time-user sessions, actual public journey, hosting/TLS, rollback/reboot, and hardware/volume-loss durability remain unverified |
 
-## Current remediation and selected-offer recovery
+Local evidence lives in ignored `output/verification/modernization/`:
+
+- `type-coverage.json` records configuration coverage and rejected type-error probes.
+- `typescript-check.log` records strict typechecking, lint, 291 native tests, and the build.
+- `typescript-browser.log` records the complete 436-execution TypeScript browser run.
+- `final-audit-all.json` and `final-audit-production.json` record zero known findings
+  for the final TypeScript dependency graph.
+- `dependencies-browser.log` records the earlier passing 436-execution JavaScript
+  dependency checkpoint; it is distinct from the later TypeScript result.
+
+Focused regression coverage includes malformed destination entries and retry,
+Express startup port conflicts without false success logs, body-size errors,
+compression/HEAD/static routes, environment precedence and quiet loading, and
+response shape/identity validation. Browser scenarios retain independent fixture
+oracles, including deliberate malformed-wire and nullable-display fallback cases.
+No hosted, live-provider, real provider-state reset, or manual device proof is
+implied by these local checks. See [modernization status](MODERNIZATION.md) for
+checkpoint progress and [live integration evidence](LIVE_ACCESS.md) for earlier
+provider observations and their limits.
+
+## Historical remediation and selected-offer recovery
 
 Lifecycle core `51a3ab8` and recovery `d71e2b6` separate an original offer from the inferred hotel and
 its quote. Partial discovery, missing facts, absent membership and transport

@@ -13,12 +13,13 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build --workspace frontend && node scripts/compress-build.mjs",
-    "start": "node backend/server.js",
-    "test": "node --test backend/domain/*.test.js backend/destinations/*.test.js backend/provider/*.test.js backend/*.test.js frontend/src/traveler/*.test.js scripts/check-health.test.mjs scripts/matching-study/*.test.mjs",
+    "build": "npm run build --workspace frontend && node scripts/compress-build.mts",
+    "start": "node backend/server.ts",
+    "test": "node --test backend/domain/*.test.ts backend/destinations/*.test.ts backend/provider/*.test.ts backend/*.test.ts frontend/src/traveler/*.test.ts scripts/check-health.test.mts scripts/matching-study/*.test.mts",
     "test:browser": "playwright test",
     "lint": "eslint . --max-warnings 0",
-    "check": "npm run lint && npm test && npm run build",
+    "typecheck": "tsc -p tsconfig.server.json && tsc -p frontend/tsconfig.json && tsc -p tsconfig.json",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "measure:capacity": "node scripts/measure-capacity.mjs",
     "provider:reset": "node scripts/reset-provider.mjs"
   },
@@ -30,9 +31,15 @@
     "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
+    "@types/express": "5.0.6",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
     "eslint": "10.10.0",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "17.12.0"
+    "globals": "17.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
   },
   "overrides": {
     "qs": "6.16.0"

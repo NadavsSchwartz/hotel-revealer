@@ -67,7 +67,7 @@ removed. No performance improvement or identification accuracy is claimed.
 Use Node 24.20.0 from `.nvmrc` and the existing root workspace dependencies:
 
 ```sh
-node --test backend/domain/matching.test.js backend/domain/normalization.test.js scripts/matching-study/*.test.mjs
+node --test backend/domain/matching.test.js backend/domain/normalization.test.js scripts/matching-study/*.test.mts
 node scripts/matching-study/compare.mjs output/original-matching/current-listings.json
 ```
 

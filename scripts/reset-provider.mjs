@@ -1,5 +1,5 @@
-import '../backend/env.js';
-import { resetProviderState } from '../backend/provider/state.js';
+import '../backend/env.ts';
+import { resetProviderState } from '../backend/provider/state.ts';
 
 if (!process.argv.includes('--after-review')) {
   console.error('Stop the app and review the provider block or interrupted request first. Then use npm run provider:reset -- --after-review and restart the application.');

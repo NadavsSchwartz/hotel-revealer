@@ -16,7 +16,7 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
-    command: 'node backend/server.js',
+    command: 'node backend/server.ts',
     url: 'http://127.0.0.1:4319/health',
     reuseExistingServer: false,
     env: { NODE_ENV: 'production', PORT: '4319', HOTEL_PROVIDER: 'disabled', PROVIDER_STATE_FILE: path.join(tmpdir(), 'hotel-revealer-browser-provider-state.json') },

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { matchOriginal } from './original.mjs';
-import { isValidOffer, isValidHotel, matchObservations as matchRefactored } from '../../backend/domain/matching.js';
-import { matchListings } from '../../backend/domain/matching.js';
+import { isValidOffer, isValidHotel, matchObservations as matchRefactored } from '../../backend/domain/matching.ts';
+import { matchListings } from '../../backend/domain/matching.ts';
 
 const filename = process.argv[2];
 if (!filename) throw new Error('Usage: node scripts/matching-study/compare.mjs <saved-capture.json>');

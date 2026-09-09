@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from '@playwright/test';
-import { detailResponse, searchResponse, searchPath } from '../tests/browser/fixtures.js';
+import { detailResponse, searchResponse, searchPath } from '../tests/browser/fixtures.ts';
 
 const baseURL = process.env.LOCAL_URL || 'http://127.0.0.1:4320';
 const origin = new URL(baseURL).origin;

@@ -6,7 +6,6 @@
 **/coverage
 **/test-results
 **/playwright-report
-**/*.test.js
 .env
 .env.*
 !.env.example
