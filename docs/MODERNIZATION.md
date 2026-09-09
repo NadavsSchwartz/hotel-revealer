@@ -14,7 +14,7 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
 | Shared TypeScript contracts | Complete | Strict contracts and raw/validated input boundaries; independent review findings fixed and retested |
 | Frontend and browser tests | Complete | Typed state, refs, view contracts and tests; 436 integrated browser executions passed |
 | Backend and remaining tests | Complete | Typed matching/provider/HTTP code and tests; 291 integrated native tests passed |
-| Packaging and final evidence | Partial | Clean production-only local snapshot and dev smoke passed; Docker execution unavailable; final measurement/source binding pending |
+| Packaging and final evidence | Local checks complete; Docker unverified | Clean installs, local runtime/dev smoke, source-bound measurements and static packaging review passed; Docker execution unavailable |
 
 ## Evidence
 
@@ -55,7 +55,7 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
   `output/verification/modernization/dependencies-browser.log` (ignored).
 - Container execution is unverified: no Docker command, Docker Desktop or OrbStack
   installation was found in the standard local locations. Packaging source and
-  offline script checks will still be completed; no container success is implied.
+  offline script checks passed; no container success is implied.
 - TypeScript integration: **291/291 native tests**, strict checks, type-aware lint
   and production build passed. **436/436 browser executions passed in 3.3 minutes**
   without retries. Logs: `typescript-check.log` and `typescript-browser.log`.
@@ -63,6 +63,10 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
   virtual invalid-assignment and implicit-any probes fail as required. No probe
   source was written to disk. Temporary JavaScript allowances are removed.
   `noUncheckedIndexedAccess` remains deferred as agreed.
+- Deliberate language exceptions: the static pre-paint theme script, JavaScript
+  configuration/operator tools and independent legacy oracle remain unchanged in
+  language. Existing shell/Python deployment checks are not ported. Application
+  modules and Node/Playwright suites are TypeScript.
 - Clean production-only local install: 88 packages installed; compiler/lint/Vite
   packages and test files absent. Native TypeScript startup, readiness, HTML and
   Brotli assets, API 404s, destination lookup, refused/unlocked operator reset,
@@ -73,10 +77,24 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
   Desktop (1440×1100) and mobile (390×844) production captures were inspected;
   no page errors or horizontal overflow were found. Evidence: `dev-smoke.json`,
   `final-desktop.jpg`, and `final-mobile.jpg`.
-- Initial final capacity run passed: peak RSS **352.72 MiB** versus **332.63 MiB**
-  baseline (+20.09 MiB), leaving 159.28 MiB against the local 512 MiB comparison
-  budget. This increase is not a performance improvement or Linux capacity proof.
-  Final source-bound measurements and startup comparison remain to be recorded.
+- Both final capacity runs passed. Peak RSS was **352.72 MiB** in the first run
+  and **319.42 MiB** on committed `6c3a9ad`, versus **332.63 MiB** at baseline.
+  Maximum health latency varied from 59.68 to 262.23 ms after migration (80.07 ms
+  before). These variations do not establish a fixed RSS change or speedup.
+  The committed report identifies `6c3a9ad` with no dirty measured source paths.
+- Five alternating fresh-process catalog imports compared `2cf7f32` JavaScript
+  with `6c3a9ad` TypeScript on Node 24.20.0, using a warm filesystem. Median import
+  time rose **1292.57 → 1642.06 ms**; heap after forced GC rose **76.04 → 80.05 MiB**.
+  This includes native type stripping and the added catalog validation, excludes
+  Node process bootstrap, and does not isolate individual costs or hosted startup.
+- All generated JS/CSS assets changed from **148,602 → 150,029 Brotli bytes**.
+  This is the complete asset set, not cold-page transfer. Measurements and limits
+  are recorded in `performance-comparison.json` and `startup-comparison.json`.
+- A clean development `npm ci` succeeded, followed by strict checks, type-aware
+  lint, **291/291 native tests** and the build. All **46 build files** exactly
+  match the build used by the passing 436-execution browser matrix. The optional
+  native watcher binding also loads. Evidence: `clean-install.log`,
+  `clean-install-check.log`, and `clean-install-build.json`.
 - Existing untracked `sketches/hidden-name/` and `sketches/open-secret/` belong to
   unrelated work and remain untouched.
 
@@ -108,9 +126,15 @@ unverified gate below. Keep dependency and behavioral changes separate.
 - Independent frontend, provider, HTTP and refreshed packaging reviews found no
   remaining consequential defects. Browser view types preserve nullable ratings
   and existing object-form image/amenity fallbacks separately from producer types.
+- `6c3a9ad`: strict TypeScript application/tests, native runtime entrypoints,
+  request/response contracts and filtered runtime packaging.
+- Closing independent review verified test/audit counts, lock and build hashes,
+  staged runtime source binding, performance figures and remaining gates. No
+  consequential findings remained; language-exception wording was clarified.
 
-## Next action
+## Remaining release gates
 
-Commit the verified TypeScript implementation, bind final measurements to that
-revision, complete the clean development install check and close the documentation.
-Docker execution and hosted/manual/live-provider release gates remain unverified.
+Local implementation and verification are complete. Run the Docker build and
+image smoke checks on a machine with Docker before release. Hosted deployment,
+live-provider/known-outcome validation, physical devices and manual accessibility
+remain separate, unverified release gates. No push or deployment was performed.

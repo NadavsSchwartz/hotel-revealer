@@ -53,6 +53,9 @@ JavaScript dependency checkpoint, before TypeScript dependencies.
   runtime validation remains at external boundaries. Configuration and maintenance
   scripts stay JavaScript where appropriate, and the independent legacy matching
   reference retains its original implementation with a narrow declaration.
+  The pre-paint browser theme script remains plain JavaScript because Vite copies
+  it unchanged. Existing shell/Python deployment checks retain their runtimes;
+  application modules and Node/Playwright test suites are TypeScript.
 - **Express 5:** the root-inclusive SPA wildcard and startup error callback were
   migrated explicitly. A failed bind emits a structured failure and cannot emit
   `server_started`. Compression fallthrough, JSON limits, static responses, and
@@ -66,8 +69,16 @@ JavaScript dependency checkpoint, before TypeScript dependencies.
 
 Strict typechecking, lint, **291 native tests**, the production build, and
 **436 browser executions** (109 scenarios across four configurations) passed
-for the TypeScript working tree. See [acceptance evidence](ACCEPTANCE.md) for
-logs, verification boundaries, and packaging status. Docker execution, deployed
+for the code committed as `6c3a9ad`. A clean production-only local snapshot also
+started the native TypeScript server without compiler, lint, Vite, or test files;
+health, static/API routes, reviewed synthetic state reset, restart, and graceful
+shutdown passed. Development startup and its Vite proxy passed separately.
+A subsequent clean development `npm ci` and full check passed; all 46 generated
+build files matched the browser-tested build byte-for-byte. The optional macOS
+`fsevents` install-script notice did not block installation or loading its native
+binding. Measured catalog-import and heap costs are recorded in the
+[acceptance evidence](ACCEPTANCE.md#modernization-performance-comparison); no runtime
+speedup is claimed. Docker execution, deployed
 behavior, physical devices, and manual assistive-technology checks remain
 separate gates. A dependency audit cannot replace those checks.
 

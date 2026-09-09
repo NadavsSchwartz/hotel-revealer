@@ -8,8 +8,8 @@ their original revisions; they are not repeated verification of the current tree
 ## Modernization — 2026-09-09
 
 The migration starts at `6bf14b2`; dependency checkpoints culminated at `2cf7f32`.
-The TypeScript results below were captured from the subsequent working tree,
-before its checkpoint commit. Application code and automated tests are typed;
+The verified TypeScript code and runtime integration are committed as **`6c3a9ad`**.
+Application modules and Node/Playwright test suites are typed;
 shared contracts preserve editable versus validated trips, provider and public
 responses, and request-dependent identity checks. Runtime validation remains in
 place because TypeScript erases. Existing matching, request sharing, cancellation,
@@ -18,13 +18,15 @@ recovery keys, pricing separation, and the single-process architecture remain.
 | Gate | Current result | Evidence and limit |
 | --- | --- | --- |
 | Type coverage | Passed | 94 application/test/support source files covered, none uncovered; invalid-assignment and implicit-`any` probes rejected without writing probe files |
-| Static checks and native tests | Passed | Strict server/frontend/test configurations, lint, and 291/291 native tests; no skips or failures |
-| Production browser build | Passed | Vite production build and compressed assets generated; backend uses native Node 24 type stripping |
+| Static checks and native tests | Passed again after clean install | Strict server/frontend/test configurations, typed lint, and 291/291 native tests; no skips or failures |
+| Production browser build | Passed and reproduced | Clean `npm ci` followed by checks/build reproduces all 46 files byte-for-byte against the 436-browser-tested build; backend uses native Node 24 type stripping |
 | Browser journeys | Passed: 436/436 in 3.3 minutes | 109 scenarios across Chromium, mobile Chromium, Firefox, and WebKit; TypeScript specs run against the production build with synthetic API fixtures |
-| Presentation | Checked locally | Current homepage screenshot, rendered README/Mermaid, local links, and representative ignore rules; no live deployment link added |
+| Presentation and rendered UI | Checked locally | README/Mermaid and source links checked; final 1440×1100 desktop and 390×844 mobile captures inspected without console errors or horizontal overflow; no live deployment link added |
 | Dependency audits | Passed: zero known findings | Full and production-only final reports match the lock identity in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md); this is an advisory check, not a blanket security claim |
-| Runtime packaging | Incomplete | Dockerfile/filtering received static review; Docker is unavailable locally, so image execution, reset persistence, non-root/read-only behavior, and resource limits remain unverified |
-| Performance | Final comparison pending | New modernization measurements must use the same runtime and fixtures; older improvements below are historical results |
+| Development runtime | Passed | Root `npm run dev` starts the native TypeScript backend and serves TSX through Vite; health and proxy checks pass with provider disabled |
+| Production-only runtime snapshot | Passed locally | Filtered snapshot excludes tests and a clean production-only install excludes compiler, lint, and Vite; native TypeScript startup, health, HTML/Brotli, API 404, catalog lookup, reviewed synthetic stopped-state reset, restart, and graceful stop pass |
+| Container and deployment | Image execution incomplete | Dockerfile/filtering static review and shell validation pass, including 12 simulated release scenarios; Docker is unavailable, so image execution, non-root/read-only behavior, container persistence, and resource limits remain unverified |
+| Performance | Compared locally; costs recorded below | All capacity assertions passed; catalog import and retained heap increased, while RSS and peak health latency varied between runs. No speedup or fixed RSS-delta claim |
 | Live provider / accuracy | No new proof | Earlier local flows are recorded below; known hotel outcomes, future provider compatibility, and permission remain unresolved |
 | Accessibility and devices | Partial | Automated browser checks passed; physical mobile, actual Edge/Safari, VoiceOver, and full manual accessibility signoff remain separate |
 | Human usability / hosted release | Open | First-time-user sessions, actual public journey, hosting/TLS, rollback/reboot, and hardware/volume-loss durability remain unverified |
@@ -33,9 +35,17 @@ Local evidence lives in ignored `output/verification/modernization/`:
 
 - `type-coverage.json` records configuration coverage and rejected type-error probes.
 - `typescript-check.log` records strict typechecking, lint, 291 native tests, and the build.
+- `clean-install.log` and `clean-install-check.log` record successful `npm ci` and
+  repeated checks; `clean-install-build.json` confirms 46 byte-identical build files.
 - `typescript-browser.log` records the complete 436-execution TypeScript browser run.
 - `final-audit-all.json` and `final-audit-production.json` record zero known findings
   for the final TypeScript dependency graph.
+- `runtime-smoke.json` records the production-only local snapshot checks and
+  explicitly records `imageExecuted: false`; `runtime-install.log` records installation.
+- `dev-smoke.json` records native backend, TSX entry, and Vite proxy checks.
+- `performance-comparison.json` and `startup-comparison.json` retain all reported
+  capacity runs, asset totals, and paired catalog-import samples.
+- `final-desktop.jpg` and `final-mobile.jpg` retain the inspected rendered captures.
 - `dependencies-browser.log` records the earlier passing 436-execution JavaScript
   dependency checkpoint; it is distinct from the later TypeScript result.
 
@@ -48,6 +58,39 @@ No hosted, live-provider, real provider-state reset, or manual device proof is
 implied by these local checks. See [modernization status](MODERNIZATION.md) for
 checkpoint progress and [live integration evidence](LIVE_ACCESS.md) for earlier
 provider observations and their limits.
+
+### Modernization performance comparison
+
+Node 24.20.0 was used throughout. The capacity harness compares the starting
+revision with an initial TypeScript working tree and a rerun of committed
+`6c3a9ad` with no dirty source paths. All capacity assertions passed.
+
+| Capacity observation | Baseline `6bf14b2` | Initial TypeScript tree | Committed `6c3a9ad` |
+| --- | ---: | ---: | ---: |
+| Peak RSS | 332.63 MiB | 352.72 MiB | 319.42 MiB |
+| Peak sampled heap | 149.92 MiB | 176.84 MiB | 176.55 MiB |
+| Maximum sampled health latency | 80.07 ms | 59.68 ms | 262.23 ms |
+
+Both after-runs had higher sampled peak heap. RSS and maximum health latency
+varied; these runs do not establish a fixed RSS improvement/regression or a
+speedup. They are synthetic local measurements, not Linux cgroup or hosted proof.
+
+Five alternating fresh-process catalog imports compared the final JavaScript
+checkpoint `2cf7f32` with `6c3a9ad`, using a warm filesystem and excluding Node
+bootstrap. Median import time increased from **1,292.57 to 1,642.06 ms** (+349.49 ms);
+post-GC heap increased from **76.04 to 80.05 MiB** (+4.01 MiB). The after version
+combines native type stripping and catalog validation; this does not isolate
+those costs or measure full application/hosted startup.
+
+| All generated JS/CSS assets | Baseline `6bf14b2` | `6c3a9ad` |
+| --- | ---: | ---: |
+| Uncompressed | 559,543 B | 565,432 B |
+| Brotli | 148,602 B | 150,029 B |
+| gzip | 158,775 B | 160,227 B |
+
+These totals include every generated JS/CSS asset, including lazy chunks; they
+are not cold-page transfer measurements. The earlier performance improvements
+below belong to earlier revisions.
 
 ## Historical remediation and selected-offer recovery
 

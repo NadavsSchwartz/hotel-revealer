@@ -107,7 +107,10 @@ live provider.
 
 The [acceptance record](docs/ACCEPTANCE.md) binds results to tested revisions and
 distinguishes native tests, browser scenarios, live observations, and unresolved
-gates. Browser configurations cover Chromium, mobile Chromium emulation, Firefox,
+gates. The TypeScript checkpoint passed 291 native tests and 436 browser
+executions, plus local development and production-only runtime checks. A clean
+install reproduced the browser-tested build byte-for-byte. Docker image execution
+remains unverified. Browser configurations cover Chromium, mobile Chromium emulation, Firefox,
 and WebKit; they do not establish physical-device or manual accessibility support.
 Generated evidence stays in ignored `output/`, `test-results/`, and `playwright-report/`.
 
