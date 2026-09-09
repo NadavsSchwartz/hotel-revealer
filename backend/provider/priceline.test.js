@@ -109,6 +109,18 @@ test('handoff binds the original opaque offer, stay, rooms, adults, and every ch
   }
 });
 
+test('an observed routing city reconstructs the original handoff without another provider request', async () => {
+  const { search, adapter, requests } = setup();
+  const { listings } = await search();
+  const issued = listings[1];
+  const before = requests.length;
+  assert.equal(adapter.originalOfferUrl({ context, offerId: issued.pclnId, cityId: String(issued.location.cityId) }), issued.handoffUrl);
+  assert.equal(requests.length, before);
+  for (const cityId of [null, '0', 'city-1', '3000015284/other', '1'.repeat(17)]) {
+    assert.equal(adapter.originalOfferUrl({ context, offerId: issued.pclnId, cityId }), null);
+  }
+});
+
 test('invalid masked values remain unknown and unsafe offer tokens do not become URLs', async () => {
   const { search } = setup(() => jsonResponse(page({ hotels: [named, { ...opaque,
     overallGuestRating: -1, totalReviewCount: 1.5, pclnId: '../another-offer',

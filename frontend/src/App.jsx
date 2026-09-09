@@ -73,6 +73,13 @@ function Policy({ privacy }) {
             are collected here.
           </p>
           <p>
+            To reopen a recently selected offer after a restart, this server temporarily
+            stores a hashed selection reference, the provider’s city ID and an expiry time.
+            These records are valid for 30 minutes and are removed when expired while the
+            service runs and when it starts. They contain no travel dates, guest counts or
+            ages, offer IDs, prices, hotel guesses or booking links.
+          </p>
+          <p>
             When photographs are available, your browser may request them from
             the image host. Opening an original offer takes you to Priceline,
             where its privacy policy applies.

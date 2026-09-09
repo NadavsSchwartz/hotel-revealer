@@ -244,12 +244,12 @@ function hasNearbyListing(rows, destination) {
   });
 }
 
-function originalOfferUrl(row, context) {
+function originalOfferUrl({ context, offerId, cityId }) {
   // The public guest selector encodes aggregate room/adult counts and child ages.
   if (!isCurrency(context.currency) ||
-      typeof row.pclnId !== 'string' || !/^[a-f\d]{1,1024}$/i.test(row.pclnId) ||
-      !/^[1-9]\d{0,15}$/.test(String(row.location?.cityId))) return null;
-  return `https://www.priceline.com/relax-ui/at/express/${row.location.cityId}/${row.pclnId}` +
+      typeof offerId !== 'string' || !/^[a-f\d]{1,1024}$/i.test(offerId) ||
+      !/^[1-9]\d{0,15}$/.test(String(cityId))) return null;
+  return `https://www.priceline.com/relax-ui/at/express/${cityId}/${offerId}` +
     `/from/${context.checkIn.replaceAll('-', '')}/to/${context.checkOut.replaceAll('-', '')}` +
     `/rooms/${context.rooms}/adults/${context.adults}` +
     (context.childrenAges.length ? `/children/${context.childrenAges.join(',')}` : '') + `?cur=${context.currency}`;
@@ -288,7 +288,7 @@ function adaptListing(row, context) {
       reviewCount: reviewCount === null ? { kind: 'unknown' } : { kind: 'minimum', value: reviewCount },
     },
     ratesSummary,
-    handoffUrl: originalOfferUrl(row, context),
+    handoffUrl: originalOfferUrl({ context, offerId: row.pclnId, cityId: row.location?.cityId }),
   };
 }
 
@@ -385,6 +385,7 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
   }
 
   return {
+    originalOfferUrl,
     async listingsPage({ context, cursor, signal }) {
       const destination = getDestination(context.destinationId);
       if (!destination) throw invalidResponse();

@@ -7,10 +7,10 @@ import { ProviderScheduler, realClock } from './scheduler.js';
 import { cleanState, createFileStateStore, retryAfterDeadline } from './state.js';
 import { assertJsonSize } from './size.js';
 import { diagnostic } from '../diagnostics.js';
+import { selectionHash, SELECTION_TTL as ISSUED_OFFER_TTL } from './selection-store.js';
 
 const SEARCH_TTL = 5 * 60_000;
 const DETAIL_TTL = 60_000;
-const ISSUED_OFFER_TTL = 30 * 60_000;
 const CACHE_BYTES = 16 * 1024 * 1024; // Serialized payload weight per cache, not a heap limit.
 const partialFailures = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED']);
 const contextKey = (context) => JSON.stringify([context.destinationId, context.checkIn, context.checkOut, context.rooms, context.adults, context.childrenAges, context.currency]);
@@ -52,7 +52,7 @@ function withDeadline(operation, deadline, clock) {
  * hotelDetails({context,offerId,hotelId,signal}) => display fields, honors AbortSignal,
  * and classifies challenges/rate limits with ProviderFailure.
  */
-export function createProviderService({ adapter = null, clock = realClock, stateStore = createFileStateStore(), logger = console } = {}) {
+export function createProviderService({ adapter = null, clock = realClock, stateStore = createFileStateStore(), selectionStore = null, logger = console } = {}) {
   const configured = Boolean(adapter && typeof adapter.listingsPage === 'function' && typeof adapter.hotelDetails === 'function');
   const searches = new FreshCache({ capacity: 25, maxBytes: CACHE_BYTES, ttlMs: SEARCH_TTL, now: clock.now });
   const details = new FreshCache({ capacity: 100, maxBytes: CACHE_BYTES, ttlMs: DETAIL_TTL, now: clock.now });
@@ -232,6 +232,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
     };
     metrics.pagesFetched = pagesFetched;
     const bytes = assertJsonSize(result);
+    const cities = selectionStore ? new Map(offers.map(row => [String(row?.pclnId), row?.location?.cityId])) : null;
+    const records = [];
     for (const offer of result.offers) {
       const selectionKey = issuedOfferKey(context, offer.offerId);
       // Missing observations cannot disprove a previously issued inference.
@@ -240,6 +242,22 @@ export function createProviderService({ adapter = null, clock = realClock, state
       issuedOffers.set(selectionKey, issued, {
         bytes: assertJsonSize(issued), expiresAt: Date.parse(result.retrievedAt) + ISSUED_OFFER_TTL,
       });
+      if (selectionStore) {
+        const cityId = String(cities.get(offer.offerId));
+        const sameLink = offer.handoffUrl && adapter.originalOfferUrl?.({ context, offerId: offer.offerId, cityId }) === offer.handoffUrl;
+        records.push({ hash: selectionHash(selectionKey), cityId: sameLink ? cityId : null,
+          expiresAt: Date.parse(result.retrievedAt) + ISSUED_OFFER_TTL });
+      }
+    }
+    if (records.length) {
+      const writing = Promise.resolve().then(() => selectionStore.remember(records)).catch(error => {
+        log('error', { event: 'selection_recovery_failed', operation: 'write', diagnostic: diagnostic(error) });
+      });
+      holdWork?.(writing);
+      if (deadline > clock.now()) {
+        try { await withDeadline(writing, deadline, clock); }
+        catch { log('info', { event: 'selection_recovery_pending' }); }
+      } else log('info', { event: 'selection_recovery_pending' });
     }
     if (cacheable && deadline > clock.now()) searches.set(key, result, { bytes, expiresAt: Date.parse(result.expiresAt) });
     return result;
@@ -323,6 +341,24 @@ export function createProviderService({ adapter = null, clock = realClock, state
         await withDeadline(available({ allowCooldown: true }), deadline, clock);
         const selectionKey = issuedOfferKey(context, offerId);
         let issued = issuedOffers.get(selectionKey);
+        if (!issued && selectionStore) {
+          const reading = Promise.resolve().then(() => selectionStore.get(selectionHash(selectionKey))).catch(error => {
+            log('error', { event: 'selection_recovery_failed', operation: 'read', diagnostic: diagnostic(error) });
+          });
+          holdWork?.(reading);
+          const record = await withDeadline(reading, deadline, clock);
+          if (record && record.expiresAt > clock.now()) {
+            // Recovery proves the original selection, never a hotel inference
+            // or price. The caller supplies the trip and opaque offer ID again.
+            issued = { offer: { offerId, neighborhoodName: null, stars: null,
+              clues: { guestRating: { kind: 'unknown' }, reviewCount: { kind: 'unknown' }, amenities: null },
+              quote: normalizeQuote(null),
+              handoffUrl: record.cityId === null ? null : adapter.originalOfferUrl?.({ context, offerId, cityId: record.cityId }) ?? null,
+              resolution: { status: 'unresolved', reason: 'missing_facts' }, candidates: [],
+            }, offerExpiresAt: iso(record.expiresAt - ISSUED_OFFER_TTL + SEARCH_TTL) };
+            issuedOffers.set(selectionKey, issued, { bytes: assertJsonSize(issued), expiresAt: record.expiresAt });
+          }
+        }
         if (!issued) {
           // City discovery owns its full search budget. This detail caller may
           // stop waiting earlier without terminating another search subscriber.
@@ -404,6 +440,6 @@ export function createProviderService({ adapter = null, clock = realClock, state
       return { available: !state.disabled && state.cooldownUntil <= clock.now(), search: structuredClone(searchSummary) };
     },
     drain() { draining = true; },
-    close() { draining = true; scheduler.close(); },
+    close() { draining = true; scheduler.close(); return selectionStore?.close(); },
   };
 }
