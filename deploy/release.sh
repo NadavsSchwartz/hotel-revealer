@@ -50,10 +50,7 @@ fi
 timeout 180s docker pull "$APP_IMAGE" >/dev/null
 if [[ -z "$caddy_container" ]]; then
   timeout 180s docker pull "$CADDY_IMAGE" >/dev/null
-  timeout 30s docker run --rm --read-only --cap-drop ALL --network none --tmpfs /data --tmpfs /config \
-    --env SITE_ADDRESS --env ACME_EMAIL \
-    --mount type=bind,src=/opt/hotel-revealer/deploy/Caddyfile,dst=/etc/caddy/Caddyfile,readonly \
-    "$CADDY_IMAGE" caddy validate --config /etc/caddy/Caddyfile >/dev/null
+  validate_caddy_config "$CADDY_IMAGE" /opt/hotel-revealer/deploy/Caddyfile
   compose up --detach --no-deps --pull never --no-recreate caddy
   caddy_container=$(compose ps --quiet caddy)
   [[ -n "$caddy_container" && $(docker inspect --format '{{.State.Running}}' "$caddy_container") == true ]] || fail 'Caddy bootstrap did not stay running; app has not been stopped.'

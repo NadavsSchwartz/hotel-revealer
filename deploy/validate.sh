@@ -8,3 +8,10 @@ valid_caddy_image() { [[ "$1" =~ ^caddy:2[0-9a-z.-]*@sha256:[a-f0-9]{64}$ ]]; }
 valid_host() {
   [[ ${#1} -le 253 && "$1" == *.* && "$1" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$1" != *..* && "$1" != *.-* && "$1" != *-.* ]]
 }
+validate_caddy_config() {
+  # The pinned Caddy binary requires its file capability even for validation.
+  timeout 30s docker run --rm --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE --network none --tmpfs /data --tmpfs /config \
+    --env SITE_ADDRESS --env ACME_EMAIL \
+    --mount "type=bind,src=$2,dst=/etc/caddy/Caddyfile,readonly" \
+    "$1" caddy validate --config /etc/caddy/Caddyfile >/dev/null
+}

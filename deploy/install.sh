@@ -5,7 +5,7 @@ set -euo pipefail
 source_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 command -v docker >/dev/null
 docker compose version >/dev/null
-install -d -o root -g root -m 755 /opt/hotel-revealer/deploy
+install -d -o root -g root -m 755 /opt/hotel-revealer /opt/hotel-revealer/deploy
 install -d -o root -g root -m 700 /etc/hotel-revealer /var/lib/hotel-revealer
 install -d -o 1000 -g 1000 -m 700 /var/lib/hotel-revealer/provider
 for file in compose.yaml Caddyfile validate.sh; do

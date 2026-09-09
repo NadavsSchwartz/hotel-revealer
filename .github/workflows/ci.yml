@@ -51,6 +51,14 @@ jobs:
           python3 -m py_compile deploy/provision-do.py
           bash deploy/test-validation.sh
           python3 deploy/test-release.py
+      - name: Validate the pinned Caddy image and configuration without network access
+        run: |
+          source deploy/validate.sh
+          CADDY_IMAGE=$(sed -n 's/^CADDY_IMAGE=//p' deploy/compose.env.example)
+          valid_caddy_image "$CADDY_IMAGE" || fail 'Expected a verified immutable Caddy image.'
+          export SITE_ADDRESS=hotel.example.com ACME_EMAIL=operator@example.com
+          timeout 180s docker pull "$CADDY_IMAGE" >/dev/null
+          validate_caddy_config "$CADDY_IMAGE" "$PWD/deploy/Caddyfile"
       - name: Build and smoke the production image without upstream access
         env:
           NODE_IMAGE: ${{ vars.NODE_IMAGE || 'node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e' }}
