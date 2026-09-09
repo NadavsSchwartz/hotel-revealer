@@ -50,7 +50,7 @@ changes request new provider prices rather than applying a browser-side conversi
 | Deployment | One application container behind Caddy HTTPS; Docker Compose and GitHub Actions |
 
 ```mermaid
-flowchart LR
+flowchart TD
   Browser[React traveler interface] --> API[Express API]
   API --> Catalog[Local destination catalog]
   API --> Service[Provider service]
