@@ -104,6 +104,7 @@ test('browser Forward cannot restore a candidate excluded by newer results while
   });
   await page.goto(searchPath);
   await page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Juniper House, property photograph 1', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toBeVisible();
   await page.goBack();
   await page.getByRole('button', { name: 'Update prices', exact: true }).click();

@@ -11,7 +11,7 @@ async function chooseHomeTrip(page) {
     const input = page.getByRole('combobox', { name: label, exact: true });
     if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
     const calendar = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
-    const day = calendar.locator(`td[title="${context[field]}"]`);
+    const day = calendar.locator(`[data-day="${context[field]}"]`);
     for (let month = 0; month < 13 && await day.count() === 0; month++) {
       await calendar.getByRole('button', { name: 'Next month', exact: true }).click();
     }

@@ -23,7 +23,7 @@ test('a new home search uses the selected currency with the entered trip', async
     const input = page.getByRole('combobox', { name: label, exact: true });
     if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
     const calendar = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
-    const day = calendar.locator(`td[title="${value}"]`);
+    const day = calendar.locator(`[data-day="${value}"]`);
     for (let month = 0; month < 13 && await day.count() === 0; month++) {
       await calendar.getByRole('button', { name: 'Next month', exact: true }).click();
     }

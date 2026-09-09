@@ -83,7 +83,7 @@ test('returning to a cooling-down trip preserves its retry after expiry without 
   const edit = page.getByRole('button', { name: 'Edit trip', exact: true });
   if (await edit.isVisible()) await edit.click();
   await page.getByRole('combobox', { name: 'Check-out', exact: true }).click();
-  await page.locator(`.travel-calendar-popup:visible td[title="${tripB.checkOut}"] button`).click();
+  await page.locator(`.travel-calendar-popup:visible [data-day="${tripB.checkOut}"] button`).click();
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
   await page.goBack();

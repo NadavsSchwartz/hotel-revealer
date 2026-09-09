@@ -58,7 +58,8 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
       const topEdge = (viewport?.offsetTop || 0) + 12;
       const rightEdge = leftEdge + (viewport?.width || window.innerWidth) - 24;
       const bottomEdge = topEdge + (viewport?.height || window.innerHeight) - 24;
-      if (anchor.bottom < topEdge || anchor.top > bottomEdge) { setOpen(false); return; }
+      // Focus can arrive before the browser scrolls this input into view.
+      if (anchor.bottom < topEdge || anchor.top > bottomEdge) { setPosition({ visibility: 'hidden' }); return; }
       const width = Math.min(Math.max(anchor.width, 270), rightEdge - leftEdge);
       popup.current.style.width = `${width}px`;
       const below = Math.max(0, bottomEdge - anchor.bottom - 8);
