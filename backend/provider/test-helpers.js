@@ -1,3 +1,5 @@
+import { setImmediate } from 'node:timers/promises';
+
 const testNow = Date.now();
 const dateAfter = days => new Date(testNow + days * 86_400_000).toISOString().slice(0, 10);
 export const futureContext = { cityName: 'Las Vegas, Nevada', checkIn: dateAfter(30), checkOut: dateAfter(32) };
@@ -19,7 +21,8 @@ export const listingRows = () => [
   },
 ];
 
-export const flush = async () => { for (let i = 0; i < 80; i += 1) await Promise.resolve(); };
+// Yield past queued promise work; tests waiting for I/O need its completion signal.
+export const flush = () => setImmediate();
 
 export function manualClock(initial = testNow) {
   let current = initial;

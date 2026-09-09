@@ -172,20 +172,24 @@ test('non-Error failures and logging failures cannot hide or change the HTTP 500
   assert.equal(response.body.error.code, 'INTERNAL_ERROR');
 });
 
-test('aborted requests emit one abort record instead of a successful completion', async t => {
+test('aborted requests emit one abort record instead of a successful completion', { timeout: 5000 }, async t => {
   const logs = [];
   let finish;
-  const server = createApp({ service: { search: () => new Promise(resolve => { finish = resolve; }) },
-    logger: { info: entry => logs.push(entry) } }).listen(0, '127.0.0.1');
+  let started;
+  let recorded;
+  const dispatched = new Promise(resolve => { started = resolve; });
+  const aborted = new Promise(resolve => { recorded = resolve; });
+  const server = createApp({ service: { search: () => new Promise(resolve => { finish = resolve; started(); }) },
+    logger: { info: entry => { logs.push(entry); if (entry.event === 'request_aborted') recorded(); } } }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => { finish?.({}); server.closeAllConnections(); server.close(); });
   const req = http.request({ hostname: '127.0.0.1', port: server.address().port, method: 'POST', path: '/api/v1/hotelDeals',
     headers: { 'Content-Type': 'application/json' } });
   req.on('error', () => {});
   req.end(JSON.stringify(futureContext));
-  while (!finish) await new Promise(resolve => setTimeout(resolve, 5));
+  await dispatched;
   req.destroy();
-  while (!logs.length) await new Promise(resolve => setTimeout(resolve, 5));
+  await aborted;
   assert.deepEqual(logs.map(entry => entry.event), ['request_aborted']);
   assert.equal(logs[0].status, undefined);
 });

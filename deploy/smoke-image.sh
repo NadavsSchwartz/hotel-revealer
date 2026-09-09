@@ -3,6 +3,7 @@
 set -euo pipefail
 [[ $# == 1 && "$1" =~ ^hotel-revealer-ci:[a-f0-9]{40}$ ]] || { echo 'Expected a local CI image tagged with a full commit SHA.' >&2; exit 1; }
 name="hotel-revealer-smoke-$$"
+runtime_limits=(--memory 512m --cpus 0.80 --pids-limit 100)
 cleanup() {
   docker rm --force "$name" >/dev/null 2>&1 || true
   docker volume rm "$name" >/dev/null 2>&1 || true
@@ -10,8 +11,10 @@ cleanup() {
 trap cleanup EXIT
 docker volume create "$name" >/dev/null
 docker run --detach --name "$name" --network none --read-only --cap-drop ALL \
+  "${runtime_limits[@]}" \
   --security-opt no-new-privileges --tmpfs /tmp:size=16m,mode=1777,noexec,nosuid \
   --mount "type=volume,src=$name,dst=/app/var" "$1" >/dev/null
+[[ $(docker inspect --format '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' "$name") == '536870912 800000000 100' ]]
 for attempt in {1..30}; do
   status=$(docker inspect --format '{{.State.Health.Status}}' "$name")
   [[ "$status" == healthy ]] && break
@@ -47,6 +50,7 @@ docker exec "$name" node --input-type=module -e '
 docker stop --time 45 "$name" >/dev/null
 reset_provider() {
   docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    "${runtime_limits[@]}" \
     --mount "type=volume,src=$name,dst=/app/var" "$1" node scripts/reset-provider.mjs "${@:2}"
 }
 if reset_provider "$1"; then
@@ -60,4 +64,4 @@ docker exec "$name" node --input-type=module -e '
   import fs from "node:fs";
   assert.deepEqual(JSON.parse(fs.readFileSync("/app/var/provider-state.json", "utf8")), {version:1,disabled:false,cooldownUntil:0});
 '
-printf '%s\n' 'Image served its built UI and health endpoint without external networking; nonroot, read-only root and state persistence checks passed.'
+printf '%s\n' 'Image smoke/reset passed without external networking under the production memory, CPU and PID limits. This is bounded startup/smoke evidence, not a capacity load test.'
