@@ -43,6 +43,7 @@ export async function openTripEditor(page) {
   await expect(form).toBeAttached();
   if (!await form.isVisible()) {
     await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Where are you going?', exact: true })).toBeFocused();
   }
   await expect(form).toBeVisible();
 }

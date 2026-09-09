@@ -110,7 +110,7 @@ test('old search response formats require an explicit refresh before displaying 
   await expect(page.getByRole('heading', { name: 'We could not verify this response', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(0);
   expect(calls).toBe(1);
-  await page.getByRole('button', { name: 'Refresh search', exact: true }).click();
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   expect(calls).toBe(2);
 });
