@@ -22,6 +22,35 @@ permission or exception to the published terms has been established.
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
+## Hotel photos, location and review links
+
+Verified UI revision `45fafcf56bb80b6c481d4a4b19908675a1c0ed11`, source tree
+`67c92c144a565903cb5a36deb3ae06c8bb849d32`. Details now offers a photo viewer,
+Google Maps link, named-hotel reviews link and six prioritized amenities with an
+expandable full list. Existing data and the installed Ant Design modal are reused;
+no dependencies, review API, maps SDK or added hotel-provider requests were added.
+Repeated and empty property sections are removed. Source amenity qualifiers,
+original-offer pricing/handoff and rejected-identity protections remain intact.
+
+`npm run check` passed with 227 native tests, lint and a production build. Final
+28 affected browser cases passed across Chromium, mobile Chromium, Firefox and
+WebKit. Checks ran on an isolated snapshot to exclude concurrent backend/deployment
+work. The initial full matrix passed 370 cases and exposed two gallery focus
+failures; those were fixed and retested in the affected matrix, not claimed as a
+new full-suite pass. Review also caught and verified empty-photo refresh resetting
+viewer state. Boundary controls retain focus via `aria-disabled` while movement
+stays a no-op; keyboard arrows, Escape, pointer opening and trigger restoration
+are tested. The existing date helper now uses an already-open checkout calendar.
+
+Images beyond the first four are requested only during browsing. Tests exercise
+failed images, smaller/empty/restored photo responses, rejected matches, preserved
+booking links and exact map query encoding. Mobile light/dark screenshots and
+modal Axe checks were reviewed. Priceline's public `/relax/at/48700` page was
+verified to expose reviews without dates; the link opens the named hotel page,
+since its reviews modal has no verified permalink. Reviews are not embedded.
+Evidence is under `output/verification/detail-content/`. Manual assistive-technology,
+physical-device, live identity and public-release gates remain separate.
+
 ## Offer expiry and repeated-alert repair
 
 Verified September 8, 2026. Logs for the supplied screenshots showed whole-city
