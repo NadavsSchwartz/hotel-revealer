@@ -22,6 +22,37 @@ permission or exception to the published terms has been established.
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
+## Currency runtime and offer-selection repair
+
+Verified September 8, 2026 in the user's existing Brave tab at `127.0.0.1:5173`.
+The frontend reached an older, non-watched backend on port 5001, which still
+returned `UNSUPPORTED_CONTEXT: Prices are available in USD only.` The previous
+currency checks did not establish this running frontend/backend integration.
+The stale processes were replaced with `PORT=5001 npm run dev`, preserving the
+provider's durable state. The existing backend watcher now tracks source imports;
+the frontend proxy uses the same loaded `PORT` as the backend.
+
+A second live failure occurred when changing currency on a hotel-details page:
+the new city search exceeded the 10-second detail deadline, and a cached retry
+then rejected the old offer ID. The EUR and GBP snapshots had different opaque
+offer IDs for the same named hotel. Currency changes from details now return to
+normal results search, preserving trip and rating sort while removing the old
+selection. Timeouts, matching rules and selection validation remain unchanged.
+
+The original Los Angeles September 8–9 search returned live EUR and GBP results.
+Garvey Inn's EUR details showed a quoted total of 57.97; a newly selected GBP
+offer for H by H Hospitality showed a quoted total of 105.49, property details,
+and a GBP provider link. These are independent point-in-time quotes, not an
+exchange-rate comparison or a claim of verified hotel identity/checkout parity.
+
+`npm run check` passed (221 native tests, lint, production build). All 64 focused
+currency/theme/navigation browser cases passed across the four configured
+engines/viewports. The currency test now uses different offer IDs per currency,
+rejects old IDs, and verifies fresh selection and preserved sort/history.
+Independent source review found no remaining blocking issue in this scoped fix.
+Logs are in `output/verification/currency-hardening/`. No booking or deployment
+was performed; the existing release gates remain open.
+
 ## Large-city matcher regression repair
 
 Verified 2026-09-08 at 16:09–16:10 Pacific, against base `4b33340` plus the

@@ -58,6 +58,12 @@ fallbacks suppress affected prices. Original totals still require the exact
 rate/base/fee corroboration described below. Rendered provider checkout parity
 for these non-USD probes and hosted deployment remain unverified.
 
+The subsequent real-browser check found different opaque offer IDs in EUR and
+GBP snapshots for the same named hotel. Changing currency from hotel details
+therefore returns to a normal results search and requires a fresh offer selection;
+it must not reuse the prior currency's offer ID. See the runtime repair in
+`docs/ACCEPTANCE.md` for the failures and the actual application verification.
+
 The local artifacts below are ignored files under `output/live-access/`; they are
 not committed inventory fixtures. `flow-research.md` records the bounded public
 website/bundle research, the selected request shape and its limits.

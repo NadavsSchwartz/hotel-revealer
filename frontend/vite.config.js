@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     fs: { allow: [fileURLToPath(new URL('..', import.meta.url))] },
-    proxy: { '/api': { target: 'http://127.0.0.1:5000', changeOrigin: false } },
+    proxy: { '/api': { target: `http://127.0.0.1:${process.env.PORT || 5000}`, changeOrigin: false } },
   },
   build: {
     outDir: 'dist', emptyOutDir: true,

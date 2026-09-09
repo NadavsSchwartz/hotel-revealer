@@ -37,7 +37,15 @@ export function useCurrency() {
       const params = new URLSearchParams(location.search);
       params.set('currency', value);
       params.delete('page');
-      navigate({ pathname: location.pathname, search: `?${params}`, hash: location.hash });
+      if (detailRoute) {
+        // Provider offer IDs change with currency; retrieve fresh offers before selecting one.
+        params.delete('offerId');
+        params.delete('hotelId');
+        const resultsUrl = location.state?.resultsUrl;
+        const sort = typeof resultsUrl === 'string' ? new URLSearchParams(resultsUrl.split('?')[1]).get('sort') : null;
+        if (sort === 'rating') params.set('sort', sort);
+      }
+      navigate({ pathname: detailRoute ? '/results' : location.pathname, search: `?${params}` });
     }
   }
 

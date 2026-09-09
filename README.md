@@ -27,6 +27,11 @@ The frontend runs at `http://127.0.0.1:5173`; `/api` is proxied to Express on po
 Set `HOTEL_PROVIDER=disabled` for offline development. Normal startup defaults to
 the live public Priceline adapter; CI explicitly disables it.
 
+Use `PORT=5001 npm run dev` when port 5000 is occupied (for example by macOS
+AirPlay). The API and frontend proxy use the same `PORT`, including values from
+the root `.env`. Keep this command running while editing: it watches backend
+imports as well as frontend changes, so both sides use the current source.
+
 For the actual production build:
 
 ```sh

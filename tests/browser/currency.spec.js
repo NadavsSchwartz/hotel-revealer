@@ -74,6 +74,7 @@ test('currency requests new prices, updates every quote and handoff, and follows
     searches.push(input);
     if (input.currency === 'EUR') await euroReady;
     const data = searchResponse({ context: input });
+    data.offers[0].offerId = `offer-${input.currency}`;
     data.offers[0].quote = { ...data.offers[0].quote, currency: input.currency, nightlyCents: input.currency === 'EUR' ? 10900 : 11900 };
     data.offers[0].handoffUrl = data.offers[0].handoffUrl.replace('cur=USD', `cur=${input.currency}`);
     await route.fulfill({ json: data });
@@ -81,8 +82,10 @@ test('currency requests new prices, updates every quote and handoff, and follows
   await page.route('**/api/v1/deal', route => {
     const input = route.request().postDataJSON();
     details.push(input);
+    if (input.offerId !== `offer-${input.currency}`) return route.fulfill({ status: 409, json: { error: { code: 'INVALID_SELECTION' } } });
     const data = detailResponse();
     data.context = { ...context, currency: input.currency };
+    data.offer.offerId = input.offerId;
     data.offer.quote = { ...data.offer.quote, currency: input.currency, nightlyCents: 10900, stayCents: 21800,
       totalCents: 25600, taxesFees: 'excluded', totalTaxesFees: 'included' };
     data.offer.handoffUrl = data.offer.handoffUrl.replace('cur=USD', `cur=${input.currency}`);
@@ -100,6 +103,7 @@ test('currency requests new prices, updates every quote and handoff, and follows
   finishEuro();
   await expect(page.locator('.quote-price').first()).toContainText('€109');
   await expect(page.locator('.trip-summary').first()).toContainText('EUR');
+  await page.getByLabel('Sort by').selectOption('rating');
   await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
   await expect(page.locator('.detail-quote-panel .quote-price')).toContainText('€256');
   await expect(page.locator('.detail-retail .quote-price')).toContainText('€356');
@@ -107,10 +111,19 @@ test('currency requests new prices, updates every quote and handoff, and follows
   await expect(page.locator('.detail-quote-panel .quote-breakdown')).toContainText('€38');
   await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', /cur=EUR$/);
   await selectCurrency(page).selectOption('GBP');
+  await expect(page).toHaveURL(/\/results\?/);
+  await expect(page.getByLabel('Sort by')).toHaveValue('rating');
+  await expect(page.locator('.quote-price').first()).toContainText('£119');
+  expect(new URL(page.url()).searchParams.has('offerId')).toBe(false);
+  expect(new URL(page.url()).searchParams.has('hotelId')).toBe(false);
+  expect(details).toHaveLength(1);
+  await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
   await expect(page.locator('.detail-quote-panel .quote-price')).toContainText('£256');
   await expect(page.locator('.detail-retail .quote-price')).toContainText('£356');
   await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', /cur=GBP$/);
-  expect(details.at(-1)).toEqual({ ...context, currency: 'GBP', offerId: 'offer-one', hotelId: 'hotel-one' });
+  expect(details.at(-1)).toEqual({ ...context, currency: 'GBP', offerId: 'offer-GBP', hotelId: 'hotel-one' });
+  await page.goBack();
+  await expect(page.getByLabel('Sort by')).toHaveValue('rating');
   await page.goBack();
   await expect(selectCurrency(page)).toHaveValue('EUR');
   await expect(page.locator('.detail-quote-panel .quote-price')).toContainText('€256');
