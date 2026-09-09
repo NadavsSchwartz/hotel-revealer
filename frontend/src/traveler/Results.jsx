@@ -88,10 +88,10 @@ export default function Results() {
   const loading = request.key === key && request.status === 'loading';
   const error =
     request.key === key && request.status === 'error' ? request.error : null;
-  const cooldownUntil = useSelector((state) => state.searchCooldowns[key]);
+  const cooldownError = useSelector((state) => state.searchCooldowns[key]);
+  const cooldownUntil = cooldownError?.retryAt;
   const cooldownExpired = useExpired(cooldownUntil);
   const coolingDown = Boolean(cooldownUntil) && !cooldownExpired;
-  const cooldownError = cooldownUntil ? { code: 'PROVIDER_COOLDOWN', retryAt: cooldownUntil } : null;
   const visibleError = coolingDown ? cooldownError : error || (!data ? cooldownError : null);
   const params = new URLSearchParams(location.search);
   const waitingForFirstResults = valid && !data && (loading || !visibleError);

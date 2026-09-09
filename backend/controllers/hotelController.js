@@ -4,11 +4,16 @@ import { assertJsonSize } from '../provider/size.js';
 const handler = (validate, method, service) => async (req, res, next) => {
   try {
     const input = validate(req.body);
-    const result = await service[method](input, { requestId: req.requestId });
+    req.hotelAdmission?.dispatch();
+    const result = await service[method](input, { requestId: req.requestId, admitUpstream: req.hotelAdmission?.admitUpstream });
+    if (res.destroyed) return;
     assertJsonSize(result);
     res.set('Cache-Control', 'no-store').json(result);
   } catch (error) {
+    if (res.destroyed) return;
     next(error instanceof Error ? error : new Error('Non-Error service failure', { cause: error }));
+  } finally {
+    req.hotelAdmission?.settle();
   }
 };
 

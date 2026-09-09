@@ -212,7 +212,7 @@ test('detail response still requires exact offer and candidate identities', asyn
   }
 });
 
-test('trip cooldown survives other-trip success and suppresses retries before abort/start or fetch', async t => {
+for (const code of ['PROVIDER_COOLDOWN', 'PROVIDER_UNAVAILABLE', 'PROVIDER_BUSY']) test(`${code} cooldown survives other-trip success and suppresses retries before abort/start or fetch`, async t => {
   let now = Date.now();
   t.mock.method(Date, 'now', () => now);
   const retryAt = new Date(now + 60000).toISOString();
@@ -225,7 +225,7 @@ test('trip cooldown survives other-trip success and suppresses retries before ab
     const input = JSON.parse(options.body);
     if (contextKey(input) === tripKey) {
       return now < Date.parse(retryAt)
-        ? { ok: false, json: async () => ({ error: { code: 'PROVIDER_COOLDOWN', retryAt } }) }
+        ? { ok: false, json: async () => ({ error: { code, retryAt } }) }
         : { ok: true, json: async () => shortlist(trip) };
     }
     otherSignal = options.signal;
@@ -236,6 +236,7 @@ test('trip cooldown survives other-trip success and suppresses retries before ab
   const originalSearch = state.searches[tripKey];
   await loadSearch(trip)(dispatch, getState);
   assert.equal(selectSearchCooldown(state, tripKey), retryAt);
+  assert.equal(state.searchCooldowns[tripKey].code, code);
   assert.equal(state.searches[tripKey], originalSearch);
   const otherPending = loadSearch(otherTrip)(dispatch, getState);
   const whileOtherPending = state;
@@ -318,6 +319,29 @@ test('cooldown storage prunes expired records and remains bounded to five trips'
   state = travelerReducer(state, { type: 'search/error', key: tripKey, requestId: 10, receivedAt: now + 60000,
     error: { code: 'PROVIDER_COOLDOWN', retryAt: new Date(now + 120000).toISOString() } });
   assert.deepEqual(Object.keys(state.searchCooldowns), [tripKey]);
+});
+
+test('usable partial searches and detail fallbacks retain their data and backoff reason', () => {
+  const retryAt = new Date(Date.now() + 60_000).toISOString();
+  for (const code of ['PROVIDER_COOLDOWN', 'PROVIDER_UNAVAILABLE', 'PROVIDER_BUSY']) {
+    const backoff = { code, retryAt };
+    const partial = { ...shortlist(), backoff };
+    const search = cacheSearch(undefined, trip, 'partial', partial);
+    assert.equal(search.searches[tripKey], partial);
+    assert.deepEqual(search.searchCooldowns[tripKey], backoff);
+    const data = { ...loadedDetail(), backoff };
+    const detail = travelerReducer(startDetail(undefined, 'fallback'), {
+      type: 'detail/success', key, tripKey, requestId: 'fallback', data,
+    });
+    assert.equal(detail.detail.data, data);
+    assert.equal(selectSearchCooldown(detail, tripKey), retryAt);
+    assert.deepEqual(detail.searchCooldowns[tripKey], backoff);
+  }
+  for (const backoff of [{ code: 'INTERNAL_ERROR', retryAt }, { code: 'PROVIDER_BUSY', retryAt: Date.now() + 60000 },
+    { code: 'PROVIDER_UNAVAILABLE', retryAt: 'invalid' }]) {
+    const state = cacheSearch(undefined, trip, 'invalid-backoff', { ...shortlist(), backoff });
+    assert.equal(selectSearchCooldown(state, tripKey), null);
+  }
 });
 
 test('offer-only requests omit hotelId and require the distinct null-candidate envelope', async t => {

@@ -68,8 +68,8 @@ export default function Details() {
     detail: request, search, key, offerId, hotelId,
   });
   const context = data?.context || search?.context || requestedContext;
-  const error = request.key === key ? request.error : null;
-  const priceUpdateFailed = offer && !bindingRejected &&
+  const error = request.key === key ? request.error ?? request.data?.backoff : null;
+  const priceUpdateFailed = offer && !bindingRejected && !error?.retryAt &&
     ['DEADLINE_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'NETWORK_ERROR'].includes(error?.code);
   const loading =
     valid &&

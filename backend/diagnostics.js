@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ProviderFailure, ServiceError } from './provider/errors.js';
+import { ProviderFailure, ServiceError, providerDiagnostic } from './provider/errors.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 // Only filenames shipped with the app may appear in diagnostics, even if an
@@ -16,6 +16,10 @@ const systemCodes = new Set(['EACCES', 'EPERM', 'EIO', 'ENOSPC', 'EISDIR', 'ENOE
 export function diagnostic(error, depth = 0) {
   const result = { name: classes.find(type => error instanceof type)?.name || 'UnknownError' };
   try {
+    if (error instanceof ProviderFailure || error instanceof ServiceError) {
+      const provider = providerDiagnostic(error.provider);
+      if (Object.keys(provider).length) result.provider = provider;
+    }
     if (systemCodes.has(error?.code)) result.code = error.code;
     const locations = [];
     if (typeof error?.stack === 'string') {

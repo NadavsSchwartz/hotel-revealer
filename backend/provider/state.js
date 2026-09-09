@@ -9,9 +9,11 @@ function validateState(value) {
     value?.version !== 1 ||
     typeof value.disabled !== 'boolean' ||
     !Number.isFinite(value.cooldownUntil) ||
-    value.cooldownUntil < 0 || value.cooldownUntil > 8_640_000_000_000_000
+    value.cooldownUntil < 0 || value.cooldownUntil > 8_640_000_000_000_000 ||
+    (value.cooldownReason !== undefined && value.cooldownReason !== 'unavailable')
   ) throw new Error('Invalid provider state');
-  return { version: 1, disabled: value.disabled, cooldownUntil: value.cooldownUntil };
+  return { version: 1, disabled: value.disabled, cooldownUntil: value.cooldownUntil,
+    ...(value.cooldownReason ? { cooldownReason: value.cooldownReason } : {}) };
 }
 
 export function createFileStateStore(filePath = process.env.PROVIDER_STATE_FILE || path.resolve('var/provider-state.json')) {

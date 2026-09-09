@@ -41,6 +41,29 @@ and runner source addresses are available. The cloud firewall permits public TCP
 80/443; only Caddy publishes those ports. Docker can bypass UFW for published
 ports, so keep the cloud firewall and loopback-only app port in place.
 
+The app bounds outstanding hotel operations at eight overall and four per client
+IP, including cache/shared-work subscribers and disconnected callers whose service
+work is still running. Each client IP can start four
+uncached provider requests immediately, then one per ten seconds. Cache hits and
+shared in-flight work do not spend that budget; each new inventory page or detail
+fetch does. Busy responses include a retry time when the client budget is spent.
+The four-request burst allows a full three-page search followed by one detail fetch.
+This is a fairness bound, not measured production capacity: users sharing an IP
+also share the allowance, and distributed clients can still reach the global cap.
+The in-memory table holds at most 1,000 identities and removes them when their full
+allowance replenishes (at most 40 seconds after their last admitted request).
+
+Compose sets `HOTEL_CLIENT_IDENTITY=caddy`. Caddy unconditionally overwrites
+`X-Hotel-Revealer-Client-IP` with its immediate connection's `{remote_host}`;
+the app accepts only a canonical literal IP from that header. This mode trusts
+the local host and Docker-network peers that can reach the app, so never expose
+the app port publicly or attach untrusted containers to its network. Missing or
+invalid identity headers share the socket peer's allowance. Direct app startup
+defaults to `socket` mode and ignores all client-supplied forwarding headers.
+`X-Forwarded-For` is never used and Express proxy trust stays disabled. An extra
+CDN or reverse proxy is not implicitly supported: it would share its connection
+IP's allowance and needs an explicitly reviewed trust configuration first.
+
 ## Install the reviewed configuration
 
 1. Verify `cloud-init status --wait` and inspect failures through the provider

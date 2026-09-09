@@ -550,6 +550,124 @@ test('Retry-After cooldown persists and prevents dispatch after restart without 
   assert.equal(restarted.calls.length, 1);
 });
 
+test('maintenance cooldown keeps its unavailable meaning on disk and a later throttle replaces it', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'hotel-maintenance-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'state.json');
+  const store = createFileStateStore(file);
+  const clock = manualClock();
+  const expectedRetry = new Date(clock.now() + 120_000).toISOString();
+  const first = setup({ clock, stateStore: store, adapter: {
+    async listingsPage() { throw new ProviderFailure('maintenance', { retryAfter: '120' }); },
+  } });
+  await assert.rejects(first.service.search(futureContext), { code: 'PROVIDER_UNAVAILABLE', retryAt: expectedRetry });
+  assert.equal((await store.read()).disabled, false);
+  assert.equal((await store.read()).cooldownReason, 'unavailable');
+  const restarted = setup({ clock, stateStore: createFileStateStore(file) });
+  let admissions = 0;
+  await assert.rejects(restarted.service.search(futureContext, { admitUpstream() { admissions += 1; } }),
+    { code: 'PROVIDER_UNAVAILABLE', retryAt: expectedRetry });
+  assert.equal(admissions, 0);
+  assert.equal(restarted.calls.length, 0);
+  await clock.advance(120_000);
+  await restarted.service.search(futureContext);
+  assert.equal(restarted.calls.length, 1);
+
+  const throttled = setup({ clock, stateStore: store, adapter: {
+    async listingsPage() { throw new ProviderFailure('rate_limit', { retryAfter: '60' }); },
+  } });
+  await assert.rejects(throttled.service.search(futureContext), { code: 'PROVIDER_COOLDOWN' });
+  assert.equal((await store.read()).cooldownReason, undefined);
+  await assert.rejects(setup({ clock, stateStore: store }).service.search(futureContext), { code: 'PROVIDER_COOLDOWN' });
+});
+
+test('maintenance preserves fresh cached offers and optional details remain recoverable', async () => {
+  const logs = [];
+  const { service, clock, calls } = setup({ logger: { info: entry => logs.push(entry) }, adapter: {
+    async hotelDetails() {
+      throw new ProviderFailure('maintenance', { retryAfter: '60', provider: {
+        operation: 'HotelRevealerDetails', httpStatus: 503, responseType: 'json', category: 'maintenance', body: 'private-sentinel',
+      } });
+    },
+  } });
+  const search = await service.search(futureContext);
+  const pending = service.detail(selection);
+  await clock.advance(1000);
+  const detail = await pending;
+  assert.equal(detail.detailStatus, 'unavailable');
+  assert.equal(detail.quoteStatus, 'unavailable');
+  assert.deepEqual(detail.backoff, { code: 'PROVIDER_UNAVAILABLE', retryAt: new Date(clock.now() + 60_000).toISOString() });
+  assert.deepEqual(detail.offer, search.offers[0]);
+  assert.deepEqual(await service.search(futureContext), search);
+  const waiting = await service.detail(selection);
+  assert.equal(waiting.detailStatus, 'unavailable');
+  assert.equal(calls.length, 1);
+  assert.ok(logs.some(entry => entry.event === 'provider_failure' && entry.diagnostic.provider?.httpStatus === 503));
+  assert.doesNotMatch(JSON.stringify(logs), /private-sentinel/);
+});
+
+test('legacy state remains readable and invalid cooldown reasons fail closed', async () => {
+  const legacy = setup({ stateStore: createMemoryStateStore({ version: 1, disabled: false, cooldownUntil: 0 }) });
+  await legacy.service.search(futureContext);
+  const invalid = setup({ stateStore: { read: async () => ({ version: 1, disabled: false, cooldownUntil: 0, cooldownReason: 'private-invalid' }) } });
+  await assert.rejects(invalid.service.search(futureContext), { code: 'PROVIDER_DISABLED' });
+  assert.equal(invalid.calls.length, 0);
+  assert.throws(() => createMemoryStateStore({ version: 1, disabled: false, cooldownUntil: 0, cooldownReason: 'private-invalid' }));
+});
+
+test('client admission charges only uncached upstream work, not shared or cached callers', async () => {
+  let admissions = 0;
+  const options = { admitUpstream() { admissions += 1; } };
+  const { service, clock, calls } = setup({ adapter: { async hotelDetails() { return { originalQuote: originalQuote() }; } } });
+  await Promise.all([service.search(futureContext, options), service.search(futureContext, options)]);
+  await service.search(futureContext, options);
+  assert.equal(admissions, 1);
+  const first = service.detail(selection, options);
+  const shared = service.detail(selection, options);
+  await clock.advance(1000);
+  await Promise.all([first, shared]);
+  await service.detail(selection, options);
+  assert.equal(admissions, 2);
+  assert.equal(calls.length, 1);
+});
+
+test('client budget rejection cannot reach the provider or write dispatch state, including cold details', async () => {
+  for (const method of ['search', 'detail']) {
+    const store = createMemoryStateStore();
+    let writes = 0;
+    const { service, calls } = setup({ stateStore: { read: () => store.read(), write() { writes += 1; } } });
+    let admissions = 0;
+    const retryAt = new Date(Date.now() + 10_000).toISOString();
+    await assert.rejects(service[method](method === 'search' ? futureContext : selection, {
+      admitUpstream() { admissions += 1; throw new ServiceError('PROVIDER_BUSY', { retryAt }); },
+    }), { code: 'PROVIDER_BUSY', retryAt });
+    assert.equal(admissions, 1);
+    assert.equal(calls.length, 0);
+    assert.equal(writes, 0);
+  }
+});
+
+test('later-page client budget rejection preserves partial coverage without caching it', async () => {
+  let admissions = 0;
+  let upstream = 0;
+  const { service, clock } = setup({ adapter: { async listingsPage({ cursor }) {
+    upstream += 1;
+    return { listings: listingRows(), nextCursor: cursor === null ? 'second' : null };
+  } } });
+  const retryAt = new Date(clock.now() + 10_000).toISOString();
+  const result = await service.search(futureContext, { admitUpstream() {
+    if (++admissions > 1) throw new ServiceError('PROVIDER_BUSY', { retryAt });
+  } });
+  assert.equal(result.coverage.status, 'partial');
+  assert.equal(result.coverage.pagesFetched, 1);
+  assert.deepEqual(result.backoff, { code: 'PROVIDER_BUSY', retryAt });
+  assert.equal(upstream, 1);
+  const retry = service.search(futureContext);
+  await clock.advance(2000);
+  assert.equal((await retry).coverage.status, 'complete');
+  assert.equal(upstream, 3);
+});
+
 test('challenge persists to disk, survives restart, and only operator reset clears it', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'hotel-provider-state-'));
   const file = path.join(directory, 'state.json');

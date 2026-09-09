@@ -438,6 +438,100 @@ test('429 preserves Retry-After and never retries', async () => {
   assert.equal(requests.length, 1);
 });
 
+const nginxErrorPage = (title) => `<html>\r\n<head><title>${title}</title></head>\r\n<body>\r\n<center><h1>${title}</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n`;
+
+test('non-HTML 503s and complete stock gateway pages request a maintenance cooldown without retries', async () => {
+  for (const [status, body, contentType] of [
+    [503, '{}', 'application/json'],
+    [503, 'Service unavailable', 'text/plain'],
+    [503, new Uint8Array(), null],
+    [502, nginxErrorPage('502 Bad Gateway'), 'text/html'],
+    [503, nginxErrorPage('503 Service Temporarily Unavailable'), 'text/html'],
+    [504, nginxErrorPage('504 Gateway Time-out').replace('>nginx<', '>nginx/1.28.0<'), 'text/html; charset=utf-8'],
+  ]) {
+    const { search, requests } = setup(() => new Response(body, { status,
+      headers: { ...(contentType ? { 'Content-Type': contentType } : {}), 'Retry-After': '120' } }));
+    await assert.rejects(search(), error => {
+      assert.equal(error.kind, 'maintenance');
+      assert.equal(error.retryAfter, '120');
+      assert.deepEqual(error.provider, { operation: 'HotelRevealerListings', httpStatus: status,
+        responseType: contentType?.startsWith('text/html') ? 'html' : contentType === 'application/json' ? 'json' : contentType ? 'other' : 'missing', category: 'maintenance' });
+      return true;
+    });
+    assert.equal(requests.length, 1);
+  }
+});
+
+test('unknown, altered, incomplete and oversized HTML stays blocked even with a maintenance status and Retry-After', async () => {
+  const normal = nginxErrorPage('503 Service Temporarily Unavailable');
+  for (const body of [
+    '<html>Maintenance: verify your browser</html>',
+    normal.replace('<body>', '<body onload="challenge()">'),
+    normal.replace('</body>', '<script>challenge()</script></body>'),
+    normal.replace('</body>', '<a href="/verify">Continue</a></body>'),
+    normal.replace('</body>', 'Please verify access</body>'),
+    normal.replace('</html>', ''),
+    nginxErrorPage('502 Bad Gateway'),
+    `${normal}${' '.repeat(8192)}`,
+  ]) {
+    const { search, requests } = setup(() => new Response(body, { status: 503,
+      headers: { 'Content-Type': 'text/html', 'Retry-After': '1' } }));
+    await assert.rejects(search(), { kind: 'challenge', provider: { operation: 'HotelRevealerListings',
+      httpStatus: 503, responseType: 'html', category: 'unknown_html' } });
+    assert.equal(requests.length, 1);
+  }
+  for (const status of [200, 401, 403]) {
+    const { search } = setup(() => new Response(normal, { status, headers: { 'Content-Type': 'text/html', 'Retry-After': '1' } }));
+    await assert.rejects(search(), { kind: 'challenge' });
+  }
+});
+
+test('HTML inspection cancels oversized or aborted streams and never restores unknown access', async () => {
+  let cancelled = false;
+  let reads = 0;
+  const body = new ReadableStream({
+    pull(controller) { reads += 1; controller.enqueue(new Uint8Array(4097)); },
+    cancel() { cancelled = true; },
+  });
+  const { search } = setup(() => new Response(body, { status: 503, headers: { 'Content-Type': 'text/html' } }));
+  await assert.rejects(search(), { kind: 'challenge' });
+  assert.equal(cancelled, true);
+  assert.ok(reads <= 3);
+
+  const controller = new AbortController();
+  let reading;
+  const started = new Promise(resolve => { reading = resolve; });
+  let abortCancelled = false;
+  const stalled = setup(() => new Response(new ReadableStream({
+    pull() { reading(); }, cancel() { abortCancelled = true; },
+  }), { status: 503, headers: { 'Content-Type': 'text/html' } }));
+  const request = stalled.search({ signal: controller.signal });
+  await started;
+  controller.abort();
+  await assert.rejects(request, { kind: 'challenge' });
+  assert.equal(abortCancelled, true);
+});
+
+test('safe diagnostics distinguish GraphQL schema drift from execution and HTTP failures', async () => {
+  for (const [response, expected] of [
+    [() => jsonResponse({ errors: [{ message: 'private-sentinel', extensions: { code: 'GRAPHQL_VALIDATION_FAILED', secret: 'private-sentinel' } }] }),
+      { httpStatus: 200, responseType: 'json', category: 'graphql_schema' }],
+    [() => jsonResponse({ errors: [{ message: 'private-sentinel', extensions: { code: 'private-sentinel' } }] }),
+      { httpStatus: 200, responseType: 'json', category: 'graphql_execution' }],
+    [() => new Response('private-sentinel', { status: 500, headers: { 'Content-Type': 'text/plain; secret=private-sentinel' } }),
+      { httpStatus: 500, responseType: 'other', category: 'http' }],
+    [() => new Response('{private-sentinel', { headers: { 'Content-Type': 'application/json' } }),
+      { httpStatus: 200, responseType: 'json', category: 'invalid_json' }],
+  ]) {
+    const { search } = setup(response);
+    await assert.rejects(search(), error => {
+      assert.deepEqual(error.provider, { operation: 'HotelRevealerListings', ...expected });
+      assert.doesNotMatch(JSON.stringify(error), /private-sentinel/);
+      return true;
+    });
+  }
+});
+
 test('access denial and HTML interstitials stop with a sanitized challenge failure', async () => {
   for (const response of [
     () => new Response('private denial text', { status: 401 }),

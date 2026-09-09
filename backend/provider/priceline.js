@@ -1,7 +1,7 @@
 import { getDestination } from '../destinations/index.js';
 import { isRecord, normalizedId } from '../domain/validation.js';
 import { numberOrNull, normalizeQuote } from '../domain/normalization.js';
-import { ProviderFailure, ServiceError } from './errors.js';
+import { ProviderFailure, ServiceError, providerDiagnostic } from './errors.js';
 import { MAX_JSON_BYTES } from './size.js';
 import { nightCount } from '../../shared/travel.js';
 import { isCurrency } from '../../shared/currency.js';
@@ -101,7 +101,7 @@ const DETAILS_QUERY = `query HotelRevealerDetails(
 ${ORIGINAL_QUERY}
 }`;
 
-const invalidResponse = () => new ServiceError('PROVIDER_RESPONSE_INVALID');
+const invalidResponse = (category = 'invalid_shape') => new ServiceError('PROVIDER_RESPONSE_INVALID', { provider: { category } });
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw signal.reason ?? new DOMException('The request was aborted.', 'AbortError');
@@ -111,9 +111,9 @@ async function cancelBody(response) {
   try { await response.body?.cancel(); } catch { /* Cancellation is best effort. */ }
 }
 
-async function readJson(response, signal, allowPartialDetails = false) {
+async function readBody(response, signal, maximum = MAX_JSON_BYTES) {
   const contentLength = response.headers.get('content-length');
-  if (contentLength !== null && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_JSON_BYTES) {
+  if (contentLength !== null && /^\d+$/.test(contentLength) && Number(contentLength) > maximum) {
     await cancelBody(response);
     throw new ServiceError('RESULT_TOO_LARGE');
   }
@@ -130,28 +130,16 @@ async function readJson(response, signal, allowPartialDetails = false) {
       try { chunk = await reader.read(); }
       catch (cause) {
         throwIfAborted(signal);
-        throw new ProviderFailure('unavailable', { cause });
+        throw new ProviderFailure('unavailable', { cause, provider: { category: 'network' } });
       }
       const { done, value } = chunk;
       throwIfAborted(signal);
       if (done) break;
       bytes += value.byteLength;
-      if (bytes > MAX_JSON_BYTES) throw new ServiceError('RESULT_TOO_LARGE');
+      if (bytes > maximum) throw new ServiceError('RESULT_TOO_LARGE');
       chunks.push(value);
     }
-    const body = Buffer.concat(chunks, bytes).toString('utf8');
-    // HTML at this JSON endpoint is an unsupported interstitial; stop further requests.
-    if (/^\s*</.test(body)) throw new ProviderFailure('challenge');
-    let parsed;
-    try { parsed = JSON.parse(body); } catch { throw invalidResponse(); }
-    if (!isRecord(parsed)) throw invalidResponse();
-    if (parsed.errors != null) {
-      if (!Array.isArray(parsed.errors) || (parsed.errors.length > 0 && !(allowPartialDetails && isRecord(parsed.data) &&
-          parsed.errors.every(error => Array.isArray(error?.path) && ['details', 'original'].includes(error.path[0]))))) {
-        throw new ProviderFailure('unavailable');
-      }
-    }
-    return parsed;
+    return Buffer.concat(chunks, bytes).toString('utf8');
   } catch (error) {
     try { await reader.cancel(); } catch { /* Preserve the original classified failure. */ }
     throw error;
@@ -159,6 +147,53 @@ async function readJson(response, signal, allowPartialDetails = false) {
     signal?.removeEventListener('abort', abort);
     reader.releaseLock();
   }
+}
+
+async function readJson(response, signal, allowPartialDetails = false) {
+  const body = await readBody(response, signal);
+  if (/^\s*</.test(body)) throw new ProviderFailure('challenge', { provider: { category: 'unknown_html' } });
+  let parsed;
+  try { parsed = JSON.parse(body); } catch { throw invalidResponse('invalid_json'); }
+  if (!isRecord(parsed)) throw invalidResponse();
+  if (parsed.errors != null) {
+    if (!Array.isArray(parsed.errors)) throw invalidResponse();
+    if (parsed.errors.length > 0 && !(allowPartialDetails && isRecord(parsed.data) &&
+        parsed.errors.every(error => Array.isArray(error?.path) && ['details', 'original'].includes(error.path[0])))) {
+      const schemaError = parsed.errors.some(error => ['GRAPHQL_VALIDATION_FAILED', 'GRAPHQL_PARSE_FAILED', 'PERSISTED_QUERY_NOT_FOUND'].includes(error?.extensions?.code));
+      throw new ProviderFailure('unavailable', { provider: { category: schemaError ? 'graphql_schema' : 'graphql_execution' } });
+    }
+  }
+  return parsed;
+}
+
+// Recognize only complete stock nginx gateway/maintenance documents. A status
+// code or a phrase such as "temporarily unavailable" cannot identify a challenge.
+// Template source: nginx/src/http/ngx_http_special_response.c.
+function temporaryErrorPage(body, status) {
+  const title = { 502: '502 Bad Gateway', 503: '503 Service Temporarily Unavailable', 504: '504 Gateway Time-out' }[status];
+  if (!title) return false;
+  const compact = body.replace(/>\s+</g, '><').trim();
+  const head = `<html><head><title>${title}</title></head><body><center><h1>${title}</h1></center>`;
+  if (!compact.startsWith(head)) return false;
+  return /^<hr><center>nginx(?:\/\d+\.\d+\.\d+)?<\/center><\/body><\/html>$/.test(compact.slice(head.length));
+}
+
+async function classifyHtml(response, signal) {
+  if (![502, 503, 504].includes(response.status)) {
+    await cancelBody(response);
+    throw new ProviderFailure('challenge', { provider: { category: 'unknown_html' } });
+  }
+  try {
+    const body = await readBody(response, signal, 8 * 1024);
+    if (temporaryErrorPage(body, response.status)) {
+      return new ProviderFailure('maintenance', { retryAfter: response.headers.get('retry-after'), provider: { category: 'maintenance' } });
+    }
+  } catch (error) {
+    if (!signal?.aborted && !(error instanceof ServiceError) && !(error instanceof ProviderFailure)) throw error;
+    // A truncated, oversized or interrupted interstitial is still unknown.
+    throw new ProviderFailure('challenge', { cause: error, provider: { category: 'unknown_html' } });
+  }
+  return new ProviderFailure('challenge', { provider: { category: 'unknown_html' } });
 }
 
 function tripVariables(context) {
@@ -308,27 +343,45 @@ export function createPricelineAdapter({ fetchImpl = globalThis.fetch } = {}) {
       body: JSON.stringify({ operationName, query, variables }), signal,
     };
     let response;
+    const provider = { operation: operationName };
     try {
-      response = await fetchImpl(ENDPOINT, options);
-    } catch (cause) {
+      try {
+        response = await fetchImpl(ENDPOINT, options);
+      } catch (cause) {
+        throwIfAborted(signal);
+        throw new ProviderFailure('unavailable', { cause, provider: { category: 'network' } });
+      }
       throwIfAborted(signal);
-      throw new ProviderFailure('unavailable', { cause });
+      provider.httpStatus = response.status;
+      const type = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+      provider.responseType = !type ? 'missing' : ['text/html', 'application/xhtml+xml'].includes(type) ? 'html'
+        : ['application/json', 'application/graphql-response+json'].includes(type) ? 'json' : 'other';
+      if ([401, 403].includes(response.status)) {
+        await cancelBody(response);
+        throw new ProviderFailure('challenge', { provider: { category: 'access_denied' } });
+      }
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after');
+        await cancelBody(response);
+        throw new ProviderFailure('rate_limit', { retryAfter, provider: { category: 'rate_limit' } });
+      }
+      if (provider.responseType === 'html') throw await classifyHtml(response, signal);
+      if (!response.ok) {
+        const retryAfter = response.headers.get('retry-after');
+        await cancelBody(response);
+        const maintenance = response.status === 503;
+        throw new ProviderFailure(maintenance ? 'maintenance' : 'unavailable', {
+          retryAfter, provider: { category: maintenance ? 'maintenance' : 'http' },
+        });
+      }
+      return await readJson(response, signal, allowPartialDetails);
+    } catch (error) {
+      if (error instanceof ProviderFailure || error instanceof ServiceError) {
+        error.provider = providerDiagnostic({ ...provider,
+          ...(error.code === 'RESULT_TOO_LARGE' ? { category: 'response_too_large' } : {}), ...error.provider });
+      }
+      throw error;
     }
-    throwIfAborted(signal);
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('retry-after');
-      await cancelBody(response);
-      throw new ProviderFailure('rate_limit', { retryAfter });
-    }
-    if ([401, 403].includes(response.status) || /text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type') || '')) {
-      await cancelBody(response);
-      throw new ProviderFailure('challenge');
-    }
-    if (!response.ok) {
-      await cancelBody(response);
-      throw new ProviderFailure('unavailable');
-    }
-    return readJson(response, signal, allowPartialDetails);
   }
 
   return {

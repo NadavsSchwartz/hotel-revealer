@@ -7,6 +7,7 @@
 	encode zstd gzip
 	header -Server
 	reverse_proxy app:5000 {
+		header_up X-Hotel-Revealer-Client-IP {remote_host}
 		health_uri /health
 		health_interval 30s
 		health_timeout 3s

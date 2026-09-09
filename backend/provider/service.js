@@ -17,6 +17,9 @@ const contextKey = (context) => JSON.stringify([context.destinationId, context.c
 const issuedOfferKey = (context, offerId) => JSON.stringify([contextKey(context), offerId]);
 const iso = (timestamp) => new Date(timestamp).toISOString();
 const text = (value, maximum) => typeof value === 'string' ? value.trim().slice(0, maximum) || null : null;
+const backoffFor = error => typeof error.retryAt === 'string' && Number.isFinite(Date.parse(error.retryAt)) &&
+  ['PROVIDER_COOLDOWN', 'PROVIDER_UNAVAILABLE', 'PROVIDER_BUSY'].includes(error.code)
+  ? { code: error.code, retryAt: error.retryAt } : null;
 
 function normalizeDetails(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
@@ -71,7 +74,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
 
   async function loadState() {
     loaded ||= Promise.resolve().then(() => stateStore.read()).then((saved) => {
-      if (saved?.version !== 1 || typeof saved.disabled !== 'boolean' || !Number.isFinite(saved.cooldownUntil) || saved.cooldownUntil < 0 || saved.cooldownUntil > 8_640_000_000_000_000) throw new Error('Invalid state');
+      if (saved?.version !== 1 || typeof saved.disabled !== 'boolean' || !Number.isFinite(saved.cooldownUntil) || saved.cooldownUntil < 0 || saved.cooldownUntil > 8_640_000_000_000_000 ||
+          (saved.cooldownReason !== undefined && saved.cooldownReason !== 'unavailable')) throw new Error('Invalid state');
       state = saved;
     }).catch(error => {
       state = { ...cleanState(), disabled: true };
@@ -84,7 +88,12 @@ export function createProviderService({ adapter = null, clock = realClock, state
     if (!configured) throw new ServiceError('PROVIDER_NOT_CONFIGURED');
     await loadState();
     if (state.disabled) throw new ServiceError('PROVIDER_DISABLED');
-    if (!allowCooldown && state.cooldownUntil > clock.now()) throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil) });
+    if (!allowCooldown && state.cooldownUntil > clock.now()) throw cooldownError();
+  }
+
+  function cooldownError(cause) {
+    return new ServiceError(state.cooldownReason === 'unavailable' ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_COOLDOWN',
+      { retryAt: iso(state.cooldownUntil), cause });
   }
 
   async function persistState(value = state) {
@@ -111,12 +120,19 @@ export function createProviderService({ adapter = null, clock = realClock, state
     afterDispatch: () => persistState(),
   });
 
-  async function call(method, parameters, deadline, metrics) {
+  async function call(method, parameters, deadline, metrics, admitUpstream) {
+    // Cache hits and coalesced subscribers never enter here. Reject excessive
+    // client work before it can occupy the shared upstream queue.
+    await withDeadline(available(), deadline, clock);
+    admitUpstream?.();
     return scheduler.run(async (signal) => {
       try {
         metrics.upstreamCalls += 1;
         return await adapter[method]({ ...parameters, signal });
       } catch (error) {
+        if (error instanceof ProviderFailure || error instanceof ServiceError) {
+          log('info', { event: 'provider_failure', method, diagnostic: diagnostic(error) });
+        }
         if (error instanceof ProviderFailure && error.kind === 'challenge') {
           state.disabled = true;
           searches.clear();
@@ -125,10 +141,12 @@ export function createProviderService({ adapter = null, clock = realClock, state
           log('error', { event: 'provider_paused', reason: 'challenge' });
           throw new ServiceError('PROVIDER_DISABLED', { cause: error });
         }
-        if (error instanceof ProviderFailure && error.kind === 'rate_limit') {
+        if (error instanceof ProviderFailure && ['rate_limit', 'maintenance'].includes(error.kind)) {
           state.cooldownUntil = retryAfterDeadline(error.retryAfter, clock.now());
-          log('info', { event: 'provider_paused', reason: 'cooldown', retryAt: iso(state.cooldownUntil) });
-          throw new ServiceError('PROVIDER_COOLDOWN', { retryAt: iso(state.cooldownUntil), cause: error });
+          if (error.kind === 'maintenance') state.cooldownReason = 'unavailable';
+          else delete state.cooldownReason;
+          log('info', { event: 'provider_paused', reason: error.kind === 'maintenance' ? 'maintenance' : 'cooldown', retryAt: iso(state.cooldownUntil) });
+          throw cooldownError(error);
         }
         if (signal.aborted) throw new ServiceError('DEADLINE_EXCEEDED');
         if (error instanceof ProviderFailure && error.kind === 'unavailable') throw new ServiceError('PROVIDER_UNAVAILABLE', { cause: error });
@@ -137,7 +155,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
     }, { deadline });
   }
 
-  async function retrieveSearch(context, deadline, metrics) {
+  async function retrieveSearch(context, deadline, metrics, admitUpstream) {
     await withDeadline(available({ allowCooldown: true }), deadline, clock);
     const key = contextKey(context);
     const cached = searches.get(key);
@@ -150,10 +168,11 @@ export function createProviderService({ adapter = null, clock = realClock, state
     let pagesFetched = 0;
     let reason = null;
     let cacheable = true;
+    let backoff = null;
     let retrievedAt;
     do {
       try {
-        const page = await call('listingsPage', { context, cursor }, deadline, metrics);
+        const page = await call('listingsPage', { context, cursor }, deadline, metrics, admitUpstream);
         assertJsonSize(page);
         if (!page || !Object.hasOwn(page, 'listings') || !Object.hasOwn(page, 'nextCursor') ||
           (page.nextCursor !== null && (typeof page.nextCursor !== 'string' || !page.nextCursor || page.nextCursor.length > 2_048))) {
@@ -183,6 +202,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
       } catch (error) {
         if (pagesFetched === 0 || !(error instanceof ServiceError) || !partialFailures.has(error.code)) throw error;
         metrics.failureCode = error.code;
+        backoff = backoffFor(error);
         cacheable = false;
         reason = 'A later provider page could not be retrieved. Coverage is incomplete.';
         break;
@@ -199,6 +219,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
     if (matched.invalidRows > 0) cacheable = false;
     const result = {
       context,
+      ...(backoff ? { backoff } : {}),
       retrievedAt: iso(retrievedAt ?? clock.now()),
       expiresAt: iso((retrievedAt ?? clock.now()) + SEARCH_TTL),
       coverage: {
@@ -221,9 +242,9 @@ export function createProviderService({ adapter = null, clock = realClock, state
     return result;
   }
 
-  async function searchWork(context, deadline, metrics) {
+  async function searchWork(context, deadline, metrics, admitUpstream) {
     try {
-      const result = await retrieveSearch(context, deadline, metrics);
+      const result = await retrieveSearch(context, deadline, metrics, admitUpstream);
       if (metrics.searchCache === 'miss') {
         const unresolved = { no_match: 0, ambiguous: 0, missing_facts: 0, incomplete_search: 0 };
         let matched = 0;
@@ -276,17 +297,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
   const newMetrics = () => ({ searchCache: 'not_checked', detailCache: 'not_checked', shared: false, upstreamCalls: 0, pagesFetched: 0, queueDepth: scheduler.queue.length });
 
   return {
-    search(input, { requestId } = {}) {
+    search(input, { requestId, admitUpstream } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const context = validateSearch(input, new Date(admittedAt));
       const deadline = admittedAt + 20_000;
       const metrics = newMetrics();
       metrics.shared = searchFlights.has(contextKey(context));
-      const request = coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics));
+      const request = coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics, admitUpstream));
       return observe('search', request, admittedAt, metrics, requestId);
     },
-    detail(input, { requestId } = {}) {
+    detail(input, { requestId, admitUpstream } = {}) {
       if (draining) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
       const admittedAt = clock.now();
       const { offerId, hotelId, ...context } = validateDetail(input, new Date(admittedAt));
@@ -300,7 +321,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         let issued = issuedOffers.get(selectionKey);
         if (!issued) {
           // Cold links still require server-observed matching evidence for this exact trip.
-          const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics)), deadline, clock);
+          const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics, admitUpstream)), deadline, clock);
           const offer = search.offers.find((item) => item.offerId === offerId);
           if (offer) issued = { offer, offerExpiresAt: search.expiresAt };
         }
@@ -322,8 +343,9 @@ export function createProviderService({ adapter = null, clock = realClock, state
         let originalQuote = null;
         let detailStatus = hotelId === undefined ? 'not_requested' : 'available';
         let cacheable = true;
+        let backoff = null;
         try {
-          const rawDetails = await call('hotelDetails', { context, offerId, hotelId }, deadline, metrics);
+          const rawDetails = await call('hotelDetails', { context, offerId, hotelId }, deadline, metrics, admitUpstream);
           assertJsonSize(rawDetails);
           if (!rawDetails || typeof rawDetails !== 'object' || Array.isArray(rawDetails)) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
           if (hotelId !== undefined) normalizedDetails = normalizeDetails(rawDetails);
@@ -332,6 +354,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         } catch (error) {
           if (!(error instanceof ServiceError) || !['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED'].includes(error.code)) throw error;
           metrics.failureCode = error.code;
+          backoff = backoffFor(error);
           cacheable = false;
           if (hotelId !== undefined) {
             detailStatus = 'unavailable';
@@ -350,6 +373,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
           ? { ...offer, quote: originalQuote, quoteExpiresAt: iso(retrievedAt + DETAIL_TTL) } : offer;
         const result = {
           context, retrievedAt: iso(retrievedAt), expiresAt: iso(retrievedAt + DETAIL_TTL), offerExpiresAt: issued.offerExpiresAt,
+          ...(backoff ? { backoff } : {}),
           offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
           quoteStatus: originalQuote ? 'available' : 'unavailable',
         };

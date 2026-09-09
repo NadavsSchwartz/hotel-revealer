@@ -17,23 +17,37 @@ const errors = {
   INTERNAL_ERROR: [500, 'The request could not be completed.'],
 };
 
+// Only fixed categories leave the adapter. Provider text, headers and variables
+// must never reach logs, even through an error's cause chain.
+export function providerDiagnostic(value) {
+  const result = {};
+  if (['HotelRevealerListings', 'HotelRevealerDetails', 'HotelRevealerQuote'].includes(value?.operation)) result.operation = value.operation;
+  if (Number.isInteger(value?.httpStatus) && value.httpStatus >= 100 && value.httpStatus <= 599) result.httpStatus = value.httpStatus;
+  if (['json', 'html', 'other', 'missing'].includes(value?.responseType)) result.responseType = value.responseType;
+  if (['network', 'http', 'rate_limit', 'maintenance', 'access_denied', 'unknown_html',
+    'graphql_schema', 'graphql_execution', 'invalid_json', 'invalid_shape', 'response_too_large'].includes(value?.category)) result.category = value.category;
+  return result;
+}
+
 export class ServiceError extends Error {
-  constructor(code, { retryAt, cause } = {}) {
+  constructor(code, { retryAt, cause, provider } = {}) {
     const [status, message] = errors[code] || errors.INTERNAL_ERROR;
     super(message, { cause });
     this.name = 'ServiceError';
     this.code = errors[code] ? code : 'INTERNAL_ERROR';
     this.status = status;
     if (retryAt) this.retryAt = retryAt;
+    if (provider) this.provider = providerDiagnostic(provider);
   }
 }
 
 // An authorized adapter classifies failures without exposing upstream content.
 export class ProviderFailure extends Error {
-  constructor(kind, { retryAfter, cause } = {}) {
+  constructor(kind, { retryAfter, cause, provider } = {}) {
     super('Provider request failed', { cause });
     this.name = 'ProviderFailure';
     this.kind = kind;
     this.retryAfter = retryAfter;
+    if (provider) this.provider = providerDiagnostic(provider);
   }
 }

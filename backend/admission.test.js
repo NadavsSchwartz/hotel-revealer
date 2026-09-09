@@ -6,18 +6,22 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from './app.js';
-import { futureContext } from './provider/test-helpers.js';
+import { futureContext, listingRows } from './provider/test-helpers.js';
+import { createClientLimiter } from './admission.js';
+import { createProviderService } from './provider/service.js';
+import { createMemoryStateStore } from './provider/state.js';
 
-function controlledService() {
+function controlledService({ admit = false } = {}) {
   const calls = [];
   const waiters = [];
-  const hold = () => new Promise(resolve => {
+  const hold = (input, { admitUpstream } = {}) => new Promise(resolve => {
+    if (admit) admitUpstream();
     calls.push({ resolve });
     for (const waiter of waiters) if (calls.length >= waiter.count) waiter.resolve();
   });
   return { calls, service: { search: hold, detail: hold, status: async () => ({ available: true }) },
     waitForCalls(count) { return calls.length >= count ? Promise.resolve() : new Promise(resolve => waiters.push({ count, resolve })); },
-    release(index) { calls[index].resolve({ offers: [] }); },
+    release(index, result = { offers: [] }) { calls[index].resolve(result); },
     releaseAll() { for (const call of calls) call.resolve({ offers: [] }); },
   };
 }
@@ -31,13 +35,13 @@ async function serve(t, controlled, options = {}) {
     return new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
   });
   return {
-    start(route = '/api/v1/hotelDeals', { method = 'POST', rawBody, body, partial = false } = {}) {
+    start(route = '/api/v1/hotelDeals', { method = 'POST', rawBody, body, partial = false, headers = {} } = {}) {
       const payload = rawBody ?? JSON.stringify(body ?? (route.toLowerCase().includes('/deal') && !route.toLowerCase().includes('hoteldeals')
         ? { ...futureContext, offerId: 'offer-1', hotelId: 'hotel-1' } : futureContext));
       let request;
       const response = new Promise(resolve => {
         request = http.request({ hostname: '127.0.0.1', port: server.address().port, path: route, method,
-          headers: method === 'POST' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {},
+          headers: { ...(method === 'POST' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}), ...headers },
         }, res => {
           const chunks = [];
           res.on('data', chunk => chunks.push(chunk));
@@ -65,10 +69,17 @@ function assertBusy(response) {
   assert.equal(response.headers['retry-after'], undefined);
 }
 
-test('eight held identical/cache-like operations share one HTTP cap across search and detail', { timeout: 5000 }, async t => {
+const caddyHeaders = client => ({ 'X-Hotel-Revealer-Client-IP': `203.0.113.${client}` });
+
+test('one client can hold four shared/cache-like operations while another can use the other four global slots', { timeout: 5000 }, async t => {
   const controlled = controlledService();
-  const app = await serve(t, controlled);
-  const held = Array.from({ length: 8 }, (_, index) => app.start(index % 2 ? '/api/v1/deal' : '/api/v1/hotelDeals'));
+  const app = await serve(t, controlled, { clientIdentity: 'caddy' });
+  const held = Array.from({ length: 4 }, (_, index) => app.start(index % 2 ? '/api/v1/deal' : '/api/v1/hotelDeals', { headers: caddyHeaders(1) }));
+  await controlled.waitForCalls(4);
+  for (const route of ['/api/v1/hotelDeals', '/api/v1/deal', '/API/V1/HOTELDEALS/?same=1']) {
+    assertBusy(await app.start(route, { headers: caddyHeaders(1) }).response);
+  }
+  held.push(...Array.from({ length: 4 }, () => app.start('/api/v1/hotelDeals', { headers: caddyHeaders(2) })));
   await controlled.waitForCalls(8);
   for (const route of ['/api/v1/hotelDeals', '/api/v1/deal', '/API/V1/HOTELDEALS/?same=1']) {
     assertBusy(await app.start(route).response);
@@ -83,32 +94,165 @@ test('eight held identical/cache-like operations share one HTTP cap across searc
   assert.ok((await Promise.all(held.map(item => item.response))).every(response => response.status === 200));
 });
 
-test('disconnect and normal finish each release exactly one slot, including late service completion', { timeout: 5000 }, async t => {
+test('spoofed headers cannot evade four socket-client slots and disconnected work stays counted until it settles', { timeout: 5000 }, async t => {
   const controlled = controlledService();
   const app = await serve(t, controlled);
-  const held = Array.from({ length: 8 }, () => app.start());
-  await controlled.waitForCalls(8);
+  const held = Array.from({ length: 4 }, (_, index) => app.start('/api/v1/hotelDeals', { headers: {
+    ...caddyHeaders(index + 1), 'X-Forwarded-For': `192.0.2.${index + 1}`, 'Forwarded': `for=198.51.100.${index + 1}`,
+  } }));
+  await controlled.waitForCalls(4);
+  assertBusy(await app.start('/api/v1/deal', { headers: caddyHeaders(5) }).response);
   held[0].request.destroy();
   await held[0].response;
   await app.start('/health', { method: 'GET' }).response;
+  assertBusy(await app.start().response);
+  assert.equal(controlled.calls.length, 4);
+  let serializations = 0;
+  controlled.release(0, { toJSON() { serializations += 1; return { offers: [] }; } });
+  await app.start('/health', { method: 'GET' }).response;
+  assert.equal(serializations, 0);
   const replacement = app.start();
-  await controlled.waitForCalls(9);
-  controlled.release(0);
+  await controlled.waitForCalls(5);
   assertBusy(await app.start().response);
   controlled.release(1);
   assert.equal((await held[1].response).status, 200);
   const afterFinish = app.start();
-  await controlled.waitForCalls(10);
+  await controlled.waitForCalls(6);
   assertBusy(await app.start().response);
   controlled.releaseAll();
   assert.ok((await Promise.all([...held.slice(2), replacement, afterFinish].map(item => item.response)))
     .every(response => response.status === 200));
 });
 
+function assertClientBusy(response, retryAt) {
+  assert.equal(response.status, 503);
+  assert.equal(response.body.error.code, 'PROVIDER_BUSY');
+  assert.equal(typeof response.body.error.retryAt, 'string');
+  assert.equal(response.body.error.retryAt, new Date(retryAt).toISOString());
+  assert.equal(response.headers['retry-after'], new Date(retryAt).toUTCString());
+}
+
+test('socket identity ignores spoofed forwarding headers and refills one upstream admission per ten seconds', { timeout: 5000 }, async t => {
+  let now = 1_800_000_000_000;
+  const controlled = controlledService({ admit: true });
+  const app = await serve(t, controlled, { admissionNow: () => now });
+  for (let index = 0; index < 4; index += 1) {
+    const request = app.start('/api/v1/hotelDeals', { headers: {
+      'X-Forwarded-For': `192.0.2.${index + 1}`, 'X-Hotel-Revealer-Client-IP': `198.51.100.${index + 1}`,
+    } });
+    await controlled.waitForCalls(index + 1);
+    controlled.release(index);
+    assert.equal((await request.response).status, 200);
+  }
+  assertClientBusy(await app.start('/api/v1/deal', { headers: {
+    'Forwarded': 'for=203.0.113.4', 'X-Forwarded-For': '203.0.113.4', 'X-Real-IP': '203.0.113.4',
+    'X-Hotel-Revealer-Client-IP': '203.0.113.4',
+  } }).response, now + 10_000);
+  now += 9999;
+  assertClientBusy(await app.start().response, now + 1);
+  now += 1;
+  const refilled = app.start('/api/v1/deal');
+  await controlled.waitForCalls(5);
+  controlled.release(4);
+  assert.equal((await refilled.response).status, 200);
+  assertClientBusy(await app.start().response, now + 10_000);
+});
+
+test('explicit Caddy boundary canonicalizes literal IPs and one exhausted client leaves capacity for another', { timeout: 5000 }, async t => {
+  const now = 1_800_000_000_000;
+  const controlled = controlledService({ admit: true });
+  const app = await serve(t, controlled, { clientIdentity: 'caddy', admissionNow: () => now });
+  const start = ip => app.start('/api/v1/hotelDeals', { headers: {
+    'X-Hotel-Revealer-Client-IP': ip, 'X-Forwarded-For': '203.0.113.99',
+  } });
+  const sameClient = ['2001:db8::1', '2001:0DB8:0:0:0:0:0:1', '2001:db8:0000::1', '2001:DB8:0:0::1'].map(start);
+  await controlled.waitForCalls(4);
+  controlled.releaseAll();
+  assert.ok((await Promise.all(sameClient.map(request => request.response))).every(response => response.status === 200));
+  for (let index = 0; index < 10; index += 1) assertClientBusy(await start('2001:DB8::1').response, now + 10_000);
+  const otherClient = start('2001:db8::2');
+  await controlled.waitForCalls(5);
+  controlled.releaseAll();
+  assert.equal((await otherClient.response).status, 200);
+
+  // Invalid/missing trusted headers all fall back to the same socket identity;
+  // IPv4-mapped IPv6 is also canonicalized to that IPv4 identity.
+  for (const ip of ['127.0.0.1', '::ffff:127.0.0.1', '::FFFF:7f00:1', '0:0:0:0:0:ffff:7f00:0001']) {
+    const request = start(ip);
+    await controlled.waitForCalls(controlled.calls.length + 1);
+    controlled.releaseAll();
+    assert.equal((await request.response).status, 200);
+  }
+  for (const ip of ['not-an-ip', '2001:db8::3%zone', '203.0.113.4, 203.0.113.5', '[2001:db8::3]', ['203.0.113.4', '203.0.113.5']]) {
+    assertClientBusy(await start(ip).response, now + 10_000);
+  }
+  assertClientBusy(await app.start().response, now + 10_000);
+});
+
+test('bounded identity table never evicts active quotas and expired identities safely regain their full allowance', () => {
+  let now = 1_800_000_000_000;
+  const admit = createClientLimiter({ now: () => now });
+  const exhaust = key => { for (let index = 0; index < 4; index += 1) admit(key); };
+  for (let index = 0; index < 1000; index += 1) exhaust(`client-${index}`);
+  for (let index = 1000; index < 1050; index += 1) {
+    assert.throws(() => admit(`client-${index}`), error => error.code === 'PROVIDER_BUSY' && error.retryAt === new Date(now + 40_000).toISOString());
+  }
+  assert.throws(() => admit('client-0'), error => error.code === 'PROVIDER_BUSY' && error.retryAt === new Date(now + 10_000).toISOString());
+  now += 10_000;
+  admit('client-0');
+  assert.throws(() => admit('new-client'), error => error.code === 'PROVIDER_BUSY' && error.retryAt === new Date(now + 30_000).toISOString());
+  now += 30_000;
+  exhaust('new-client');
+  exhaust('client-999');
+  admit('client-0');
+  admit('client-0');
+  admit('client-0');
+  assert.throws(() => admit('client-0'), error => error.code === 'PROVIDER_BUSY' && error.retryAt === new Date(now + 10_000).toISOString());
+});
+
+test('assembled HTTP and provider service charge shared work once and keep cached search/detail available at quota', { timeout: 10_000 }, async t => {
+  const now = Date.now();
+  let calls = 0;
+  let releaseSearch;
+  let searchStarted;
+  const started = new Promise(resolve => { searchStarted = resolve; });
+  const held = new Promise(resolve => { releaseSearch = resolve; });
+  const service = createProviderService({ logger: null, stateStore: createMemoryStateStore(), adapter: {
+    async listingsPage() {
+      calls += 1;
+      if (calls === 1) { searchStarted(); await held; }
+      return { listings: listingRows(), nextCursor: null };
+    },
+    async hotelDetails() {
+      calls += 1;
+      return { description: 'Hotel information', images: [], amenities: [], address: null, retailQuote: null };
+    },
+  } });
+  const app = await serve(t, { service, releaseAll() { releaseSearch(); service.close(); } }, { clientIdentity: 'caddy', admissionNow: () => now });
+  const start = (route, options = {}) => app.start(route, { ...options, headers: caddyHeaders(1) });
+  const coalesced = Array.from({ length: 4 }, () => start());
+  await started;
+  await app.start('/health', { method: 'GET' }).response;
+  assertBusy(await start().response);
+  coalesced.push(...Array.from({ length: 4 }, () => app.start('/api/v1/hotelDeals', { headers: caddyHeaders(2) })));
+  await app.start('/health', { method: 'GET' }).response;
+  releaseSearch();
+  assert.ok((await Promise.all(coalesced.map(request => request.response))).every(response => response.status === 200));
+  assert.equal(calls, 1);
+  assert.equal((await start('/api/v1/deal').response).status, 200);
+  assert.equal((await start('/api/v1/hotelDeals', { body: { ...futureContext, rooms: 2 } }).response).status, 200);
+  assert.equal((await start('/api/v1/hotelDeals', { body: { ...futureContext, adults: 3 } }).response).status, 200);
+  assert.equal(calls, 4);
+  assertClientBusy(await start('/api/v1/hotelDeals', { body: { ...futureContext, adults: 4 } }).response, now + 10_000);
+  assert.equal((await start().response).status, 200);
+  assert.equal((await start('/api/v1/deal').response).status, 200);
+  assert.equal(calls, 4);
+});
+
 test('an aborted body releases admission before service dispatch and admitted JSON limits still apply', { timeout: 5000 }, async t => {
   const controlled = controlledService();
   const app = await serve(t, controlled);
-  const partial = Array.from({ length: 8 }, () => app.start('/api/v1/hotelDeals', { partial: true }));
+  const partial = Array.from({ length: 4 }, () => app.start('/api/v1/hotelDeals', { partial: true }));
   // A completed health request lets the server process the preceding headers.
   await app.start('/health', { method: 'GET' }).response;
   assertBusy(await app.start().response);
@@ -141,14 +285,14 @@ test('app factories have independent admission counters and static content stays
   let appA;
   try {
     process.env.NODE_ENV = 'production';
-    appA = await serve(t, first, { frontendDirectory: directory });
+    appA = await serve(t, first, { frontendDirectory: directory, clientIdentity: 'caddy' });
   } finally {
     if (previous === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previous;
   }
-  const appB = await serve(t, second);
-  const heldA = Array.from({ length: 8 }, () => appA.start());
-  const heldB = Array.from({ length: 8 }, () => appB.start());
+  const appB = await serve(t, second, { clientIdentity: 'caddy' });
+  const heldA = Array.from({ length: 8 }, (_, index) => appA.start('/api/v1/hotelDeals', { headers: caddyHeaders(index < 4 ? 1 : 2) }));
+  const heldB = Array.from({ length: 8 }, (_, index) => appB.start('/api/v1/hotelDeals', { headers: caddyHeaders(index < 4 ? 1 : 2) }));
   await Promise.all([first.waitForCalls(8), second.waitForCalls(8)]);
   assertBusy(await appA.start().response);
   assertBusy(await appB.start().response);

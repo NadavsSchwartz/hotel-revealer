@@ -16,6 +16,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "5000"
+      HOTEL_CLIENT_IDENTITY: caddy
       PROVIDER_STATE_FILE: /app/var/provider-state.json
     volumes:
       - /var/lib/hotel-revealer/provider:/app/var

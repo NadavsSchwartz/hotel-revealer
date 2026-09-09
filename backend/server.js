@@ -7,7 +7,8 @@ import { createPricelineAdapter } from './provider/priceline.js';
 const providerMode = process.env.HOTEL_PROVIDER || 'priceline';
 if (!['priceline', 'disabled'].includes(providerMode)) throw new Error('HOTEL_PROVIDER must be priceline or disabled');
 const service = createProviderService({ adapter: providerMode === 'priceline' ? createPricelineAdapter() : null });
-const app = createApp({ service, frontendDirectory: process.env.FRONTEND_DIST_DIR ? path.resolve(process.env.FRONTEND_DIST_DIR) : undefined });
+const app = createApp({ service, clientIdentity: process.env.HOTEL_CLIENT_IDENTITY || 'socket',
+  frontendDirectory: process.env.FRONTEND_DIST_DIR ? path.resolve(process.env.FRONTEND_DIST_DIR) : undefined });
 const port = Number(process.env.PORT || 5000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
 

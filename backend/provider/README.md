@@ -47,6 +47,7 @@ payloads, or raw errors. It classifies blocking failures with:
 
 ```js
 throw new ProviderFailure('rate_limit', { retryAfter: '120' });
+throw new ProviderFailure('maintenance', { retryAfter: '120' });
 throw new ProviderFailure('challenge');
 ```
 
@@ -57,6 +58,21 @@ thrown errors become a controlled provider-unavailable response. An adapter that
 ignores abort keeps the active slot until it settles;
 the service never dispatches overlapping calls to compensate.
 
+The public adapter honors non-HTML HTTP 503 backoff. It also recognizes complete
+stock nginx 502/503/504 error documents, inspecting at most 8 KiB. Only the exact
+static document shape is accepted; scripts, attributes, other content, truncated
+or oversized bodies remain unknown challenges. This recognizes a response shape,
+not the provider's internal cause. HTTP 401/403 and other HTML interstitials still
+disable access. No automatic retries or block resets occur. An aborted inspection
+cancels the body and retains the unknown-access block.
+
+Maintenance returns `PROVIDER_UNAVAILABLE` with `retryAt`; rate limiting returns
+`PROVIDER_COOLDOWN`. Both retain the same wait deadline across restart. Successful
+partial searches or optional detail fallbacks can include
+`backoff: { code, retryAt }` for these conditions or client `PROVIDER_BUSY` waits.
+The UI retains the usable data and original failure reason while disabling retry
+until that ISO timestamp. These fallbacks are never cached as fresh successes.
+
 ## Budgets, caches, and state
 
 One service instance runs one upstream call at a time, at least one second between
@@ -65,6 +81,18 @@ details has 10 seconds including relationship revalidation. Search reads at most
 three pages. An ordinary later-page failure returns successful earlier pages with
 explicit partial coverage. Provider disablement, shutdown, and size limits remain
 errors. Identical in-flight work is shared without extending budgets.
+
+The HTTP layer also bounds outstanding callers to eight globally and four per
+client, including disconnected callers whose service work has not settled. It
+skips serialization to disconnected clients and does not cancel shared upstream
+work needed by another caller. Each client can admit four new upstream calls in
+a burst (three search pages plus one selected detail); one allowance replenishes
+every ten seconds. Cache hits and coalesced followers do not spend that allowance.
+Excess work is rejected before queue entry with `PROVIDER_BUSY` and `retryAt`.
+At most 1,000 short-lived client quota records are kept in memory, without raw-IP
+logging. These are application defaults, not supplier limits or a guarantee of
+fairness among people sharing an IP. See `deploy/README.md` for the explicit Caddy
+identity boundary; generic forwarded headers are never trusted.
 
 Matching indexes eligible raw hotel observations by neighborhood and star rating,
 preserving strict number/string types, arrival order and duplicate rates. The
@@ -99,6 +127,9 @@ process stop during a call leaves the next process disabled, even if the previou
 record allowed requests. This intentionally requires operator review after an
 interrupted call. Healthy calls and ordinary classified transport failures restore
 availability; persisted rate limits and challenges keep their existing behavior.
+Version-one records remain compatible; optional `cooldownReason: 'unavailable'`
+distinguishes maintenance. A subsequent rate limit removes that reason. Invalid
+reason values fail closed, and operator reset removes it with the rest of state.
 
 The scheduler holds its active slot through persistence. State-write time is part
 of the admission deadline, and the one-second gap is measured at actual adapter
@@ -116,6 +147,10 @@ These limits are per process. Run one application process against one persistent
 state file. Multiple workers/replicas require a separately designed shared queue
 and state coordinator before release. Summary logs contain only controlled event,
 operation, cache/reuse, upstream/page/queue counts, outcome, and duration fields.
+Failure diagnostics additionally include fixed operation, HTTP status, media-type
+and schema/execution/transport/access categories. Raw headers, GraphQL error text,
+paths, extensions, trip variables and credentials are excluded; categories are
+allowlisted again at the logging boundary.
 
 ## Offline verification
 

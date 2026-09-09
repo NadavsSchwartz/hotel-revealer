@@ -26,17 +26,19 @@ function detailWithResolution(data, offer) {
 }
 
 export function selectSearchCooldown(state, key, now = Date.now()) {
-  const retryAt = state?.searchCooldowns?.[key];
+  const retryAt = state?.searchCooldowns?.[key]?.retryAt;
   return Date.parse(retryAt) > now ? retryAt : null;
 }
 
 function recordCooldown(cooldowns, action) {
   const now = action.receivedAt ?? Date.now();
-  if (action.error.code !== 'PROVIDER_COOLDOWN' || !(Date.parse(action.error.retryAt) > now)) return cooldowns;
-  const updated = Object.fromEntries(Object.entries(cooldowns || {}).filter(([, retryAt]) => Date.parse(retryAt) > now));
+  const error = action.error ?? action.data?.backoff;
+  if (!['PROVIDER_COOLDOWN', 'PROVIDER_UNAVAILABLE', 'PROVIDER_BUSY'].includes(error?.code) ||
+      typeof error.retryAt !== 'string' || !(Date.parse(error.retryAt) > now)) return cooldowns;
+  const updated = Object.fromEntries(Object.entries(cooldowns || {}).filter(([, value]) => Date.parse(value.retryAt) > now));
   const key = action.tripKey || action.key;
   delete updated[key];
-  updated[key] = action.error.retryAt;
+  updated[key] = { code: error.code, retryAt: error.retryAt };
   if (Object.keys(updated).length > 5) delete updated[Object.keys(updated)[0]];
   return updated;
 }
@@ -111,6 +113,7 @@ export function travelerReducer(state = initialState, action) {
     return {
       ...state,
       searches,
+      searchCooldowns: recordCooldown(state.searchCooldowns, action),
       search: { ...state.search, status: 'success', error: null },
       detail,
     };
@@ -169,6 +172,7 @@ export function travelerReducer(state = initialState, action) {
       ? detailWithResolution(action.data, stored.offer) : action.data;
     return {
       ...state,
+      searchCooldowns: recordCooldown(state.searchCooldowns, action),
       detail: { ...state.detail, searchAtStart: null, dataSearch: search, status: 'success', data,
         offer: data.offer, offerExpiresAt: data.offerExpiresAt || data.expiresAt,
         error: null, bindingRejected: false },

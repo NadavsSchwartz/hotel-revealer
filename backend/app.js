@@ -10,6 +10,7 @@ import { ServiceError } from './provider/errors.js';
 import { SAFE_IMAGE_HOSTS } from './domain/index.js';
 import { searchDestinations, validQuery } from './destinations/index.js';
 import { requestRoute } from './diagnostics.js';
+import { createHotelAdmission } from './admission.js';
 
 const defaultFrontendDirectory = fileURLToPath(new URL('../frontend/dist/', import.meta.url));
 const contentSecurityPolicy = [
@@ -19,9 +20,8 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'", "form-action 'self'",
 ].join('; ');
 
-export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now() } = {}) {
+export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now(), clientIdentity = 'socket', admissionNow } = {}) {
   const app = express();
-  let hotelOperations = 0;
   // One process, ten catalog scans per second, with a burst of ten. Refill on
   // demand; malformed, short and exact-country lookups don't spend this budget.
   let destinationTokens = 10;
@@ -54,25 +54,7 @@ export function createApp({ logger = console, service = createProviderService({ 
     });
     next();
   });
-  app.use((req, res, next) => {
-    if (req.method !== 'POST' || !/^\/api\/v1\/(?:hotelDeals|deal)\/?$/i.test(req.path)) return next();
-    // Bound response cloning/serialization even when calls share work or hit cache.
-    if (hotelOperations >= 8) return next(new ServiceError('PROVIDER_BUSY'));
-    hotelOperations += 1;
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      hotelOperations -= 1;
-      res.off('finish', release);
-      res.off('close', release);
-      req.off('aborted', release);
-    };
-    res.once('finish', release);
-    res.once('close', release);
-    req.once('aborted', release);
-    next();
-  });
+  app.use(createHotelAdmission({ clientIdentity, now: admissionNow }));
   app.use(express.json({ limit: '16kb', strict: true }));
   app.get('/api/v1/destinations', (req, res) => {
     const url = new URL(req.originalUrl, 'http://localhost');
