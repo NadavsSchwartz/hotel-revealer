@@ -146,8 +146,14 @@ separate job with package-write permission; production receives its exact digest
 The deployment job has no package-write or cloud API credential.
 
 The release script serializes changes, rejects unexpected repositories and
-mutable image references, pulls before downtime, then stops/drains the old app
-before starting the replacement. It checks `/health` within a bounded polling
+mutable image references, and pulls the application image before downtime. If
+Caddy has no container, it pulls and validates the configured Caddy image, then
+creates Caddy before stopping the app. Existing Caddy containers are never pulled,
+started or recreated by an application release; a stopped Caddy aborts the
+release before the app is interrupted. Changes to Caddy's configured image or
+files require the separate maintenance procedure below.
+
+The script stops/drains the old app before starting the replacement. It checks `/health` within a bounded polling
 window. Failure stops the replacement and restores the previous application
 digest; a failed first release removes only the failed app container and preserves
 its state directory, allowing a later retry. Release failure remains a
@@ -165,6 +171,56 @@ journey, a planned failed-image rollback, and reboot recovery. Measure memory,
 CPU and disk before claiming this host is sufficient. Docker/cloud/SSH/TLS/reboot
 execution remains unverified locally; shell/YAML parsing and fake-command release
 tests do not substitute for those checks.
+
+### Update or restore Caddy separately
+
+Use an administrator maintenance session, holding the same release lock shown in
+the provider-reset procedure. Preserve the old immutable Caddy image reference,
+`compose.env` and Caddyfile in a root-only backup before editing. Keep the
+unconditional `X-Hotel-Revealer-Client-IP` overwrite and the loopback-only app
+port; an app release will not apply proxy changes for you.
+
+Export `APP_IMAGE` from the validated `current-image` record and use the same
+Compose function as the reset procedure. After reviewing the candidate image and
+configuration, run `compose pull caddy` and the network-disabled `caddy validate`
+command used by `release.sh`'s bootstrap path, with the candidate image and
+configured domain/email. Validation failure must leave the running proxy alone.
+Apply only Caddy with:
+
+```sh
+compose up --detach --no-deps --pull never --force-recreate caddy
+```
+
+Verify Caddy remains running, public HTTPS/static assets and `/health`, and that
+the application container ID is unchanged. On failure, restore the saved Caddy
+image reference and configuration and repeat that same Caddy-only command.
+Preserve its TLS volumes; do not run `compose down` or delete volumes. A stopped
+existing Caddy also needs this reviewed recovery before an app release can run.
+This procedure has its own brief proxy outage and requires real-host validation.
+
+### Reconcile an interrupted release record
+
+An abrupt host/process interruption can leave the app container and
+`/var/lib/hotel-revealer/current-image` out of agreement. Release automation fails
+closed in this state; do not blindly copy the running image into the record.
+
+1. As an administrator, acquire the release lock and preserve the existing record
+   and any `current-image.next` for inspection. Load the Compose configuration as
+   above, using a previously approved immutable `APP_IMAGE` if the record is
+   missing or invalid. Read the single app container's image with
+   `docker inspect --format '{{.Config.Image}}' "$(compose ps --all --quiet app)"`.
+2. Compare that exact digest with the tested release artifact, allowed repository
+   and deployment logs. If the running image is the intended tested release,
+   verify container health, local `/health` and public HTTPS before accepting it.
+   Otherwise restore a previously tested digest: set `APP_IMAGE` to it, stop the
+   app with `compose stop --timeout 45 app`, then run
+   `compose up --detach --no-deps --pull never --force-recreate app` and verify the
+   same health checks. Never run two app instances against the provider state.
+3. Only after those checks, write the accepted validated digest to a root-owned,
+   mode-600 `current-image.next`, then rename it to `current-image` on the same
+   filesystem. Retain the recovery evidence and rerun the requested release only
+   if it is still needed. If health or image provenance cannot be established,
+   leave deployment blocked for investigation.
 
 ## Health notifications and maintenance
 

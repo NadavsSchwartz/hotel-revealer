@@ -40,14 +40,24 @@ if [[ -n "$container" ]]; then
   [[ -n "$previous" ]] || fail 'Existing app has no release record; reconcile it first.'
   [[ $(docker inspect --format '{{.Config.Image}}' "$container") == "$previous" ]] || fail 'Running image and release record disagree.'
 fi
+caddy_container=$(compose ps --all --quiet caddy)
+[[ "$caddy_container" != *$'\n'* ]] || fail 'More than one Caddy instance exists.'
+if [[ -n "$caddy_container" ]]; then
+  [[ $(docker inspect --format '{{.State.Running}}' "$caddy_container") == true ]] || fail 'Existing Caddy is stopped; restore it before releasing the app.'
+fi
 
-# Pull and validate infrastructure before interrupting the current process.
+# Ordinary application releases do not pull or recreate existing infrastructure.
 timeout 180s docker pull "$APP_IMAGE" >/dev/null
-timeout 180s docker pull "$CADDY_IMAGE" >/dev/null
-timeout 30s docker run --rm --read-only --cap-drop ALL --network none --tmpfs /data --tmpfs /config \
-  --env SITE_ADDRESS --env ACME_EMAIL \
-  --mount type=bind,src=/opt/hotel-revealer/deploy/Caddyfile,dst=/etc/caddy/Caddyfile,readonly \
-  "$CADDY_IMAGE" caddy validate --config /etc/caddy/Caddyfile >/dev/null
+if [[ -z "$caddy_container" ]]; then
+  timeout 180s docker pull "$CADDY_IMAGE" >/dev/null
+  timeout 30s docker run --rm --read-only --cap-drop ALL --network none --tmpfs /data --tmpfs /config \
+    --env SITE_ADDRESS --env ACME_EMAIL \
+    --mount type=bind,src=/opt/hotel-revealer/deploy/Caddyfile,dst=/etc/caddy/Caddyfile,readonly \
+    "$CADDY_IMAGE" caddy validate --config /etc/caddy/Caddyfile >/dev/null
+  compose up --detach --no-deps --pull never --no-recreate caddy
+  caddy_container=$(compose ps --quiet caddy)
+  [[ -n "$caddy_container" && $(docker inspect --format '{{.State.Running}}' "$caddy_container") == true ]] || fail 'Caddy bootstrap did not stay running; app has not been stopped.'
+fi
 
 wait_healthy() {
   local attempt cid
@@ -89,7 +99,6 @@ stop_app() { timeout 75s docker compose --env-file /dev/null --file /opt/hotel-r
 trap recover EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-compose up --detach --no-deps --pull never caddy
 interrupted=1
 stop_app
 compose up --detach --no-deps --pull never --force-recreate app
