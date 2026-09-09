@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DayPicker } from '@daypicker/react';
 import '@daypicker/react/style.css';

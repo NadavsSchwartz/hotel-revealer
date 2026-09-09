@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TRAVEL_LIMITS } from './context.js';
 import './travelers.css';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 
 export function BrandIcon({ className = 'brand-symbol', light = false }) {

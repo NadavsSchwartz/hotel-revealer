@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme);

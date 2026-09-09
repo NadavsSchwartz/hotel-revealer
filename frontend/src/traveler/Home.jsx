@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import SearchForm from './SearchForm.jsx';
 import './room-home.css';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrandIcon } from './Brand.jsx';
 import './progress.css';
 

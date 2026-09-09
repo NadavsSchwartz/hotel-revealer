@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_OCCUPANCY, contextKey, searchUrl, validateContext } from './context.js';
 import DestinationSearch from './DestinationSearch.jsx';

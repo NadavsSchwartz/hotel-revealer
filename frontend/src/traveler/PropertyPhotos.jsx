@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import './property-photos.css';
 
 export default function PropertyPhotos({ images, name }) {

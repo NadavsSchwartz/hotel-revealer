@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { displayDate, money, nights, safeHref } from './context.js';
 import './comparison.css';
 

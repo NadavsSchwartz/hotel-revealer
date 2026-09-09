@@ -1,4 +1,4 @@
-import React, { forwardRef, useLayoutEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useLayoutEffect, useImperativeHandle, useRef, useState } from 'react';
 import { validDestinationResponse } from './destinationResponse.js';
 import './destination-search.css';
 
