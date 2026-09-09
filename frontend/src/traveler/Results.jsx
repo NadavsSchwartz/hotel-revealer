@@ -355,7 +355,6 @@ export default function Results() {
                         <span aria-hidden="true"> · </span>Hotel name withheld
                       </p>
                     </div>
-                    <Quote quote={offer.quote} compact title={stale ? 'Last seen room rate' : 'Room rate'} />
                     <div className="offer-preview">
                       <p className="preview-label">Likely hotel</p>
                       <Link className="candidate-preview" {...candidateLink(offer, candidate, `preview-${encodeURIComponent(offer.offerId)}-${encodeURIComponent(candidate.hotelId)}`)} aria-label={`View likely hotel: ${candidate.name}`}>
@@ -367,11 +366,12 @@ export default function Results() {
                       </Link>
                     </div>
                     <div className="offer-booking">
+                      <Quote quote={offer.quote} compact trip={data.context} title={stale ? 'Last seen room rate' : 'Room rate'} />
                       <Link className="offer-detail-link button-link" {...candidateLink(offer, candidate, `details-${encodeURIComponent(offer.offerId)}`)}>
                         View hotel &amp; prices
                         <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>
                       </Link>
-                      <ProviderLink offer={offer} stale={stale} refreshing={loading} />
+                      <ProviderLink offer={offer} stale={stale} refreshing={loading} compact />
                     </div>
                   </div>
                 </article>

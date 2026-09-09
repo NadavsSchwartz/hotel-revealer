@@ -122,4 +122,29 @@ test('a fresh offer without a listing rate still offers the current supplier pri
   await page.goto(searchPath);
   await expect(page.getByText('Rate unavailable', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', data.offers[0].handoffUrl);
+  await expect(page.locator('.booking-note')).toHaveText('Check current price and terms on Priceline.');
+});
+
+test('result cards keep one fee-aware booking note, including when the offer link is missing', async ({ page }) => {
+  const data = searchResponse();
+  const originalQuote = data.offers[0].quote;
+  const originalLink = data.offers[0].handoffUrl;
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
+  for (const { quote, link = originalLink, note } of [
+    { quote: { taxesFees: 'excluded' }, note: 'Before taxes and fees; check final price and terms on Priceline.' },
+    { quote: { taxesFees: 'included' }, note: 'Taxes and fees included; check final price and terms on Priceline.' },
+    { quote: { taxesFees: 'unknown', totalCents: 27900, totalTaxesFees: 'included' }, note: 'Taxes and fees included; check final price and terms on Priceline.' },
+    { quote: { taxesFees: 'unknown' }, link: null, note: 'Taxes and fees unconfirmed; original offer link unavailable.' },
+  ]) {
+    data.offers[0].quote = { ...originalQuote, ...quote };
+    data.offers[0].handoffUrl = link;
+    await page.goto(searchPath);
+    await expect(page.locator('.offer-booking .provider-handoff > p')).toHaveText(note);
+    await expect(page.locator('.quote-taxes')).toHaveCount(0);
+    if (quote.totalCents) {
+      await expect(page.locator('.quote-price')).toHaveText('$279 total');
+      await expect(page.locator('.offer-booking .quote-stay')).not.toContainText('Taxes & fees included');
+    }
+    if (!link) await expect(page.getByRole('button', { name: 'Original offer unavailable' })).toBeDisabled();
+  }
 });

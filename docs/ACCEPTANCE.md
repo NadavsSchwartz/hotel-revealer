@@ -172,6 +172,22 @@ manual accessibility and first-time-user sessions remain open release gates.
 Neither these checks nor a unique match establish measured identity accuracy or
 website/checkout price parity.
 
+## Compact result-card pricing
+
+Result cards group the quoted amount, baseline-aligned unit, bound trip nights and
+rooms, supplied stay price, and actions in one column. Unusually large amounts can
+wrap without clipping. A single 12px bottom note combines the fee qualification
+and Priceline terms, including stale, missing-price and missing-link states.
+Fee-inclusive totals keep their total basis; detail-page wording is preserved.
+No stay price is calculated from the nightly rate.
+
+Isolated `d65b85d` plus this patch passed lint, 221 native tests and a production
+build. The 40-case focused browser run passed 39 cases; its WebKit appearance test
+sampled an unstyled background. Waiting for font readiness retained the same
+assertions and passed two targeted reruns. Pricing, multiroom, fee, currency,
+stale, dark-mode and narrow-layout checks passed. Independent review approved
+the final production captures in `output/verification/price-card/`.
+
 ## Shared application design
 
 The accepted homepage palette, Manrope typography, page gutters, rounded controls,

@@ -61,9 +61,8 @@
 .results-page .results-comparison-intro { margin: 0 0 29px; max-width: 780px; font-size: 14px; line-height: 1.8; color: var(--muted); }
 .results-page .offer-list { display: grid; gap: 24px; }
 .results-page .offer-card { padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: 0 12px 32px #23372b06; }
-.results-page .offer-overview { display: grid; grid-template-columns: minmax(0, 1fr) 278px; grid-template-areas: 'identity price' 'preview price' 'preview handoff'; grid-template-rows: auto 1fr auto; gap: 14px 54px; padding: 0; }
+.results-page .offer-overview { display: grid; grid-template-columns: minmax(0, 1fr) 278px; grid-template-areas: 'identity booking' 'preview booking'; grid-template-rows: auto 1fr; gap: 14px 54px; padding: 0; }
 .results-page .offer-identity { grid-area: identity; min-width: 0; }
-.results-page .offer-overview > .quote { grid-area: price; align-self: start; min-width: 0; padding-left: 27px; border-left: 1px solid var(--line); }
 .results-page :is(.offer-preview, .offer-preview-empty) { grid-area: preview; min-width: 0; }
 .results-page .offer-index { display: block; margin-bottom: 9px; font-size: 12px; letter-spacing: 1.2px; color: var(--blue); font-weight: 750; }
 .results-page .offer-identity h3 { margin: 0 0 7px; font-family: Manrope, sans-serif; font-size: 25px; font-weight: 650; letter-spacing: -.75px; line-height: 1.35; }
@@ -86,22 +85,23 @@
 .results-page .tier-supported { color: #455c35; }
 .results-page .tier-supported::before { background: currentColor; }
 .results-page .preview-more { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
-.results-page .offer-booking { grid-area: handoff; display: grid; gap: 8px; min-width: 0; padding-left: 27px; border-left: 1px solid var(--line); align-self: start; }
+.results-page .offer-booking { grid-area: booking; display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-left: 27px; border-left: 1px solid var(--line); align-self: stretch; }
 .results-page .quote-compact { padding: 0; border: 0; }
 .results-page .quote .eyebrow { font-size: 12px; letter-spacing: 1px; color: var(--muted); }
-.results-page .quote-price { font-size: 37px; font-weight: 650; letter-spacing: -1.5px; margin: 11px 0 5px; line-height: 1.18; overflow-wrap: anywhere; }
-.results-page .quote-price span { display: block; font-size: 13px; font-weight: 450; letter-spacing: 0; color: var(--muted); margin-top: 6px; }
+.results-page .quote-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 37px; font-weight: 650; letter-spacing: -1.5px; margin: 11px 0 5px; line-height: 1.18; overflow-wrap: anywhere; }
+.results-page .quote-price span { flex-shrink: 0; font-size: 13px; font-weight: 450; letter-spacing: 0; color: var(--muted); white-space: nowrap; }
+.results-page .quote-amount { max-width: 100%; min-width: 0; }
+.results-page .quote-context { margin: 0 0 5px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .results-page .quote-stay { font-size: 14px; margin-bottom: 5px; overflow-wrap: anywhere; }
-.results-page .quote-stay span, .results-page .quote-taxes { color: var(--muted); }
-.results-page .quote-taxes { font-size: 13px; line-height: 1.7; }
+.results-page .quote-stay span { color: var(--muted); }
 .results-page .offer-detail-link.button-link { width: 100%; min-height: 48px; height: auto; border-radius: var(--radius-control); padding: 11px 14px; gap: 10px; font-size: 14px; line-height: 1.6; white-space: normal; text-align: center; background: var(--blue); border-color: var(--blue); color: white; }
 .results-page .offer-detail-link.button-link:hover { background: var(--forest); border-color: var(--forest); color: white; }
-.results-page .offer-booking .provider-handoff { padding: 0; gap: 2px; }
+.results-page .offer-booking .provider-handoff { flex: 1; display: flex; flex-direction: column; align-items: stretch; padding: 0; gap: 2px; }
 .results-page .offer-booking .provider-handoff .button-link { justify-content: flex-start; min-height: 44px; padding: 8px 0; gap: 7px; border: 0; border-radius: 0; background: transparent; color: var(--blue); font-size: 13px; line-height: 1.5; }
 .results-page .offer-booking .provider-handoff .button-link:hover { background: transparent; color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
 .results-page .offer-booking .provider-handoff .action-icon { width: 16px; height: 16px; }
 .results-page .offer-booking .provider-handoff .ant-btn { width: 100%; min-height: 44px; height: auto; border-radius: var(--radius-control); padding: 8px 12px; font-size: 13px; white-space: normal; }
-.results-page .offer-booking .provider-handoff p { font-size: 13px; line-height: 1.75; color: var(--muted); }
+.results-page .offer-booking .provider-handoff .booking-note { margin-top: auto; padding-top: 8px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .results-page .offer-action { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px 0 0; margin-top: 24px; border-top: 1px solid var(--line); background: transparent; }
 .results-page .offer-action p { font-size: 13px; color: var(--muted); }
 .results-page .offer-action .offer-candidate-count { margin: 0; font-weight: 450; }
@@ -153,7 +153,7 @@
   .results-page .trip-search-fields .search-button.ant-btn { grid-column: auto; min-height: 46px; margin: 14px 0 0; }
   .results-page .trip-control { padding-inline: 12px; }
   .results-page .offer-overview { column-gap: 30px; grid-template-columns: minmax(0, 1fr) 249px; }
-  .results-page .offer-booking, .results-page .offer-overview > .quote { padding-left: 22px; }
+  .results-page .offer-booking { padding-left: 22px; }
   .results-page .candidate-preview { grid-template-columns: 142px minmax(0, 1fr); gap: 18px; }
   .results-page .candidate-preview-copy > strong { font-size: 19px; }
 }
@@ -186,9 +186,8 @@
   .results-page .results-comparison-intro { margin-bottom: 20px; font-size: 13px; line-height: 1.65; }
   .results-page .offer-list { gap: 18px; }
   .results-page .offer-card { padding: 18px 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; }
-  .results-page .offer-overview { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'identity' 'preview' 'price' 'handoff'; grid-template-rows: auto; gap: 16px; }
-  .results-page .offer-overview > .quote { padding: 0; border: 0; }
-  .results-page .offer-overview > .quote > .eyebrow { font-size: 11px; line-height: 1.5; letter-spacing: .5px; }
+  .results-page .offer-overview { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'identity' 'preview' 'booking'; grid-template-rows: auto; gap: 16px; }
+  .results-page .offer-booking > .quote > .eyebrow { font-size: 11px; line-height: 1.5; letter-spacing: .5px; }
   .results-page .offer-index { font-size: 12px; letter-spacing: .5px; }
   .results-page .offer-identity h3 { font-size: 20px; }
   .results-page .candidate-previews { gap: 18px; }
@@ -196,7 +195,7 @@
   .results-page .candidate-preview-photo { aspect-ratio: 4 / 3; }
   .results-page .candidate-preview-copy > strong { font-size: 21px; }
   .results-page .offer-booking { padding: 0; border: 0; }
-  .results-page .quote-price { font-size: 32px; display: block; margin: 9px 0 5px; }
+  .results-page .quote-price { font-size: 32px; margin: 9px 0 5px; }
   .results-page .offer-booking .provider-handoff { padding: 0; }
   .results-page .offer-action { margin-top: 15px; padding-top: 12px; flex-direction: row; gap: 20px; }
   .results-page .offer-action .ant-btn { gap: 19px; }
@@ -215,7 +214,6 @@
   .results-page .candidate-preview-copy > strong { font-size: 18px; margin-top: 6px; }
   .results-page .tier { font-size: 12px; }
   .results-page .quote-price { font-size: clamp(24px, 8vw, 34px); }
-  .results-page .quote-price span { display: block; margin-left: 0; }
   .results-page .offer-action { flex-direction: column; align-items: stretch; gap: 7px; margin-top: 19px; }
   .results-page .results-pagination .ant-btn { min-width: 78px; padding: 8px; }
   .results-page .empty-panel h2, .results-page .loading-panel h2, .results-page .notice-panel h2 { font-size: 25px; }

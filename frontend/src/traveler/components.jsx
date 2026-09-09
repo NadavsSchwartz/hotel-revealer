@@ -25,6 +25,7 @@ export function Quote({
   quote,
   title = 'Original Express quote',
   compact = false,
+  trip = null,
   expired = false,
   onRefresh,
   refreshing = false,
@@ -39,6 +40,7 @@ export function Quote({
     ? quote.advertisedDiscount.percent : null;
   const fees = total && Number.isSafeInteger(quote.stayCents) && quote.totalCents >= quote.stayCents
     ? format(quote.totalCents - quote.stayCents) : null;
+  const nightCount = trip ? nights(trip) : null;
   const taxes =
     quote?.taxesFees === 'included'
       ? 'Taxes and fees included'
@@ -57,11 +59,12 @@ export function Quote({
       </div> : <>
         {discount && <span className="quote-discount" title="Priceline's advertised room-rate discount against its comparison rate, which may be estimated. Before taxes and fees.">{discount}% off room rate <span>· Priceline</span></span>}
         <p className="quote-price">
-          {total || nightly || 'Rate unavailable'}
+          <strong className="quote-amount">{total || nightly || 'Rate unavailable'}</strong>
           {total ? <span> total</span> : nightly && <span>{quote.nightlyBasis === 'per-room' ? ' / room / night' : ' / night'}</span>}
         </p>
+        {compact && nightCount > 0 && <p className="quote-context">{nightCount} {nightCount === 1 ? 'night' : 'nights'} · {trip.rooms} {trip.rooms === 1 ? 'room' : 'rooms'}</p>}
         {(total || !compact || !nightly || stay !== nightly || quote?.roomCount > 1) && <p className="quote-stay">
-          {total ? `${quote.roomCount > 1 ? `${quote.roomCount} rooms · ` : ''}Entire stay · Taxes & fees included`
+          {total ? `${quote.roomCount > 1 ? `${quote.roomCount} rooms · ` : ''}Entire stay${compact ? '' : ' · Taxes & fees included'}`
             : stay ? quote.stayBasis === 'all-rooms' && quote.roomCount > 1
               ? `${stay} for ${quote.roomCount} rooms, entire stay`
               : `${stay} for the stay` : 'Stay total unavailable'}{' '}
@@ -76,7 +79,7 @@ export function Quote({
             <div><dt>Quoted total</dt><dd>{total}</dd></div>
           </dl>
           <p>Includes the fees in Priceline’s quote. Promotions and the final payable price may change on Priceline.</p>
-        </details> : <p className="quote-taxes">{taxes}</p>}
+        </details> : !compact && <p className="quote-taxes">{taxes}</p>}
       </>}
     </section>
   );
@@ -291,12 +294,19 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
   );
 }
 
-export function ProviderLink({ offer, stale, unavailable = false, refreshing = false }) {
+export function ProviderLink({ offer, stale, unavailable = false, refreshing = false, compact = false }) {
   const href = safeHref(offer?.handoffUrl, true);
   const quote = offer?.quote;
   const hasPrice = [quote?.nightlyCents, quote?.stayCents, quote?.totalTaxesFees === 'included' ? quote.totalCents : null]
     .some(cents => Number.isSafeInteger(cents) && cents >= 0);
   const currentPrice = stale || unavailable || refreshing || !hasPrice;
+  const totalIncludesFees = quote?.totalTaxesFees === 'included' && money(quote.totalCents, quote.currency ?? null) !== null;
+  const feeNote = totalIncludesFees || quote?.taxesFees === 'included'
+    ? 'Taxes and fees included'
+    : quote?.taxesFees === 'excluded' ? 'Before taxes and fees' : 'Taxes and fees unconfirmed';
+  const bookingNote = href
+    ? `${hasPrice ? `${feeNote}; check` : 'Check'} ${currentPrice ? 'current' : 'final'} price and terms on Priceline.`
+    : hasPrice ? `${feeNote}; original offer link unavailable.` : 'The provider did not supply a usable price or offer link.';
   return (
     <div className="provider-handoff">
       {href ? (
@@ -308,10 +318,10 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
       ) : (
         <>
           <Button disabled>Original offer unavailable</Button>
-          <p>The provider did not supply a usable link to this offer.</p>
+          {!compact && <p>The provider did not supply a usable link to this offer.</p>}
         </>
       )}
-      {href && <p>Final price and booking terms on Priceline.</p>}
+      {compact ? <p className="booking-note">{bookingNote}</p> : href && <p>Final price and booking terms on Priceline.</p>}
     </div>
   );
 }

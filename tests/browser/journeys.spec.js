@@ -228,6 +228,8 @@ async function auditAccessibility(page) {
 
 test('landing and result states have no automated WCAG A/AA violations', async ({ page }) => {
   await page.goto('/');
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('.unboxed-application')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const sharedBackground = await page.locator('.unboxed-application').evaluate(element => getComputedStyle(element).backgroundColor);
   await page.getByRole('link', { name: 'Skip to content', exact: true }).focus();
   let results = await auditAccessibility(page);
@@ -344,14 +346,22 @@ test('multiroom quotes distinguish a per-room nightly rate from the entire stay 
   search.offers[0].handoffUrl = search.offers[0].handoffUrl.replace('/rooms/1/adults/2', '/rooms/2/adults/4');
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: search }));
   await page.route('**/api/v1/deal', route => route.fulfill({ json: { ...detailResponse(), context: trip, offer: search.offers[0] } }));
-  const checkQuote = async (title) => {
+  const checkQuote = async (title, compact = false) => {
     const quote = page.getByRole('region', { name: title, exact: true });
     await expect(quote).toContainText('$119 / room / night');
     await expect(quote).toContainText('$476 for 2 rooms, entire stay');
-    await expect(quote).toContainText('Taxes and fees are not confirmed');
+    if (compact) {
+      await expect(quote.locator('.quote-context')).toHaveText('2 nights · 2 rooms');
+      await expect(quote.locator('.quote-taxes')).toHaveCount(0);
+      const amount = await quote.locator('.quote-amount').boundingBox();
+      const unit = await quote.locator('.quote-price > span').boundingBox();
+      expect(unit.x).toBeGreaterThan(amount.x);
+      expect(unit.y).toBeLessThan(amount.y + amount.height);
+      await expect(page.locator('.offer-booking .provider-handoff > p')).toHaveText('Taxes and fees unconfirmed; check final price and terms on Priceline.');
+    } else await expect(quote).toContainText('Taxes and fees are not confirmed');
   };
   await page.goto(`/results?${new URLSearchParams(trip)}`);
-  await checkQuote('Room rate');
+  await checkQuote('Room rate', true);
   await page.getByRole('link', { name: /View likely hotel:.*Juniper House/ }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await checkQuote('Original Express quote');
@@ -463,6 +473,7 @@ test('last-seen room rates remain visible after five minutes, during refresh, an
   await expect(page.locator('.results-toolbar')).toContainText('Prices checked');
   await page.clock.fastForward(301000);
   await expect(page.getByRole('region', { name: 'Last seen room rate', exact: true })).toContainText('$119');
+  await expect(page.locator('.booking-note')).toHaveText('Taxes and fees unconfirmed; check current price and terms on Priceline.');
   expect(searches).toBe(1);
   await expect(page.getByText('These quotes need a refresh.', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Update prices', exact: true }).click();

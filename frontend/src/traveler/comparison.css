@@ -1,4 +1,5 @@
 .unboxed-application .quote-price { font-family: Manrope, sans-serif; letter-spacing: -.045em; }
+.quote-amount { font: inherit; }
 .unboxed-application .quote-taxes { line-height: 1.5; }
 .quote-discount { display: inline-flex; flex-wrap: wrap; gap: 5px; align-items: baseline; margin: 8px 0 12px; padding: 5px 8px; background: #e3e8d8; color: #3b512e; font-size: 14px; font-weight: 750; }
 .quote-discount > span { font-size: 12px; font-weight: 550; }
