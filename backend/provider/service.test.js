@@ -243,7 +243,7 @@ test('selected-offer total has one-minute freshness and survives detail-cache hi
   assert.equal(calls.filter(([type]) => type === 'detail').length, 2);
 });
 
-test('search revalidation updates the relationship while preserving the still-fresh selected-offer quote', async () => {
+test('an explicit fresh search updates same-offer evidence without extending a cached total', async () => {
   let searches = 0;
   const { service, clock, calls } = setup({ adapter: {
     async listingsPage(request) {
@@ -258,9 +258,10 @@ test('search revalidation updates the relationship while preserving the still-fr
   const search = await service.search(futureContext);
   await clock.advance(299000);
   const first = await service.detail(selection);
-  assert.equal(first.expiresAt, search.expiresAt);
+  assert.equal(first.offerExpiresAt, search.expiresAt);
   assert.equal(Date.parse(first.offer.quoteExpiresAt) - clock.now(), 60000);
   await clock.advance(1001);
+  await service.search(futureContext);
   const revalidated = await service.detail(selection);
   assert.equal(revalidated.candidate.name, 'Updated hotel name');
   assert.equal(revalidated.offer.candidates[0].name, 'Updated hotel name');
@@ -352,20 +353,184 @@ test('details share in-flight search and retain ten-second total budget includin
   assert.equal(detailCalls, 1);
 });
 
-test('expired search context is revalidated before a detail selection can be used', async () => {
-  let hasHotel = true;
-  const { service, clock, calls } = setup({ adapter: { async listingsPage(request) {
-    calls.push(['search', request]);
-    return { listings: hasHotel ? listingRows() : [listingRows()[0]], nextCursor: null };
-  } } });
-  await service.search(futureContext);
+test('an issued selection refreshes its original quote after search expiry without searching the city again', async () => {
+  let searches = 0;
+  let totalCents = 43902;
+  const { service, clock, calls } = setup({ adapter: {
+    async listingsPage(request) {
+      calls.push(['search', request]);
+      const rows = listingRows();
+      if (++searches > 1) rows[0].pclnId = 'rotated-offer';
+      return { listings: rows, nextCursor: null };
+    },
+    async hotelDetails(request) {
+      calls.push(['detail', request]);
+      return { description: 'Hotel information', originalQuote: originalQuote({ totalCents }) };
+    },
+  } });
+  const search = await service.search(futureContext);
   const detail = service.detail(selection);
   await clock.advance(1_000);
   await detail;
-  hasHotel = false;
   await clock.advance(300_000);
-  await assert.rejects(service.detail(selection), { code: 'INVALID_SELECTION' });
+  totalCents = 44400;
+  const refreshed = await service.detail(selection);
+  assert.equal(searches, 1);
+  assert.equal(refreshed.offer.offerId, selection.offerId);
+  assert.equal(refreshed.candidate.hotelId, selection.hotelId);
+  assert.equal(refreshed.offer.quote.totalCents, totalCents);
+  assert.equal(refreshed.offerExpiresAt, search.expiresAt);
+  assert.ok(Date.parse(refreshed.offerExpiresAt) < clock.now());
+  assert.equal(Date.parse(refreshed.offer.quoteExpiresAt) - clock.now(), 60_000);
+  assert.equal(calls.filter(([type]) => type === 'detail').length, 2);
+  assert.ok(calls.filter(([type]) => type === 'detail').every(([, request]) => request.offerId === selection.offerId));
+});
+
+test('an offer issued in results can be opened for the first time after the search-price cache expires', async () => {
+  let searches = 0;
+  const { service, clock, calls } = setup({ adapter: {
+    async listingsPage(request) {
+      calls.push(['search', request]);
+      return { listings: ++searches === 1 ? listingRows() : [], nextCursor: null };
+    },
+    async hotelDetails(request) { calls.push(['detail', request]); return { originalQuote: originalQuote() }; },
+  } });
+  const search = await service.search(futureContext);
+  await clock.advance(301_000);
+  const detail = await service.detail(selection);
+  assert.equal(searches, 1);
+  assert.equal(detail.candidate.hotelId, selection.hotelId);
+  assert.equal(detail.quoteStatus, 'available');
+  assert.equal(detail.offerExpiresAt, search.expiresAt);
   assert.equal(calls.filter(([type]) => type === 'detail').length, 1);
+});
+
+test('a newer search with rotated opaque IDs does not revoke an earlier issued offer', async () => {
+  let searches = 0;
+  const { service, clock, calls } = setup({ adapter: {
+    async listingsPage(request) {
+      calls.push(['search', request]);
+      const rows = listingRows();
+      if (++searches > 1) rows[0].pclnId = 'rotated-offer';
+      return { listings: rows, nextCursor: null };
+    },
+    async hotelDetails(request) { calls.push(['detail', request]); return { originalQuote: originalQuote() }; },
+  } });
+  await service.search(futureContext);
+  await clock.advance(301_000);
+  const newer = await service.search(futureContext);
+  assert.equal(newer.offers[0].offerId, 'rotated-offer');
+  const pending = service.detail(selection);
+  await clock.advance(1000);
+  const detail = await pending;
+  assert.equal(searches, 2);
+  assert.equal(detail.offer.offerId, selection.offerId);
+  assert.equal(detail.candidate.hotelId, selection.hotelId);
+  assert.equal(calls.find(([type]) => type === 'detail')[1].offerId, selection.offerId);
+});
+
+test('issued-offer retention expires thirty minutes after retrieval despite cached searches and quote refreshes', async () => {
+  let searches = 0;
+  const { service, clock, calls } = setup({ adapter: {
+    async listingsPage(request) {
+      calls.push(['search', request]);
+      const rows = listingRows();
+      if (++searches > 1) rows[0].pclnId = 'rotated-offer';
+      return { listings: rows, nextCursor: null };
+    },
+    async hotelDetails(request) { calls.push(['detail', request]); return { originalQuote: originalQuote() }; },
+  } });
+  const search = await service.search(futureContext);
+  await clock.advance(299_000);
+  assert.equal((await service.search(futureContext)).retrievedAt, search.retrievedAt);
+  await service.detail(selection);
+  await clock.advance(1_499_000);
+  const refreshed = await service.detail(selection);
+  await clock.advance(1000);
+  assert.equal((await service.detail(selection)).offer.quoteExpiresAt, refreshed.offer.quoteExpiresAt);
+  assert.equal(searches, 1);
+  await clock.advance(1001);
+  await assert.rejects(service.detail(selection), { code: 'INVALID_SELECTION' });
+  assert.equal(searches, 2);
+  assert.equal(calls.filter(([type]) => type === 'detail').length, 2);
+});
+
+test('an issued binding cannot authorize another candidate, currency, or itinerary', async () => {
+  let searches = 0;
+  let details = 0;
+  const { service, clock } = setup({ adapter: {
+    async listingsPage() { return { listings: ++searches === 1 ? listingRows() : [], nextCursor: null }; },
+    async hotelDetails() { details += 1; return { originalQuote: originalQuote() }; },
+  } });
+  await service.search(futureContext);
+  await assert.rejects(service.detail({ ...selection, hotelId: 'wrong-hotel' }), { code: 'INVALID_SELECTION' });
+  assert.equal(searches, 1);
+  for (const change of [{ currency: 'EUR' }, { adults: 3 }, { rooms: 2 }, { childrenAges: [0] },
+    { destinationId: 'geonames:293397' }, { checkOut: addCalendarDays(futureContext.checkOut, 1) }]) {
+    const rejected = assert.rejects(service.detail({ ...selection, ...change }), { code: 'INVALID_SELECTION' });
+    await clock.advance(1000);
+    await rejected;
+  }
+  assert.equal(details, 0);
+  assert.equal(searches, 7);
+});
+
+test('a newer same-offer candidate contradiction rejects even a still-fresh cached original total', async () => {
+  for (const replaceCandidate of [false, true]) {
+    let searches = 0;
+    let details = 0;
+    const { service, clock } = setup({ adapter: {
+      async listingsPage() {
+        const rows = listingRows();
+        if (++searches > 1) {
+          if (replaceCandidate) rows[1].hotelId = 'hotel-2';
+          else rows.pop();
+        }
+        return { listings: rows, nextCursor: null };
+      },
+      async hotelDetails() { details += 1; return { originalQuote: originalQuote() }; },
+    } });
+    await service.search(futureContext);
+    await clock.advance(299_000);
+    const detail = await service.detail(selection);
+    await clock.advance(1001);
+    await service.search(futureContext);
+    assert.ok(Date.parse(detail.offer.quoteExpiresAt) > clock.now());
+    await assert.rejects(service.detail(selection), { code: 'INVALID_SELECTION' });
+    assert.equal(details, 1);
+  }
+});
+
+test('in-flight named and quote-only details honor newer same-offer matching evidence', async () => {
+  for (const request of [selection, { ...futureContext, offerId: selection.offerId }]) {
+    let searches = 0;
+    let resolveSearch;
+    const { service, clock } = setup({ adapter: {
+      listingsPage() {
+        if (++searches === 1) return Promise.resolve({ listings: listingRows(), nextCursor: null });
+        return new Promise(resolve => { resolveSearch = resolve; });
+      },
+      async hotelDetails() { return { originalQuote: originalQuote() }; },
+    } });
+    await service.search(futureContext);
+    await clock.advance(301_000);
+    const search = service.search(futureContext);
+    await flush();
+    const pending = service.detail(request);
+    const result = request.hotelId ? assert.rejects(pending, { code: 'INVALID_SELECTION' }) : pending;
+    await flush();
+    const rows = listingRows();
+    rows[1].hotelId = 'hotel-2';
+    resolveSearch({ listings: rows, nextCursor: null });
+    await search;
+    await clock.advance(1000);
+    const detail = await result;
+    if (!request.hotelId) {
+      assert.equal(detail.candidate, null);
+      assert.equal(detail.offer.candidates[0].hotelId, 'hotel-2');
+      assert.deepEqual(detail.offer.quote, originalQuote());
+    }
+  }
 });
 
 test('Retry-After cooldown persists and prevents dispatch after restart without retrying', async () => {
@@ -612,7 +777,7 @@ test('summary metrics identify cache reuse and upstream work without input or pr
   assert.equal(JSON.stringify(logs).includes('Example Hotel'), false);
 });
 
-test('detail envelopes cannot extend offer freshness and cached details are clamped to revalidated search', async () => {
+test('detail freshness stays independent of expired search prices without extending either on cache hits', async () => {
   const { service, clock, calls } = setup({ adapter: { async hotelDetails(request) {
     calls.push(['detail', request]);
     return { description: 'Hotel information', originalQuote: originalQuote() };
@@ -620,18 +785,19 @@ test('detail envelopes cannot extend offer freshness and cached details are clam
   const search = await service.search(futureContext);
   await clock.advance(299_000);
   const first = await service.detail(selection);
-  assert.equal(first.expiresAt, search.expiresAt);
+  assert.equal(first.expiresAt, first.offer.quoteExpiresAt);
   assert.equal(first.offerExpiresAt, search.expiresAt);
-  assert.equal(Date.parse(first.expiresAt) - clock.now(), 1_000);
+  assert.equal(Date.parse(first.expiresAt) - clock.now(), 60_000);
   await clock.advance(500);
   const cached = await service.detail(selection);
-  assert.equal(cached.expiresAt, search.expiresAt);
+  assert.equal(cached.expiresAt, first.expiresAt);
   assert.equal(cached.offerExpiresAt, search.expiresAt);
   await clock.advance(501);
   const refreshed = await service.detail(selection);
   assert.equal(refreshed.retrievedAt, first.retrievedAt);
   assert.equal(refreshed.expiresAt, new Date(Date.parse(first.retrievedAt) + 60_000).toISOString());
-  assert.equal(calls.filter(([type]) => type === 'search').length, 2);
+  assert.equal(refreshed.offerExpiresAt, search.expiresAt);
+  assert.equal(calls.filter(([type]) => type === 'search').length, 1);
   assert.equal(calls.filter(([type]) => type === 'detail').length, 1);
 });
 

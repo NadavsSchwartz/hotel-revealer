@@ -272,11 +272,6 @@
   font-size: 14px;
 }
 
-.detail-page .detail-binding-status {
-  margin: 18px 0 0;
-  font-size: 14px;
-}
-
 .detail-page .detail-property-content {
   grid-area: content;
   min-width: 0;

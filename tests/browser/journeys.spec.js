@@ -63,7 +63,7 @@ test('a likely hotel, unavailable details, and original handoff stay separate', 
   await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
-  await expect(page.getByText('Taxes and fees are not confirmed').first()).toBeVisible();
+  await expect(page.locator('.booking-note').first()).toContainText('Taxes and fees unconfirmed');
   await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(1);
   await expect(page.getByText('Likely hotel', { exact: true })).toBeVisible();
   await page.getByLabel('Sort by').selectOption('price');

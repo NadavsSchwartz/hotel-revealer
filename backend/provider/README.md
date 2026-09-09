@@ -74,11 +74,16 @@ before grouping by identity. Exceeding either budget or the payload limit return
 `RESULT_TOO_LARGE` (503); matches are never truncated into a unique hotel. These are
 conservative application defaults, not a claim of measured production capacity.
 
-Fresh search results use a 25-entry LRU cache for five minutes. Detail results use
-a 100-entry cache for one minute, and their relationship is checked against fresh
-search context on every request. Cache hits never extend freshness. A detail
-response expires no later than its original offer's search context; fresh hotel
-details cannot extend the lifetime of an older Express quote. A valid three-page
+Fresh search results use a 25-entry LRU cache for five minutes; detail results and
+complete totals use a 100-entry cache for one minute. Separately, up to 1,000 issued
+offers (at most 16 MiB) retain their exact trip/offer matching evidence for up to
+30 minutes from search retrieval. This preserves the earlier inference, not fresh
+prices or a verified hotel identity. Known offers can refresh their original quote
+directly without repeating the city search. Unknown/expired bindings require
+search validation; newer contradictory evidence for the same offer ID revokes the
+old candidate. Missing IDs in a new inventory snapshot alone do not revoke a
+previously issued offer. Reads and quote refreshes never extend retention or make
+old listing prices fresh. A valid three-page
 capped result may be cached while retaining partial coverage; retrieval
 errors and malformed/repeated pages are not cached. Fresh cache hits may be served
 during a provider cooldown. Challenges clear caches and disable the service.

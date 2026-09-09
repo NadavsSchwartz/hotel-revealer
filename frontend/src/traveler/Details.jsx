@@ -78,6 +78,8 @@ export default function Details() {
   });
   const context = data?.context || search?.context || requestedContext;
   const error = request.key === key ? request.error : null;
+  const priceUpdateFailed = offer && !bindingRejected &&
+    ['DEADLINE_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'NETWORK_ERROR'].includes(error?.code);
   const loading =
     valid &&
     (!request.key || request.key !== key || request.status === 'loading');
@@ -120,7 +122,7 @@ export default function Details() {
     ? data.details.address.trim()
     : null;
   const retry = () => {
-    if (!loading && !coolingDown) dispatch(loadDetail(context, offerId, hotelId));
+    if (!loading && !coolingDown && !bindingRejected) dispatch(loadDetail(context, offerId, hotelId));
   };
   const refreshOffers = () => navigate(resultsUrl, {
     state: { restore: true, searchRevision: Date.now() },
@@ -169,7 +171,7 @@ export default function Details() {
               <p>{hotelId ? 'Loading hotel details and total price…' : 'Checking the total price…'}</p>
             </div>
           )}
-          {error && (
+          {error && !priceUpdateFailed && (
             <ErrorNotice
               error={error}
               onRetry={bindingRejected ? undefined : retry}
@@ -206,8 +208,12 @@ export default function Details() {
                     {offer.neighborhoodName && `${offer.neighborhoodName} · `}
                     <Stars value={offer.stars} />
                   </p>
-                  <Quote quote={offer.quote} expired={priceStale} onRefresh={retry} refreshing={loading} refreshDisabled={coolingDown} />
-                  {data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
+                  {!bindingRejected && <Quote quote={offer.quote} expired={priceStale} onRefresh={priceUpdateFailed ? undefined : retry} refreshing={loading} refreshDisabled={coolingDown} />}
+                  {priceUpdateFailed && <div className="detail-total-unavailable" role="status">
+                    <p>We couldn’t update this price. Try again or check the current price on Priceline.</p>
+                    <Button onClick={retry} disabled={loading || coolingDown}>Try again</Button>
+                  </div>}
+                  {!bindingRejected && !priceUpdateFailed && data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
                     <p>A complete total is unavailable. Check the current price on Priceline or try again.</p>
                     <Button onClick={retry} disabled={loading || coolingDown}>Retry total price</Button>
                   </div>}
@@ -217,7 +223,6 @@ export default function Details() {
                       Property photos show this hotel. Room details are on the original offer.
                     </p>
                   )}
-                  {bindingRejected && <p className="detail-binding-status" role="status">This hotel match is no longer available. You can still check the original offer on Priceline.</p>}
                   <ProviderLink offer={offer} stale={stale || priceStale} unavailable={data?.quoteStatus === 'unavailable'} refreshing={loading} />
                   {!hotelId && data?.offer?.resolution?.status === 'matched' && data.offer.candidates?.length === 1 && (
                     <p className="detail-qualification"><Link to={searchUrl(context, '/deal', { offerId, hotelId: data.offer.candidates[0].hotelId })} state={location.state}>View the likely hotel</Link></p>

@@ -22,6 +22,36 @@ permission or exception to the published terms has been established.
 | Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
 
+## Offer expiry and repeated-alert repair
+
+Verified September 8, 2026. Logs for the supplied screenshots showed whole-city
+retrieval inside a 10-second detail request, followed by exact-ID rejection.
+Search-price expiry was also discarding previously issued offer matching evidence.
+The server now retains that exact context/offer evidence in bounded memory for up
+to 30 minutes, independently of five-minute listing and one-minute total freshness.
+Known offers refresh directly; no replacement ID is guessed and newer same-ID
+candidate contradictions still revoke the earlier binding, including queued requests.
+
+Rejected selections now have one fresh-search recovery action, with no price
+button that repeats the rejected request. Transient refresh errors on a known
+offer stay beside the price while the hotel content remains visible.
+
+Actual Brave check: a GBP offer for H by H Hospitality stayed open beyond the
+original search's five-minute lifetime. Refresh request
+`f1a0ac8a-b069-46d6-b204-4cd6fd95d69a` returned HTTP 200 in 723ms, with one upstream
+call and zero city-page fetches. The page retained the property and showed a new
+GBP 105.49 total without a mismatch or timeout alert. This validates that one
+provider snapshot; price availability and hotel identity are not guaranteed.
+
+`npm run check` passed (227 native tests, lint, production build). All 152 focused
+expiry/recovery, traveler-journey, currency and theme browser cases passed across
+Chromium, mobile Chromium, Firefox and WebKit. Logs are in
+`output/verification/offer-refresh/` and the live development request log under
+`output/verification/currency-hardening/`. The scoped independent review found
+and verified the queued quote-only matching-evidence correction. No deployment
+or booking was performed. Server restart/eviction or the retention limit can still
+require a fresh search; this does not suppress genuine provider failures.
+
 ## Currency runtime and offer-selection repair
 
 Verified September 8, 2026 in the user's existing Brave tab at `127.0.0.1:5173`.

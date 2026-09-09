@@ -75,8 +75,7 @@ test('dark results, selected calendar dates, hotel details and policy remain rea
   await expect(page.getByRole('link', { name: 'View hotel & prices', exact: true })).toBeVisible();
   await expectReadable(page, 'results');
   await openTripEditor(page);
-  await page.getByLabel('Check-in', { exact: true }).focus();
-  await page.keyboard.press('ArrowDown');
+  await page.getByLabel('Check-in', { exact: true }).click();
   await expect(page.locator('.travel-calendar-popup:visible')).toHaveCSS('opacity', '1');
   await expectReadable(page, 'calendar including selected date');
   await page.keyboard.press('Escape');

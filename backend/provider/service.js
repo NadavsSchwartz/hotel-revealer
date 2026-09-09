@@ -10,9 +10,11 @@ import { diagnostic } from '../diagnostics.js';
 
 const SEARCH_TTL = 5 * 60_000;
 const DETAIL_TTL = 60_000;
+const ISSUED_OFFER_TTL = 30 * 60_000;
 const CACHE_BYTES = 16 * 1024 * 1024; // Serialized payload weight per cache, not a heap limit.
 const partialFailures = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_RESPONSE_INVALID', 'PROVIDER_DESTINATION_UNSUPPORTED', 'PROVIDER_COOLDOWN', 'PROVIDER_BUSY', 'DEADLINE_EXCEEDED']);
 const contextKey = (context) => JSON.stringify([context.destinationId, context.checkIn, context.checkOut, context.rooms, context.adults, context.childrenAges, context.currency]);
+const issuedOfferKey = (context, offerId) => JSON.stringify([contextKey(context), offerId]);
 const iso = (timestamp) => new Date(timestamp).toISOString();
 const text = (value, maximum) => typeof value === 'string' ? value.trim().slice(0, maximum) || null : null;
 
@@ -51,6 +53,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
   const configured = Boolean(adapter && typeof adapter.listingsPage === 'function' && typeof adapter.hotelDetails === 'function');
   const searches = new FreshCache({ capacity: 25, maxBytes: CACHE_BYTES, ttlMs: SEARCH_TTL, now: clock.now });
   const details = new FreshCache({ capacity: 100, maxBytes: CACHE_BYTES, ttlMs: DETAIL_TTL, now: clock.now });
+  // Keep the exact inference we issued while its independently fetched prices expire.
+  const issuedOffers = new FreshCache({ capacity: 1000, maxBytes: CACHE_BYTES, ttlMs: ISSUED_OFFER_TTL, now: clock.now });
   const searchFlights = new Map();
   const detailFlights = new Map();
   let state = cleanState();
@@ -90,6 +94,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
       state.disabled = true;
       searches.clear();
       details.clear();
+      issuedOffers.clear();
       log('error', { event: 'provider_state_failed', operation: 'write', diagnostic: diagnostic(cause) });
       throw new ServiceError('PROVIDER_DISABLED', { cause });
     }
@@ -116,6 +121,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
           state.disabled = true;
           searches.clear();
           details.clear();
+          issuedOffers.clear();
           log('error', { event: 'provider_paused', reason: 'challenge' });
           throw new ServiceError('PROVIDER_DISABLED', { cause: error });
         }
@@ -205,6 +211,12 @@ export function createProviderService({ adapter = null, clock = realClock, state
     };
     metrics.pagesFetched = pagesFetched;
     const bytes = assertJsonSize(result);
+    for (const offer of result.offers) {
+      const issued = { offer, offerExpiresAt: result.expiresAt };
+      issuedOffers.set(issuedOfferKey(context, offer.offerId), issued, {
+        bytes: assertJsonSize(issued), expiresAt: Date.parse(result.retrievedAt) + ISSUED_OFFER_TTL,
+      });
+    }
     if (cacheable && deadline > clock.now()) searches.set(key, result, { bytes, expiresAt: Date.parse(result.expiresAt) });
     return result;
   }
@@ -283,10 +295,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
       const metrics = newMetrics();
       metrics.shared = detailFlights.has(key);
       const request = coalesce(detailFlights, key, async () => {
-        // Relationship revalidation shares this detail request's total budget.
-        const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics)), deadline, clock);
-        const offer = search.offers.find((item) => item.offerId === offerId);
-        const candidate = hotelId === undefined ? null : offer?.candidates.find((item) => item.hotelId === hotelId);
+        await withDeadline(available({ allowCooldown: true }), deadline, clock);
+        const selectionKey = issuedOfferKey(context, offerId);
+        let issued = issuedOffers.get(selectionKey);
+        if (!issued) {
+          // Cold links still require server-observed matching evidence for this exact trip.
+          const search = await withDeadline(coalesce(searchFlights, contextKey(context), () => searchWork(context, deadline, metrics)), deadline, clock);
+          const offer = search.offers.find((item) => item.offerId === offerId);
+          if (offer) issued = { offer, offerExpiresAt: search.expiresAt };
+        }
+        let offer = issued?.offer;
+        let candidate = hotelId === undefined ? null : offer?.candidates.find((item) => item.hotelId === hotelId);
         if (!offer || (hotelId !== undefined && !candidate)) throw new ServiceError('INVALID_SELECTION');
         const cached = details.get(key);
         if (cached) {
@@ -294,8 +313,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
           const cachedQuoteFresh = Date.parse(cached.offer?.quoteExpiresAt) > clock.now();
           const refreshedOffer = cachedQuoteFresh
             ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
-          const result = { ...cached, offer: refreshedOffer, candidate, quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: search.expiresAt,
-            expiresAt: iso(Math.min(Date.parse(search.expiresAt), Date.parse(cached.retrievedAt) + DETAIL_TTL)) };
+          const result = { ...cached, offer: refreshedOffer, candidate, quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: issued.offerExpiresAt };
           assertJsonSize(result);
           return result;
         }
@@ -321,10 +339,17 @@ export function createProviderService({ adapter = null, clock = realClock, state
           }
         }
         const retrievedAt = clock.now();
+        // A search completed while this quote was queued owns newer matching evidence.
+        issued = issuedOffers.get(selectionKey) || issued;
+        offer = issued.offer;
+        candidate = hotelId === undefined ? null : offer.candidates.find(item => item.hotelId === hotelId);
+        if (hotelId !== undefined && !candidate) {
+          throw new ServiceError('INVALID_SELECTION');
+        }
         const refreshedOffer = originalQuote
           ? { ...offer, quote: originalQuote, quoteExpiresAt: iso(retrievedAt + DETAIL_TTL) } : offer;
         const result = {
-          context, retrievedAt: iso(retrievedAt), expiresAt: iso(Math.min(Date.parse(search.expiresAt), retrievedAt + DETAIL_TTL)), offerExpiresAt: search.expiresAt,
+          context, retrievedAt: iso(retrievedAt), expiresAt: iso(retrievedAt + DETAIL_TTL), offerExpiresAt: issued.offerExpiresAt,
           offer: refreshedOffer, candidate, details: normalizedDetails, detailStatus,
           quoteStatus: originalQuote ? 'available' : 'unavailable',
         };

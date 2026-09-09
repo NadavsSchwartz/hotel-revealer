@@ -50,12 +50,38 @@ test('a failed same-selection price refresh retains property information and a f
     await expect(photo).toBeVisible();
     await expect(handoff).toHaveAttribute('href', data.offer.handoffUrl);
   } finally { release(); }
-  await expect(page.getByRole('region', { name: 'Search status' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Search status' })).toHaveCount(0);
+  await expect(page.locator('.detail-quote-panel').getByText('We couldn’t update this price. Try again or check the current price on Priceline.', { exact: true })).toBeVisible();
+  await expect(page.locator('.detail-quote-panel').getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
   await expect(heading).toBeVisible();
   await expect(photo).toBeVisible();
   await expect(page.getByText(data.details.description, { exact: true })).toBeVisible();
   await expect(handoff).toHaveAttribute('href', data.offer.handoffUrl);
   await expect(page.getByText('The quoted price needs a refresh.', { exact: true })).toBeVisible();
+  expect(calls).toBe(2);
+});
+
+test('a rejected selection offers one fresh-search recovery instead of retrying the rejected price', async ({ page }) => {
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  const data = populatedDetail(now);
+  await mockPhoto(page);
+  let calls = 0;
+  await page.route('**/api/v1/deal', route => ++calls === 1
+    ? route.fulfill({ json: data })
+    : route.fulfill({ status: 404, json: { error: { code: 'INVALID_SELECTION' } } }));
+  await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: searchResponse() }));
+  await page.goto(detailPath);
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
+  await page.clock.fastForward(61000);
+  await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'This match needs a fresh search', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Refresh total price|Retry total price|Try again/ })).toHaveCount(0);
+  await expect(page.locator('.quote-price')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', data.offer.handoffUrl);
+  await page.getByRole('button', { name: 'Return to results', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'View likely hotel: Juniper House', exact: true })).toBeVisible();
   expect(calls).toBe(2);
 });
 
