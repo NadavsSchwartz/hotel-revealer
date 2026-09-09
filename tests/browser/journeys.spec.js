@@ -11,7 +11,8 @@ async function chooseDestination(page, query, region) {
 }
 
 async function chooseDate(page, label, date) {
-  await page.getByLabel(label, { exact: true }).click();
+  const input = page.getByLabel(label, { exact: true });
+  if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
   const calendar = page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
   await expect(calendar).toHaveCount(1);
   await expect(calendar).toBeVisible();
@@ -71,7 +72,8 @@ test('a likely hotel, unavailable details, and original handoff stay separate', 
   expect(details).toHaveLength(0);
   await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
-  await expect(page.getByText('Additional hotel details are unavailable')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Location', exact: true })).toBeVisible();
+  await expect(page.getByText('Additional hotel information is unavailable.', { exact: true })).toHaveCount(0);
   await expect(page.locator('.detail-retail')).toHaveCount(0);
   await expect(page.getByText('A complete total is unavailable.', { exact: false })).toBeVisible();
   await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', searchResponse().offers[0].handoffUrl);
@@ -521,9 +523,9 @@ test('a likely hotel keeps property photos and available facts without ranked co
   await preview.click();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: /Juniper House, property photograph/ })).toHaveCount(3);
-  await expect.poll(() => page.locator('.detail-gallery img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
-  await expect(page.getByRole('heading', { name: 'About the property', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Listed amenities', exact: true })).toBeVisible();
+  await expect.poll(() => page.locator('.property-photo-grid img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Location', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Amenities', exact: true })).toBeVisible();
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

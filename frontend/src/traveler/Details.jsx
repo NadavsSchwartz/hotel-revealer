@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Button from 'antd/es/button';
+import PropertyPhotos from './PropertyPhotos.jsx';
 import { MAX_OFFER_ID_LENGTH, validIdentifier } from '../../../shared/identifiers.js';
 import {
   contextFromSearch,
@@ -22,34 +23,24 @@ import {
 import './details.css';
 import './progress.css';
 
-function PropertyPhotos({ images, name, loading }) {
-  const [failedImages, setFailedImages] = useState([]);
-  const available = images.filter((image) => !failedImages.includes(image)).slice(0, 4);
+const priorityAmenity = /wi[ -]?fi|internet|parking|pool|breakfast|accessible|accessibility|wheelchair|fitness|gym|air.condition/i;
 
-  if (!available.length) {
-    return loading ? null : (
-      <p className="detail-photos-unavailable">Property photos are unavailable.</p>
-    );
-  }
-
+function PropertyAmenities({ amenities }) {
+  const [expanded, setExpanded] = useState(false);
+  const names = [...new Set(amenities.map(item => typeof item === 'string' ? item : item?.name)
+    .filter(name => typeof name === 'string' && name.trim()).map(name => name.trim().replaceAll('_', ' ')))];
+  names.sort((a, b) => Number(priorityAmenity.test(b)) - Number(priorityAmenity.test(a)));
+  if (!names.length) return null;
   return (
-    <div
-      className={`detail-gallery detail-gallery-${available.length}`}
-      aria-label="Named hotel photographs"
-    >
-      {available.map((image, index) => (
-        <img
-          key={image}
-          src={image}
-          alt={`${name || 'Named hotel'}, property photograph ${index + 1}`}
-          width="960"
-          height="640"
-          loading={index === 0 ? 'eager' : 'lazy'}
-          referrerPolicy="no-referrer"
-          onError={() => setFailedImages((failed) => [...failed, image])}
-        />
-      ))}
-    </div>
+    <section className="detail-amenities">
+      <h2>Amenities</h2>
+      <ul id="hotel-amenities">
+        {(expanded ? names : names.slice(0, 6)).map(name => <li key={name}><span aria-hidden="true">•</span>{name}</li>)}
+      </ul>
+      {names.length > 6 && <Button className="detail-text-button" aria-expanded={expanded} aria-controls="hotel-amenities" onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Show fewer amenities' : `Show all ${names.length} amenities`}
+      </Button>}
+    </section>
   );
 }
 
@@ -121,6 +112,13 @@ export default function Details() {
   const address = typeof data?.details?.address === 'string'
     ? data.details.address.trim()
     : null;
+  const description = data?.details?.description;
+  const hasPropertyInfo = Boolean(address || description || amenities.length);
+  let mapsUrl = candidate?.name && address
+    ? `https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query: `${candidate.name}, ${address}` })}` : null;
+  if (mapsUrl?.length > 2048) mapsUrl = null;
+  const reviewsUrl = candidate && /^[1-9]\d*$/.test(candidate.hotelId) && candidate.reviewCount > 0
+    ? `https://www.priceline.com/relax/at/${candidate.hotelId}` : null;
   const retry = () => {
     if (!loading && !coolingDown && !bindingRejected) dispatch(loadDetail(context, offerId, hotelId));
   };
@@ -182,7 +180,7 @@ export default function Details() {
           {(candidate || offer) && <div className={`detail-layout${candidate ? '' : ' detail-layout-unverified'}`}>
             {candidate && (
               <div className="detail-property-preview">
-                <PropertyPhotos key={key} images={images} name={candidate.name} loading={loading} />
+                {images.length > 0 && <PropertyPhotos key={key} images={images} name={candidate.name} />}
                 <div className="detail-property-facts" aria-label="Hotel ratings">
                   {Number.isFinite(candidate.guestRating) && (
                     <div className="detail-guest-rating">
@@ -193,6 +191,9 @@ export default function Details() {
                   {Number.isFinite(candidate.reviewCount) && (
                     <p>{candidate.reviewCount.toLocaleString()} reviews</p>
                   )}
+                  {reviewsUrl && <a className="detail-external-link" href={reviewsUrl} target="_blank" rel="noopener noreferrer">
+                    Read reviews on Priceline<span className="sr-only"> (opens the hotel page in a new tab)</span>
+                  </a>}
                   <p><Stars value={candidate.stars} />{Number.isFinite(candidate.stars) && ' hotel'}</p>
                 </div>
               </div>
@@ -204,10 +205,10 @@ export default function Details() {
               <h2>Original Express offer</h2>
               {offer ? (
                 <>
-                  <p className="detail-offer-location">
+                  {!candidate && <p className="detail-offer-location">
                     {offer.neighborhoodName && `${offer.neighborhoodName} · `}
                     <Stars value={offer.stars} />
-                  </p>
+                  </p>}
                   {!bindingRejected && <Quote quote={offer.quote} expired={priceStale} onRefresh={priceUpdateFailed ? undefined : retry} refreshing={loading} refreshDisabled={coolingDown} />}
                   {priceUpdateFailed && <div className="detail-total-unavailable" role="status">
                     <p>We couldn’t update this price. Try again or check the current price on Priceline.</p>
@@ -218,11 +219,6 @@ export default function Details() {
                     <Button onClick={retry} disabled={loading || coolingDown}>Retry total price</Button>
                   </div>}
                   <TripSummary context={context} />
-                  {!bindingRejected && candidate && (
-                    <p className="detail-qualification">
-                      Property photos show this hotel. Room details are on the original offer.
-                    </p>
-                  )}
                   <ProviderLink offer={offer} stale={stale || priceStale} unavailable={data?.quoteStatus === 'unavailable'} refreshing={loading} />
                   {!hotelId && data?.offer?.resolution?.status === 'matched' && data.offer.candidates?.length === 1 && (
                     <p className="detail-qualification"><Link to={searchUrl(context, '/deal', { offerId, hotelId: data.offer.candidates[0].hotelId })} state={location.state}>View the likely hotel</Link></p>
@@ -235,41 +231,20 @@ export default function Details() {
                 </p>
               )}
             </aside>
-            <div className="detail-property-content">
-              {candidate && (data || amenities.length > 0) && (
-                <section className="detail-property-section">
-                  <h2>About the property</h2>
-                  {data?.details?.description && <p>{data.details.description}</p>}
-                  {data && (
-                    <div className="detail-address">
-                      <span className="eyebrow">Address</span>
-                      <p>{address || 'Street address unavailable.'}</p>
-                    </div>
-                  )}
-                  {amenities.length > 0 && (
-                    <div className="detail-amenities">
-                      <h3>Listed amenities</h3>
-                      <ul>
-                        {amenities.map((amenity, index) => (
-                          <li key={index}>
-                            <span aria-hidden="true">•</span>
-                            {typeof amenity === 'string'
-                              ? amenity.replaceAll('_', ' ')
-                              : amenity?.name || 'Amenity not specified'}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </section>
-              )}
-              {data?.detailStatus === 'unavailable' && (
-                <div className="detail-coverage-notice">
-                  <strong>Additional hotel details are unavailable</strong>
-                  <p>The Express offer and available hotel clues are still shown.</p>
-                </div>
-              )}
-            </div>
+            {candidate && <div className="detail-property-content">
+              {hasPropertyInfo && <div className="detail-property-section">
+                {description && <section><h2>About this hotel</h2><p>{description}</p></section>}
+                {address && <section className="detail-address">
+                  <h2>Location</h2>
+                  <p>{address}</p>
+                  {mapsUrl && <a className="detail-external-link" href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                    Open in Google Maps<span className="sr-only"> (opens in a new tab)</span>
+                  </a>}
+                </section>}
+                <PropertyAmenities key={key} amenities={amenities} />
+              </div>}
+              {data && !hasPropertyInfo && <p className="detail-coverage-notice">Additional hotel information is unavailable.</p>}
+            </div>}
           </div>}
         </>
       )}

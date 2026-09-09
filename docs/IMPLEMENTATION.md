@@ -167,6 +167,31 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   an independently validated offer can retain its handoff. Detail totals stay in
   detail state/cache and do not replace search snapshots or their object identity.
 
+## Hotel information in Details
+
+The named-hotel view groups its guest score, review count and hotel stars. A
+“Read reviews on Priceline” link opens the named property page when a numeric
+Priceline ID and positive review count are available. That page exposes reviews;
+its review modal has no verified permalink. This link is separate from the
+original Express booking action and sends no trip parameters. Reviews are not
+copied into the application and no additional review API is called.
+
+The photo grid shows at most four existing URLs. Opening the viewer renders only
+the selected full-size image; Previous/Next and arrow keys navigate, Escape closes,
+and the existing Ant Design modal handles focus. Smaller or empty refreshed image
+sets cannot leave a blank viewer or reopen it unexpectedly. Failed images keep
+navigation and Close available. Photos describe the inferred property and do not
+promise the room included in the Express rate.
+
+Location uses the provided address, with a Google Maps search link built from the
+hotel name and address (within Maps' 2048-character URL limit). No maps SDK, API
+key or added provider lookup is required. Six amenities are shown first, favoring
+internet, parking, pool, breakfast, accessibility, fitness and air conditioning;
+“Show all” reveals the complete returned list. Provider wording and fee qualifiers
+are preserved. Missing photos/address do not create separate empty sections; one
+small note covers absent additional hotel information. Descriptions are displayed
+only when actually supplied, and no room, bed or cancellation policy is inferred.
+
 ## Internal interfaces / work ownership
 
 - Domain owns `shared/` and `backend/domain/`: validateSearch(input, now),
