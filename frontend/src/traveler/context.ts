@@ -12,6 +12,12 @@ import {
 const legacyByName = new Map(legacyDestinations.map(([name, id, label]) => [legacyKey(name), { id, label }]));
 export { DEFAULT_OCCUPANCY, TRAVEL_LIMITS, addCalendarDays, isCalendarDate, localToday } from '../../../shared/travel.ts';
 
+export type OfferSort = 'price' | 'rating' | 'stars' | 'discount';
+
+export function parseOfferSort(value: string | null): OfferSort {
+  return value === 'rating' || value === 'stars' || value === 'discount' ? value : 'price';
+}
+
 const integerParameter = (params: URLSearchParams, key: string, fallback: number) => {
   if (!params.has(key)) return fallback;
   const value = params.get(key) ?? '';

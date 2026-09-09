@@ -1,7 +1,62 @@
 import { present } from './fixtures.ts';
 import type { BrowserRequest } from './fixtures.ts';
 import { test, expect } from '@playwright/test';
-import { context, searchPath, searchResponse, tripRequest } from './fixtures.ts';
+import { context, detailResponse, searchPath, searchResponse, tripRequest } from './fixtures.ts';
+
+test('star and discount sorts use known values, break ties by room rate, and survive navigation', async ({ page }, testInfo) => {
+  const data = searchResponse();
+  const base = data.offers[0];
+  data.offers = [
+    { name: 'Budget', nightlyCents: 10000, stars: 3, discount: 10 },
+    { name: 'Luxury', nightlyCents: 30000, stars: 5, discount: 40 },
+    { name: 'Value', nightlyCents: 15000, stars: 5, discount: 40 },
+    { name: 'Unknown', nightlyCents: 9000, stars: null, discount: undefined },
+    { name: 'Invalid discount', nightlyCents: 8000, stars: 4, discount: 100 },
+    { name: 'No discount', nightlyCents: 7000, stars: 4, discount: 0 },
+  ].map(({ name, nightlyCents, stars, discount }, index) => ({
+    ...base, offerId: `offer-${index}`, stars,
+    quote: { ...base.quote, nightlyCents, stayCents: nightlyCents * 2,
+      advertisedDiscount: discount === undefined ? undefined : { percent: discount, source: 'Priceline' } },
+    resolution: { status: 'matched' },
+    candidates: [{ ...present(base.candidates[0]), hotelId: `hotel-${index}`, name, stars: stars ?? 4 }],
+  }));
+  let searches = 0;
+  await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: data }); });
+  await page.route('**/api/v1/deal', route => {
+    const offer = present(data.offers.find(offer => offer.offerId === tripRequest(route).offerId));
+    return route.fulfill({ json: { ...detailResponse(), offer, candidate: offer.candidates[0] } });
+  });
+  await page.goto(searchPath);
+  const sort = page.getByLabel('Sort by', { exact: true });
+  const names = page.locator('.candidate-preview-copy > strong');
+  await expect(sort).toHaveValue('price');
+  await expect(names).toHaveText(['No discount', 'Invalid discount', 'Unknown', 'Budget', 'Value', 'Luxury']);
+  await sort.selectOption('stars');
+  await expect(names).toHaveText(['Value', 'Luxury', 'No discount', 'Invalid discount', 'Budget', 'Unknown']);
+  await page.getByRole('link', { name: 'View likely hotel: Value', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Value', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: /Back to results/ }).click();
+  await expect(sort).toHaveValue('stars');
+  await expect(names.first()).toHaveText('Value');
+  await sort.selectOption('discount');
+  const discountedOrder = ['Value', 'Luxury', 'Budget', 'No discount', 'Invalid discount', 'Unknown'];
+  await expect(names).toHaveText(discountedOrder);
+  await expect(sort).toHaveAccessibleDescription('Discounts are Priceline’s advertised room-rate percentages, before taxes and fees.');
+  await expect(page.locator('.results-page > [role="status"]')).toContainText('Sorted by biggest discount.');
+  expect(searches).toBe(1);
+  await page.reload();
+  await expect(sort).toHaveValue('discount');
+  await expect(names).toHaveText(discountedOrder);
+  expect(searches).toBe(2);
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+    await expect(sort).toBeInViewport({ ratio: 1 });
+    expect(present(await sort.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`sort-discount-${width}.png`) });
+  }
+});
 
 test('maximum-length offer IDs keep pagination and reload usable', async ({ page }) => {
   const data = searchResponse();

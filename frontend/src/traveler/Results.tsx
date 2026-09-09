@@ -13,12 +13,14 @@ import SearchProgress from './SearchProgress.tsx';
 import {
   contextFromSearch,
   contextKey,
+  parseOfferSort,
   readView,
   safeHref,
   saveView,
   searchUrl,
   validateContext,
 } from './context.ts';
+import type { OfferSort } from './context.ts';
 import { loadSearch, validResolution } from './state.ts';
 import {
   ErrorNotice,
@@ -31,6 +33,12 @@ import {
 import './results.css';
 
 const PAGE_SIZE = 12;
+const SORT_LABELS: Record<OfferSort, string> = {
+  price: 'Lowest room rate',
+  rating: 'Highest guest rating',
+  stars: 'Highest star rating',
+  discount: 'Biggest discount',
+};
 
 function CandidatePhoto({ candidate, eager }: { candidate: Candidate; eager: boolean }) {
   const source = safeHref(candidate.thumbnailUrl);
@@ -68,6 +76,12 @@ function comparableNightly(offer: Offer, rooms: TripDraft['rooms']) {
     : Infinity;
 }
 
+function comparableDiscount(offer: Offer) {
+  const discount = offer.quote.advertisedDiscount;
+  return discount?.source === 'Priceline' && discount.percent > 0 && discount.percent < 100
+    ? discount.percent : -Infinity;
+}
+
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -96,7 +110,7 @@ export default function Results() {
   const visibleError = coolingDown ? cooldownError : error || (!data ? cooldownError : null);
   const params = new URLSearchParams(location.search);
   const waitingForFirstResults = valid && !data && (loading || !visibleError);
-  const sort = params.get('sort') === 'rating' ? 'rating' : 'price';
+  const sort = parseOfferSort(params.get('sort'));
   const rawPage = Number(params.get('page') || 1);
   const requestedPage = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const stale = useExpired(data?.expiresAt);
@@ -180,6 +194,14 @@ export default function Results() {
           (ratingA !== null && Number.isFinite(ratingA) ? ratingA : -Infinity);
         if (difference) return difference;
       }
+      if (sort === 'stars') {
+        const difference = (b.stars ?? -Infinity) - (a.stars ?? -Infinity);
+        if (difference) return difference;
+      }
+      if (sort === 'discount') {
+        const difference = comparableDiscount(b) - comparableDiscount(a);
+        if (difference) return difference;
+      }
       return comparableNightly(a, context.rooms) - comparableNightly(b, context.rooms) ||
         a.offerId.localeCompare(b.offerId);
     });
@@ -197,7 +219,7 @@ export default function Results() {
     void navigate(`/results?${next}`, { replace: true, state: location.state });
   }, [data, page, location.search, location.state, navigate]);
 
-  function updateView(nextSort: 'price' | 'rating', nextPage = page) {
+  function updateView(nextSort: OfferSort, nextPage = page) {
     const next = new URLSearchParams(location.search);
     next.set('sort', nextSort);
     next.set('page', String(nextPage));
@@ -254,7 +276,7 @@ export default function Results() {
           ? 'The provider pause has ended. You can try this search again.'
           : 'Search could not be completed.'}${data ? ' Previous results remain available.' : ''}`
         : data
-          ? `${offers.length} hotel deals found with a likely hotel.${data.coverage.status === 'partial' ? ' The search was incomplete.' : ''} Showing page ${page} of ${pageCount}.`
+          ? `${offers.length} hotel deals found with a likely hotel.${data.coverage.status === 'partial' ? ' The search was incomplete.' : ''} Showing page ${page} of ${pageCount}. Sorted by ${SORT_LABELS[sort].toLowerCase()}.`
           : '';
 
   return (
@@ -313,10 +335,10 @@ export default function Results() {
                   <select
                     id="offer-sort"
                     value={sort}
-                    onChange={(event) => updateView(event.target.value === 'rating' ? 'rating' : 'price', 1)}
+                    aria-describedby={sort === 'discount' ? 'discount-sort-note' : undefined}
+                    onChange={(event) => updateView(parseOfferSort(event.target.value), 1)}
                   >
-                    <option value="price">Lowest room rate</option>
-                    <option value="rating">Highest guest rating</option>
+                    {Object.entries(SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                   <svg className="control-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
                 </div>
@@ -326,6 +348,7 @@ export default function Results() {
           {offers.length > 0 && (
             <p className="results-comparison-intro">
               Hotel names are inferred, not guaranteed.
+              {sort === 'discount' && <span id="discount-sort-note"> Discounts are Priceline’s advertised room-rate percentages, before taxes and fees.</span>}
             </p>
           )}
           {offers.length === 0 && (

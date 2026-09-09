@@ -5,6 +5,22 @@ claim. The current modernization results below supersede the earlier 278-native 
 420-browser summary. Historical sections retain the results and limitations of
 their original revisions; they are not repeated verification of the current tree.
 
+## Results sorting — 2026-09-09
+
+Added highest star rating and biggest advertised room-rate discount alongside
+lowest room rate (default) and guest rating. Missing values sort last, equal
+values prefer lower room rates, and sort changes reset to page one without a
+provider request. The selected sort survives details/back, reload, and currency
+changes; discount copy distinguishes room rates from taxes and fees.
+
+Node 24.20.0 with `HOTEL_PROVIDER=disabled npm run check` passed typechecking,
+lint, 291 native tests, and the production build. All 16 focused browser checks
+passed across Chromium, mobile Chromium, Firefox, and WebKit: ordering, missing
+and invalid discounts, ties, pagination, navigation, currency, and mobile layout.
+Discount-sort screenshots at 1440px and 320px were visually inspected. Browser
+checks used synthetic API responses; hosted, live provider, physical-device,
+and assistive-technology validation were not repeated.
+
 ## Modernization — 2026-09-09
 
 The migration starts at `6bf14b2`; dependency checkpoints culminated at `2cf7f32`.

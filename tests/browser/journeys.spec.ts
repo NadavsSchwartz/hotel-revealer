@@ -466,6 +466,13 @@ test('only matched deals count toward local sorting, pagination, and returning f
   await pagination.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(cards.first()).toHaveAccessibleName('Area 13');
   await expect(cards.last()).toHaveAccessibleName('Area 02');
+  await page.getByLabel('Sort by').selectOption('stars');
+  await expect(cards.first()).toHaveAccessibleName('Area 02');
+  expect(new URL(page.url()).searchParams.get('page')).toBe('1');
+  await pagination.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByLabel('Sort by').selectOption('discount');
+  await expect(cards.first()).toHaveAccessibleName('Area 02');
+  expect(new URL(page.url()).searchParams.get('page')).toBe('1');
   expect(searches).toBe(1);
   expect(details).toBe(1);
 });

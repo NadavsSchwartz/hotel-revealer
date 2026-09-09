@@ -160,10 +160,12 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   remain intact; filtering reduces the rendered list, not provider search work.
   Result counts describe deals, since different offers can infer the same hotel.
 - Cards retain listing room rates with their supported per-room/night basis and
-  unknown tax/fee treatment. Sorting offers “Lowest room rate” (default) and
-  “Highest guest rating”, with unavailable values last and stable price/ID ties.
-  Sorting and paging do not issue provider requests. Supplier room-rate discounts
-  remain separate from total-price savings.
+  unknown tax/fee treatment. Sorting offers “Lowest room rate” (default),
+  “Highest guest rating”, “Highest star rating”, and “Biggest discount”, with
+  unavailable values last and stable price/ID ties. Discounts use only Priceline's
+  advertised room-rate percentages, before taxes and fees. Sorting resets to page
+  one; the choice survives detail/back navigation, reload, and currency changes.
+  Sorting and paging do not issue provider requests.
 - The five-minute search-cache expiry no longer hides historical listing prices
   or raises a page-wide alert. Cards label them “Last seen room rate”; one short
   date/time and “Update prices” action appear above the list. Updates respect the

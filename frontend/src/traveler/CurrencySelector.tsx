@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { CURRENCIES, isCurrency } from '../../../shared/currency.ts';
+import { parseOfferSort } from './context.ts';
 import './preferences.css';
 
 const STORAGE_KEY = 'hotel-revealer:currency';
@@ -43,7 +44,7 @@ export function useCurrency() {
         params.delete('hotelId');
         const resultsUrl = location.state?.resultsUrl;
         const sort = typeof resultsUrl === 'string' ? new URLSearchParams(resultsUrl.split('?')[1]).get('sort') : null;
-        if (sort === 'rating') params.set('sort', sort);
+        params.set('sort', parseOfferSort(sort));
       }
       void navigate({ pathname: detailRoute ? '/results' : location.pathname, search: `?${params}` });
     }
