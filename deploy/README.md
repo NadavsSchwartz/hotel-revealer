@@ -252,8 +252,8 @@ provider requests; results are written under ignored `output/verification/`.
 `npm run measure:capacity -- --bursts-only` runs the smaller shared/cached burst
 scenario. Local measurements do not establish the VPS memory or CPU capacity.
 
-Dependabot checks the root npm workspace and GitHub Actions weekly for minor and
-patch version updates, with at most two open version-update PRs per ecosystem.
+Dependabot checks the root npm workspace and GitHub Actions weekly for major,
+minor and patch version updates, with at most two open version-update PRs per ecosystem.
 Security updates retain GitHub's separate behavior and limits. Updates require
 review; there is no automerge. Coordinate Node/npm and image-pin changes manually
 across the runtime, workflows and deployment validation; they are not covered by

@@ -13,6 +13,8 @@
 var
 deploy
 docs
+output
+sketches
 *.log
 *.pem
 *.key
