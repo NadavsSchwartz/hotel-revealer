@@ -1,0 +1,139 @@
+import { ServiceError } from './errors.ts';
+import type { HoldWork, ProviderClock, ProviderTimer } from './types.ts';
+export type { ProviderClock } from './types.ts';
+
+export const realClock: ProviderClock = {
+  now: () => Date.now(),
+  setTimeout: (fn, ms) => setTimeout(fn, ms),
+  clearTimeout: (timer) => clearTimeout(timer),
+};
+interface Entry {
+  task: (signal: AbortSignal) => unknown;
+  deadline: number;
+  resolve(value: unknown): void;
+  reject(error: unknown): void;
+  finish(): void;
+  settled: boolean;
+  controller: AbortController;
+  timer?: ProviderTimer;
+}
+interface SchedulerOptions {
+  clock?: ProviderClock;
+  gapMs?: number;
+  maxWaiting?: number;
+  beforeDispatch?: () => Promise<void>;
+  afterDispatch?: () => Promise<void>;
+}
+
+export class ProviderScheduler {
+  declare clock: ProviderClock;
+  declare gapMs: number;
+  declare maxWaiting: number;
+  declare beforeDispatch: () => Promise<void>;
+  declare afterDispatch: () => Promise<void>;
+  declare queue: Entry[];
+  declare active: Entry | null;
+  declare lastStart: number;
+  declare gapTimer: ProviderTimer | null;
+  declare closed: boolean;
+  constructor({ clock = realClock, gapMs = 1_000, maxWaiting = 4, beforeDispatch = async () => {}, afterDispatch = async () => {} }: SchedulerOptions = {}) {
+    this.clock = clock;
+    this.gapMs = gapMs;
+    this.maxWaiting = maxWaiting;
+    this.beforeDispatch = beforeDispatch;
+    this.afterDispatch = afterDispatch;
+    this.queue = [];
+    this.active = null;
+    this.lastStart = -Infinity;
+    this.gapTimer = null;
+    this.closed = false;
+  }
+
+  run<Value>(task: (signal: AbortSignal) => Value | Promise<Value>, { deadline, holdWork }: { deadline: number; holdWork?: HoldWork }): Promise<Value> {
+    if (this.closed) return Promise.reject(new ServiceError('SERVICE_DRAINING'));
+    if (deadline <= this.clock.now()) return Promise.reject(new ServiceError('DEADLINE_EXCEEDED'));
+    if (this.queue.length >= this.maxWaiting) return Promise.reject(new ServiceError('PROVIDER_BUSY'));
+    return new Promise<Value>((resolve, reject) => {
+      let finish = () => {};
+      if (holdWork) holdWork(new Promise<void>(done => { finish = done; }));
+      // This closure pairs one task's result with its own resolver before queue erasure.
+      const entry: Entry = { task, deadline, resolve: value => resolve(value as Value), reject, finish, settled: false, controller: new AbortController() };
+      entry.timer = this.clock.setTimeout(() => {
+        entry.controller.abort();
+        this.settle(entry, new ServiceError('DEADLINE_EXCEEDED'));
+        this.queue = this.queue.filter((item) => item !== entry);
+        this.pump();
+      }, deadline - this.clock.now());
+      this.queue.push(entry);
+      this.pump();
+    });
+  }
+
+  settle(entry: Entry, error: unknown, value?: unknown) {
+    if (entry.settled) return;
+    entry.settled = true;
+    if (entry.timer !== undefined) this.clock.clearTimeout(entry.timer);
+    if (error) entry.reject(error);
+    else entry.resolve(value);
+    if (this.active !== entry) entry.finish();
+  }
+
+  pump() {
+    if (this.active || this.closed) return;
+    if (this.gapTimer !== null) {
+      this.clock.clearTimeout(this.gapTimer);
+      this.gapTimer = null;
+    }
+    while (this.queue[0]?.deadline <= this.clock.now()) {
+      this.settle(this.queue.shift()!, new ServiceError('DEADLINE_EXCEEDED'));
+    }
+    if (!this.queue.length) return;
+    const wait = this.lastStart + this.gapMs - this.clock.now();
+    if (wait > 0) {
+      this.gapTimer = this.clock.setTimeout(() => {
+        this.gapTimer = null;
+        this.pump();
+      }, wait);
+      return;
+    }
+    const entry = this.queue.shift()!;
+    this.active = entry;
+    void this.dispatch(entry);
+  }
+
+  async dispatch(entry: Entry) {
+    try {
+      await this.beforeDispatch();
+      let value;
+      try {
+        if (entry.settled || entry.deadline <= this.clock.now()) throw new ServiceError('DEADLINE_EXCEEDED');
+        this.lastStart = this.clock.now();
+        value = await entry.task(entry.controller.signal);
+      } finally {
+        // Complete durable control-state changes before admitting another call,
+        // including when preparation used the remaining admission budget.
+        await this.afterDispatch();
+      }
+      if (entry.deadline <= this.clock.now()) throw new ServiceError('DEADLINE_EXCEEDED');
+      this.settle(entry, null, value);
+    } catch (error) {
+      this.settle(entry, error);
+    } finally {
+      // Keep the active slot until the adapter and control-state work settle.
+      // An adapter that ignores AbortSignal must never create overlapping calls.
+      this.active = null;
+      entry.finish();
+      this.pump();
+    }
+  }
+
+  close() {
+    this.closed = true;
+    if (this.gapTimer !== null) this.clock.clearTimeout(this.gapTimer);
+    for (const entry of this.queue.splice(0)) this.settle(entry, new ServiceError('SERVICE_DRAINING'));
+    if (this.active) {
+      this.active.controller.abort();
+      this.settle(this.active, new ServiceError('SERVICE_DRAINING'));
+    }
+  }
+}

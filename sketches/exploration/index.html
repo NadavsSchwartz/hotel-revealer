@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Hotel Revealer — Three new directions</title>
+  <style>
+    @font-face{font-family:Manrope;src:url('../afterlight/assets/manrope.woff2') format('woff2');font-weight:400 800;font-display:swap}
+    *{box-sizing:border-box}html,body{margin:0;height:100%;background:#20231f;font-family:Manrope,sans-serif}iframe{display:block;width:100%;height:calc(100svh - 57px);border:0;background:#f0efe8}.exploration-bar{height:57px;display:flex;align-items:center;justify-content:space-between;gap:22px;padding:0 24px;background:#20231f;color:#f4f5ef;border-top:1px solid #4b5147}.exploration-label{font-size:11px;letter-spacing:.1px;white-space:nowrap}.exploration-label span{color:#b4bcae;margin-left:9px}.directions{display:flex;align-items:center;gap:6px}.directions button{font:600 12px Manrope,sans-serif;min-height:38px;padding:0 20px;border:1px solid transparent;color:#d4dacd;background:transparent;cursor:pointer;border-radius:3px;white-space:nowrap}.directions button[aria-pressed=true]{color:#172019;background:#edf1e6}.directions button:not([aria-pressed=true]):hover{border-color:#8b9684;color:white}.directions button small{font-size:9px;opacity:.7;margin-right:9px}.full-link{font-size:11px;text-decoration:underline;text-underline-offset:4px;color:#e4e9dc;display:inline-flex;align-items:center;min-height:38px;white-space:nowrap}.directions button:focus-visible,.full-link:focus-visible{outline:2px solid #f2cbb1;outline-offset:2px}@media(max-width:760px){.exploration-bar{gap:9px;padding:0 12px}.exploration-label{display:none}.directions{gap:2px}.directions button{padding:0 13px;font-size:11px}.directions button small{margin-right:6px;font-size:8px}.full-link{font-size:10px}}@media(max-width:370px){.exploration-bar{padding-inline:8px}.directions button{padding-inline:9px}.full-link{font-size:9px}}
+  </style>
+</head>
+<body>
+  <iframe id="study" title="Hotel Revealer — Room expanded homepage" src="../room/"></iframe>
+  <nav class="exploration-bar" aria-label="Design exploration">
+    <div class="exploration-label">Hotel Revealer <span>Design studies</span></div>
+    <div class="directions" role="group" aria-label="Choose a direction">
+      <button type="button" data-study="room" aria-pressed="true"><small>1</small> Room</button>
+      <button type="button" data-study="atlas" aria-pressed="false"><small>2</small> Atlas</button>
+      <button type="button" data-study="departure" aria-pressed="false"><small>3</small> Departure</button>
+    </div>
+    <a class="full-link" id="full-link" href="../room/" target="_blank" rel="noopener">Open full size</a>
+  </nav>
+  <script>
+    const directions={room:'Room',atlas:'Atlas',departure:'Departure'};
+    const frame=document.querySelector('#study');
+    let active='room';
+    function select(name){
+      if(!Object.hasOwn(directions,name))return;
+      document.querySelectorAll('[data-study]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.study===name)));
+      const path=name==='room'?'../room/':name+'.html';
+      document.querySelector('#full-link').href=path;
+      frame.title='Hotel Revealer — '+directions[name]+' design study';
+      document.title='Hotel Revealer — '+directions[name];
+      if(name!==active){frame.src=path;active=name;}
+      history.replaceState(null,'','#'+name);
+    }
+    function shortcuts(event){
+      if(event.altKey||event.metaKey||event.ctrlKey||event.target.closest('input,select,textarea,[contenteditable="true"]'))return;
+      const name=['room','atlas','departure'][Number(event.key)-1];
+      if(name){event.preventDefault();select(name);}
+    }
+    document.querySelectorAll('[data-study]').forEach(button=>button.addEventListener('click',()=>select(button.dataset.study)));
+    document.querySelector('.directions').addEventListener('keydown',shortcuts);
+    select(Object.hasOwn(directions,location.hash.slice(1))?location.hash.slice(1):'room');
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "retrievedAt": "2026-09-07T22:00:53.188885+00:00",
+  "sources": [
+    {
+      "file": "cities5000.zip",
+      "url": "https://download.geonames.org/export/dump/cities5000.zip",
+      "bytes": 5625209,
+      "sha256": "6d94198649dd64ed84f36579bfe939e4f7c18c3256cafe3d670da43dcecd5c3f",
+      "lastModified": "Mon, 07 Sep 2026 01:53:10 GMT"
+    },
+    {
+      "file": "countryInfo.txt",
+      "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+      "bytes": 31678,
+      "sha256": "93bafc525813f22e4711ff9ed6d626343094ce48c26388dc7c49189b3d7d5512",
+      "lastModified": "Mon, 07 Sep 2026 01:58:34 GMT"
+    },
+    {
+      "file": "admin1CodesASCII.txt",
+      "url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "bytes": 151536,
+      "sha256": "590651498043f674accda2b7f46d21286cda0e290b02f8561c5005eee9a5448c",
+      "lastModified": "Mon, 07 Sep 2026 01:53:10 GMT"
+    },
+    {
+      "file": "readme.txt",
+      "url": "https://download.geonames.org/export/dump/readme.txt",
+      "bytes": 8843,
+      "sha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5",
+      "lastModified": "Mon, 07 Sep 2026 01:44:12 GMT"
+    }
+  ],
+  "license": "CC-BY-4.0",
+  "attribution": "GeoNames",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "catalogCount": 69656,
+  "countryCount": 245,
+  "excludedHistoricalAbandonedDestroyed": 41,
+  "legacyCount": 1000,
+  "columns": [
+    "geonameId",
+    "name",
+    "countryCode",
+    "admin1Code",
+    "latitude",
+    "longitude",
+    "timezone",
+    "population",
+    "normalizedAliases"
+  ],
+  "catalogSha256": "727263673f941ab77e65942c0a352dd8275284ee35a92d8c9afeb5b614566c83"
+}

@@ -1,0 +1,38 @@
+.travel-date-field { display: flex; align-items: center; gap: 5px; height: 32px; }
+.travel-date-trigger { width: 100%; min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 16px; font-weight: 500; cursor: pointer; }
+.date-control .travel-date-trigger::placeholder { color: var(--muted); opacity: 1; font-weight: 400; }
+.travel-date-field > svg { flex-shrink: 0; width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; pointer-events: none; }
+.travel-calendar-popup { position: fixed; z-index: 1050; width: 280px; max-width: calc(100vw - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 10px 12px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 16px 48px #25302326; color: var(--ink); font: 13px/1.5 Manrope, sans-serif; }
+.travel-calendar-popup .rdp-root {
+  --rdp-accent-color: var(--blue);
+  --rdp-accent-background-color: var(--surface-muted);
+  --rdp-day-width: 36px;
+  --rdp-day-height: 38px;
+  --rdp-day_button-width: 32px;
+  --rdp-day_button-height: 32px;
+  --rdp-day_button-border-radius: 7px;
+  --rdp-day_button-border: 1px solid transparent;
+  --rdp-selected-border: 1px solid var(--blue);
+  --rdp-nav_button-width: 36px;
+  --rdp-nav_button-height: 36px;
+  --rdp-nav-height: 40px;
+  --rdp-weekday-padding: 6px 0;
+  --rdp-weekday-opacity: 1;
+  --rdp-disabled-opacity: .45;
+  --rdp-outside-opacity: 1;
+  --rdp-today-color: var(--blue);
+}
+.travel-calendar-popup .rdp-months { width: 100%; }
+.travel-calendar-popup .rdp-month { width: 100%; }
+.travel-calendar-popup .rdp-month_caption { font-size: 14px; font-weight: 750; }
+.travel-calendar-popup .rdp-weekday { color: var(--muted); font-size: 11px; font-weight: 500; }
+.travel-calendar-popup .rdp-month_grid { width: 100%; }
+.travel-calendar-popup .rdp-day_button { margin: auto; color: inherit; font: inherit; }
+.travel-calendar-popup .rdp-outside { color: var(--muted); }
+.travel-calendar-popup .rdp-day_button:is(:disabled, [aria-disabled="true"]) { cursor: not-allowed; }
+.travel-calendar-popup .rdp-day:not(.rdp-selected):not(.rdp-disabled) .rdp-day_button:hover { background: var(--surface-muted); }
+.travel-calendar-popup .rdp-today:not(.rdp-outside):not(.rdp-selected) .rdp-day_button { border-color: var(--blue); }
+.travel-calendar-popup .rdp-selected .rdp-day_button { background: var(--blue); color: var(--on-accent, #fff); font-weight: 650; }
+.travel-calendar-popup .rdp-button_previous:not(:disabled):not([aria-disabled="true"]):hover, .travel-calendar-popup .rdp-button_next:not(:disabled):not([aria-disabled="true"]):hover { background: var(--surface-muted); border-radius: 7px; }
+.travel-calendar-popup button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.travel-calendar-popup .calendar-footer { display: grid; gap: 4px; max-width: none; margin: 10px -12px 0; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.5; white-space: normal; }

@@ -1,0 +1,58 @@
+html[data-theme='light'] { color-scheme: light; }
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #171e18;
+  --surface: #212a22;
+  --surface-muted: #2a342b;
+  --ink: #eceee3;
+  --muted: #a8b2a2;
+  --line: #465242;
+  --blue: #a2bd94;
+  --forest: #c1d3b8;
+  --rust: #c1d3b8;
+  --on-accent: #172018;
+  --warning: #d9c29a;
+  --warning-surface: #332e23;
+  --error: #f4a698;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-control); background: transparent; color: var(--ink); }
+.theme-toggle svg { width: 20px; height: 20px; }
+.theme-toggle:hover { background: var(--surface-muted); }
+.room-application .theme-toggle { color: #f8f5ea; border-color: #f8f5ea66; background: #14251c55; }
+.room-application .theme-toggle:hover { background: #14251c; }
+.room-application .theme-toggle:focus-visible { outline-color: #f8f5ea; }
+
+/* The home form sets local colors for the photograph; let it inherit in dark mode. */
+html[data-theme='dark'] .room-reception { --ink: inherit; --muted: inherit; --blue: inherit; --forest: inherit; --line: inherit; --surface: inherit; }
+html[data-theme='dark'] :is(.room-property-preview, .destination-status-panel) { background: var(--surface); border-color: var(--line); }
+html[data-theme='dark'] :is(.room-property-address, .room-closing, .quote-discount, .trip-control:focus-within) { background: var(--surface-muted); }
+html[data-theme='dark'] :is(.room-preview-header, .room-property-location, .room-property-body > h3 span, .room-property-address svg, .destination-status-panel, .destination-option small, .destination-option svg) { color: var(--muted); }
+html[data-theme='dark'] :is(.room-preview-header > span:first-child, .destination-option strong, .destination-status-panel button) { color: var(--ink); }
+html[data-theme='dark'] :is(.room-preview-header, .traveler-counter-row, .child-ages) { border-color: var(--line); }
+html[data-theme='dark'] :is(.destination-control, .date-control) input::placeholder { color: var(--muted); }
+html[data-theme='dark'] :is(.room-reception, .results-page) .trip-control-invalid > label,
+html[data-theme='dark'] :is(.field-error, .trip-control .field-error, .trip-currency-error, .travelers-panel .field-error) { color: var(--error); }
+
+/* Accent fills and their text change together; ordinary links retain the accent. */
+html[data-theme='dark'] .button-link { color: var(--on-accent); }
+html[data-theme='dark'] .button-link:hover { color: var(--on-accent); }
+html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button, .room-button) { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button, .room-button):is(:hover, :focus) { background: var(--forest); border-color: var(--forest); color: var(--on-accent); }
+html[data-theme='dark'] .ui-button:not(.ui-button-primary):hover { background: var(--surface-muted); }
+html[data-theme='dark'] :is(.ui-button[disabled], .trip-search-fields .search-button.ui-button[disabled], .traveler-counter button:disabled) { background: var(--surface-muted); border-color: var(--line); color: var(--muted); }
+html[data-theme='dark'] :is(.quote-discount, .clue-status-match, .tier-supported) { color: var(--blue); }
+html[data-theme='dark'] :is(.clue-status:not(.clue-status-match), .tier:not(.tier-supported), .detail-page .detail-quote-panel .inline-stale) { color: var(--warning); }
+html[data-theme='dark'] .tier { background: var(--warning-surface); border-color: var(--line); }
+html[data-theme='dark'] .tier-supported { background: var(--surface-muted); }
+html[data-theme='dark'] :is(.coverage-notice, .stale-notice, .notice-panel .ui-notice) { background: var(--warning-surface); border-color: var(--line); color: var(--ink); }
+html[data-theme='dark'] :is(.coverage-notice p, .stale-notice p, .notice-panel p) { color: var(--muted); }
+html[data-theme='dark'] .notice-panel .ui-notice-info { background: var(--surface-muted); }
+html[data-theme='dark'] .notice-panel :is(.ui-notice-message, .ui-notice-description) { color: var(--ink); }
+
+/* Overlays use root theme tokens. */
+html[data-theme='dark'] :is(.travelers-panel small, .child-age-field label, .travelers-panel-footer > span) { color: var(--muted); }
+html[data-theme='dark'] .traveler-counter button { background: var(--surface); }
+html[data-theme='dark'] .traveler-counter button:hover { background: var(--surface-muted); }

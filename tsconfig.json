@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "erasableSyntaxOnly": true
+  },
+  "include": [
+    "backend/**/*.ts", "shared/**/*.ts", "frontend/src/**/*.test.ts",
+    "tests/**/*.ts", "scripts/**/*.mts"
+  ]
+}

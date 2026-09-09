@@ -1,0 +1,153 @@
+{
+  "measuredAt": "2026-09-08T20:46:43.671Z",
+  "revision": "71639bb0ef9e604a62ce2ea3118fe12f06e5801d",
+  "runtime": {
+    "node": "v24.20.0",
+    "npm": "11.19.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "checks": {
+    "native": {
+      "passed": 207,
+      "command": "HOTEL_PROVIDER=disabled npm run check",
+      "lintAndBuildPassed": true
+    },
+    "browser": {
+      "passed": 296,
+      "failed": 0,
+      "projects": [
+        "chromium",
+        "mobile",
+        "firefox",
+        "webkit"
+      ],
+      "command": "HOTEL_PROVIDER=disabled npm run test:browser"
+    },
+    "review": "Independent diagnostics, resource and legacy reviews completed; falsy provider failure corrected before commit."
+  },
+  "matching": {
+    "referencePairs": 60,
+    "applicationPairs": 180,
+    "sharedPairs": 60,
+    "savedOutputUnchanged": true,
+    "captureSha256": "4efebd0a7788d140afc69a068a3d5cb8f5295e6a2949bfe95a31489a300f0b74",
+    "limitation": "Synthetic omission leaves a unique compatible neighbor under both policies. No hotel identity accuracy was measured."
+  },
+  "cpu": {
+    "node": "v24.20.0",
+    "baseline": "4f0f8c1",
+    "current": "92390b2d733272e320d74188f63bdc741201bcaf",
+    "method": "alternating same-process measurements; old matcher uses unchanged current normalization contracts",
+    "ordinary": {
+      "before": {
+        "medianMs": 17.210207999999966,
+        "minMs": 16.771124999999984,
+        "maxMs": 18.14037499999995
+      },
+      "after": {
+        "medianMs": 15.384792000000061,
+        "minMs": 15.108124999999973,
+        "maxMs": 18.39720900000009
+      }
+    },
+    "repeated": {
+      "before": {
+        "medianMs": 95.36812499999996,
+        "minMs": 94.64270899999974,
+        "maxMs": 96.23749999999973
+      },
+      "after": {
+        "medianMs": 14.063292000000274,
+        "minMs": 13.754042000000027,
+        "maxMs": 14.475958999999875
+      }
+    },
+    "matcher": {
+      "before": {
+        "medianMs": 1694.0423340000007,
+        "minMs": 1665.620833,
+        "maxMs": 1699.2416250000006
+      },
+      "after": {
+        "medianMs": 38.90583400000014,
+        "minMs": 36.947957999998835,
+        "maxMs": 43.2832499999995
+      }
+    }
+  },
+  "capacity": {
+    "before": {
+      "artifact": "output/verification/capacity-2026-09-08T20-12-56-340Z/capacity.json",
+      "peakRssMiB": 409.27,
+      "peakSampledHeapUsedMiB": 248.61,
+      "peakSampledExternalMiB": 25.46,
+      "maximumHealthLatencyMs": 319.67,
+      "maximumEventLoopDelayMs": 363.33,
+      "completed": true,
+      "rssHeadroomTo512MiB": 102.73,
+      "cachedBurst": {
+        "adapterCalls": 0,
+        "responses": {
+          "200": 14,
+          "503": 5
+        }
+      }
+    },
+    "after": {
+      "artifact": "output/verification/capacity-2026-09-08T20-37-29-151Z/capacity.json",
+      "peakRssMiB": 352.3,
+      "peakSampledHeapUsedMiB": 186.18,
+      "peakSampledExternalMiB": 26.66,
+      "maximumHealthLatencyMs": 1723.06,
+      "maximumEventLoopDelayMs": 1654.65,
+      "completed": true,
+      "rssHeadroomTo512MiB": 159.7,
+      "cachedBurst": {
+        "adapterCalls": 0,
+        "responses": {
+          "200": 17,
+          "503": 2
+        }
+      }
+    },
+    "burstFollowup": {
+      "artifact": "output/verification/capacity-2026-09-08T20-40-49-622Z/capacity.json",
+      "peakRssMiB": 382.05,
+      "peakSampledHeapUsedMiB": 160.78,
+      "peakSampledExternalMiB": 23.24,
+      "maximumHealthLatencyMs": 260.8,
+      "maximumEventLoopDelayMs": 255.98,
+      "completed": true,
+      "rssHeadroomTo512MiB": 129.95,
+      "cachedBurst": {
+        "adapterCalls": 0,
+        "responses": {
+          "200": 10,
+          "503": 9
+        }
+      }
+    },
+    "limitation": "Local unconstrained Mac measurements; cache-hit oracle selects the newest entry after byte eviction. Accepted burst counts and latency vary. Not Linux/VPS sizing or an end-to-end latency improvement claim."
+  },
+  "sourceHashes": {
+    "backend/app.js": "6a976ef56ca3f63e1e2a90b6954d99fd176f4655f813dea4c7f097aac8c4fe2e",
+    "backend/diagnostics.js": "a17c209a9db89577406d72775708afb32cd88f115b3d4b2f734a3e3cb872a7c4",
+    "backend/destinations/index.js": "fe65c7b6a99c0194bd52271720ce2747808c2bfb2ca6ff104f6c7d2ab84178b9",
+    "backend/domain/matching.js": "5b138f0201c56c14ff45fc3b56b6a188fbe0246f1a6020abdba91b3bc52d73a7",
+    "backend/domain/normalization.js": "1be96794c8938f451006031fb259506ecbf1d4edf64c0c9dcf4e31d3bca4010b",
+    "backend/provider/service.js": "b0fff370f8056b7095b5a4575bfa576bb0082eff9645e14c94e3be8384851518",
+    "backend/provider/priceline.js": "694c7d443ddd88cab25b479dd847aa42d0157a126cf00b533434088501964aa9",
+    "backend/provider/cache.js": "fddfc9af4972b1483caf7fd0925e7b98f4aee0a643a72badc17e13f2900c004f",
+    "backend/provider/size.js": "d105a5e3cec2908c08cfa1d0c3d1afca3ae9e9763d3b1b2e503480bb7ea63f7b",
+    "frontend/src/traveler/Results.jsx": "26520e712ff5cd741ed4594e734b9af5a62b03519ae5a9184d324138802c695d",
+    "frontend/src/traveler/components.jsx": "2ee359c9c01fba1eeeaadbf765bbe9721a1c4af3fffc54e8d42e261b71a17990",
+    "frontend/src/traveler/context.js": "30297dce1bfe0c24bdce2cd5bc4997c41bb0659fd9eac279d0ee5cab8dc814ca",
+    "frontend/vite.config.js": "90699d4a4116f9c795681930e48a1cff6829abb7366c6906ee34f57f41d41c28"
+  },
+  "limits": [
+    "No new provider requests, bookings, accuracy target, pushes or deployments.",
+    "Existing separate Home/room-home.css edits were included in the browser build but not changed or committed by this task.",
+    "Hosted operation, physical devices, assistive technology and provider stability remain unverified."
+  ]
+}

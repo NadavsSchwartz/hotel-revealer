@@ -2,7 +2,7 @@
 
 Explore the likely hotel behind a Priceline Express Deal before you book.
 
-[Visit Hotel Revealer](https://hotelrevealer.tech) · [Current source][source] · [Technical documentation][docs] · [Verified build][verified-build]
+[Visit Hotel Revealer](https://hotelrevealer.tech) · [Source][source] · [Technical documentation][docs] · [Verified build][verified-build]
 
 Priceline Express Deals hide the hotel name until booking. Hotel Revealer compares
 the offer's available clues with named hotel listings, shows one inferred hotel
@@ -12,12 +12,7 @@ continuing to the original offer on Priceline.
 **Hotel identity is inferred, not verified.** Unresolved deals stay unidentified;
 the original offer, the inferred hotel, and the current price are separate facts.
 
-> **Use the current application branch:** the rebuilt TypeScript application is
-> on [`feat/hotel-revealer-recovery`][source]. `main` still contains the legacy
-> application. The features, documentation links, and setup below describe the
-> rebuilt application; the clone command selects that branch explicitly.
-
-![Hotel Revealer search interface with destination, dates, travelers, currency, and theme controls](https://raw.githubusercontent.com/NadavsSchwartz/hotel-revealer/feat/hotel-revealer-recovery/docs/media/homepage.jpg)
+![Hotel Revealer search interface with destination, dates, travelers, currency, and theme controls](docs/media/homepage.jpg)
 
 ## What you can do
 
@@ -88,7 +83,7 @@ Use **Node.js 24.20.0** and **npm 11.19.0**, as pinned by `.nvmrc` and
 `package.json`. Install from the root workspace lockfile.
 
 ```sh
-git clone --branch feat/hotel-revealer-recovery https://github.com/NadavsSchwartz/hotel-revealer.git
+git clone https://github.com/NadavsSchwartz/hotel-revealer.git
 cd hotel-revealer
 nvm install
 nvm use
@@ -127,8 +122,6 @@ recorded provider state without issuing a new upstream search.
 
 ## Verify changes
 
-From the current application branch:
-
 ```sh
 HOTEL_PROVIDER=disabled npm run check
 npx --no-install playwright install chromium firefox webkit
@@ -146,7 +139,8 @@ The [verified CI run][verified-build] for
 passed the checks, browser suite, deployment-script validation, and production
 container smoke test, then published the tested image. This is evidence for that
 revision. The [acceptance record][acceptance] contains detailed local checkpoints
-and remaining validation gaps.
+and remaining validation gaps. The [live deployment record](docs/LIVE_DEPLOYMENT.md)
+separately documents the released image, hosted journey, reboot, and rollback checks.
 
 ## Scope and limitations
 
@@ -174,8 +168,7 @@ and remaining validation gaps.
 
 For bugs, include reproduction steps, browser/device, and the visible error; omit
 credentials and personal booking information. Keep pull requests focused and run
-the relevant checks. Target `feat/hotel-revealer-recovery` for changes to the rebuilt
-application while it remains separate from `main`.
+the relevant checks. Target `main` for application changes.
 
 ## License
 
@@ -183,15 +176,15 @@ The app is available as open source under the terms of the
 [MIT License](https://opensource.org/licenses/MIT). Third-party data, fonts, and
 media retain their own licenses; see [data sources and attribution][data].
 
-[source]: https://github.com/NadavsSchwartz/hotel-revealer/tree/feat/hotel-revealer-recovery
-[docs]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/docs/README.md
-[matching]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/scripts/matching-study/README.md
-[provider]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/backend/provider/README.md
-[selection-store]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/backend/provider/selection-store.ts
-[env]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/.env.example
-[acceptance]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/docs/ACCEPTANCE.md
-[live-access]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/docs/LIVE_ACCESS.md
-[implementation]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/docs/IMPLEMENTATION.md
-[data]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/docs/DATA_SOURCES.md
-[deployment]: https://github.com/NadavsSchwartz/hotel-revealer/blob/feat/hotel-revealer-recovery/deploy/README.md
+[source]: https://github.com/NadavsSchwartz/hotel-revealer/tree/main
+[docs]: docs/README.md
+[matching]: scripts/matching-study/README.md
+[provider]: backend/provider/README.md
+[selection-store]: backend/provider/selection-store.ts
+[env]: .env.example
+[acceptance]: docs/ACCEPTANCE.md
+[live-access]: docs/LIVE_ACCESS.md
+[implementation]: docs/IMPLEMENTATION.md
+[data]: docs/DATA_SOURCES.md
+[deployment]: deploy/README.md
 [verified-build]: https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34405371862

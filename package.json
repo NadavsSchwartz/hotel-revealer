@@ -1,42 +1,47 @@
 {
-    "name": "hotel-revealer",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "main": "server.js",
-    "scripts": {
-        "server": "nodemon backend/server",
-        "client": "npm start --prefix frontend",
-        "dev": "concurrently \"npm run server\" \"npm run client\"",
-        "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix frontend && npm run build --prefix frontend"
-    },
-    "dependencies": {
-        "agenda": "^4.2.1",
-        "axios": "^0.24.0",
-        "concurrently": "^6.0.0",
-        "cookie-parser": "^1.4.6",
-        "cors": "^2.8.5",
-        "crypto-js": "^4.1.1",
-        "dotenv": "^10.0.0",
-        "express": "^4.17.1",
-        "express-async-handler": "^1.2.0",
-        "husky": "^7.0.4",
-        "lint-staged": "^12.1.4",
-        "mongoose": "^6.0.12",
-        "mongoose-unique-validator": "^3.0.0",
-        "morgan": "^1.10.0",
-        "nodemon": "^2.0.14",
-        "prettier": "^2.5.1",
-        "react-icons": "^4.3.1"
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "lint-staged"
-        }
-    },
-    "lint-staged": {
-        "frontend/src/**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
-            "prettier --write"
-        ]
-    }
+  "name": "hotel-revealer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.20.0",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.19.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspace frontend && node scripts/compress-build.mts",
+    "start": "node backend/server.ts",
+    "test": "node --test backend/domain/*.test.ts backend/destinations/*.test.ts backend/provider/*.test.ts backend/*.test.ts frontend/src/traveler/*.test.ts scripts/check-health.test.mts scripts/matching-study/*.test.mts",
+    "test:browser": "playwright test",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.server.json && tsc -p frontend/tsconfig.json && tsc -p tsconfig.json",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "measure:capacity": "node scripts/measure-capacity.mjs",
+    "provider:reset": "node scripts/reset-provider.mjs"
+  },
+  "dependencies": {
+    "dotenv": "17.4.2",
+    "express": "5.2.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/express": "5.0.6",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "eslint": "10.10.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
+  },
+  "overrides": {
+    "qs": "6.16.0"
+  }
 }
