@@ -13,9 +13,11 @@ compatibility, matching accuracy, or uptime.
 | Released-image CI | [Run 34405371862](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34405371862) passed 291 native tests, 452 browser executions, 12 release simulations, and actual Docker image/Caddy configuration validation |
 | Monitoring on main | [PR #79](https://github.com/NadavsSchwartz/hotel-revealer/pull/79), merged as `a693f3311835747e53a344d52899319d3186f16c`, added only the health workflow and checker; existing main application files were unchanged |
 
-The application was deployed from the tested recovery-branch image. The monitoring
-merge does not move that application implementation onto `main`. CI browser cases
-use synthetic provider responses; the hosted journey below is separate evidence.
+At this launch checkpoint, the application was deployed from the tested
+recovery-branch image. The monitoring-only merge described above left the legacy
+application on `main`; this records the branch state at launch, before application
+integration. CI browser cases use synthetic provider responses; the hosted journey
+below is separate evidence.
 
 ## Observed hosted behavior
 

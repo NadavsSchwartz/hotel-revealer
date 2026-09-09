@@ -19,6 +19,8 @@ the evidence behind them.
 
 ## Supporting records
 
+- [Legacy PR audit](PR_CLEANUP.md) records why the 78 old dependency PRs are superseded.
+
 - [Audit fixes](AUDIT_FIXES.md) maps reviewed defects to their corrections and checks.
 - [Release work](RELEASE_WORK.md) records operational preparation and the remaining gates.
 - [Provider research](PRICELINE_PRODUCTION_RESEARCH.md) retains dated external research.

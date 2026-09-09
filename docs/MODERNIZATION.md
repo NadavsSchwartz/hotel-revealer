@@ -1,5 +1,9 @@
 # Modernization status
 
+This document records the modernization checkpoints below. Later container and
+hosted launch verification is recorded in [live deployment evidence](LIVE_DEPLOYMENT.md);
+earlier statements that deployment was unverified describe those checkpoints.
+
 Starting revision: `6bf14b2`. Scope: presentation, destination response validation,
 Express/dotenv/ESLint updates, and TypeScript for application code and automated tests.
 No deployment, push, matching change, recovery-key change, or speculative optimization.
