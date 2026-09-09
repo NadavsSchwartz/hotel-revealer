@@ -24,6 +24,21 @@ function cacheSearch(state, context, requestId, data = shortlist(context)) {
   return travelerReducer(state, { type: 'search/success', key: searchKey, requestId, data });
 }
 
+test('refreshing a search preserves it when the oldest successful search is evicted', () => {
+  const trips = Array.from({ length: 6 }, (_, index) => ({ ...trip, adults: index + 1 }));
+  let state;
+  for (const [index, context] of trips.slice(0, 5).entries()) state = cacheSearch(state, context, index);
+  const beforeRefresh = state;
+  const refreshed = shortlist(trips[0]);
+  state = cacheSearch(state, trips[0], 5, refreshed);
+  state = cacheSearch(state, trips[5], 6);
+  assert.equal(Object.keys(state.searches).length, 5);
+  assert.equal(state.searches[contextKey(trips[0])], refreshed);
+  assert.equal(state.searches[contextKey(trips[1])], undefined);
+  assert.ok(beforeRefresh.searches[contextKey(trips[1])]);
+  assert.equal(state.searches[contextKey(trips[0])].expiresAt, refreshed.expiresAt);
+});
+
 function startDetail(state, requestId) {
   return travelerReducer(state, { type: 'detail/start', key, tripKey, offerId, hotelId, requestId });
 }

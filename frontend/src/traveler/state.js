@@ -98,9 +98,11 @@ export function travelerReducer(state = initialState, action) {
     action.type === 'search/success' &&
     state.search.requestId === action.requestId
   ) {
-    const searches = { ...state.searches, [action.key]: action.data };
-    const oldest = Object.keys(searches)[0];
-    if (Object.keys(searches).length > 5) delete searches[oldest];
+    const searches = { ...state.searches };
+    delete searches[action.key];
+    searches[action.key] = action.data;
+    const keys = Object.keys(searches);
+    if (keys.length > 5) delete searches[keys[0]];
     let detail = state.detail;
     if (detail.tripKey === action.key && detail.offerId) {
       const stored = selectionIn(action.data, detail.offerId, detail.hotelId);
