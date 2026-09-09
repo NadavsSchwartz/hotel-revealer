@@ -14,6 +14,11 @@ limits are 512 MiB for the app and 128 MiB for Caddy; this is an unmeasured star
 point, not a capacity claim. Verify current region availability and pricing before
 creating the host. Application builds run in CI, never on the VPS.
 
+The bootstrap supports plain Ubuntu 24.04 and 26.04 LTS and selects Docker's apt
+repository suite from the installed OS metadata. The DigitalOcean provisioner
+still defaults to 24.04. An Ubuntu 26.04 host must pass bootstrap and deployment
+checks on that host; local configuration checks do not prove a successful install.
+
 Use separate existing Ed25519 public keys for the administrator and CI deployer,
 and an existing DigitalOcean administrator SSH key ID:
 
