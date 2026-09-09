@@ -1,4 +1,5 @@
 import React, { forwardRef, useLayoutEffect, useImperativeHandle, useRef, useState } from 'react';
+import { validDestinationResponse } from './destinationResponse.js';
 import './destination-search.css';
 
 const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, onChange }, ref) {
@@ -33,7 +34,7 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
         const response = await fetch(`/api/v1/destinations?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Destination lookup failed');
         const body = await response.json();
-        if (!Array.isArray(body.destinations)) throw new Error('Invalid destination response');
+        if (!validDestinationResponse(body)) throw new Error('Invalid destination response');
         if (request === sequence.current && !controller.signal.aborted) {
           setResults(body.destinations.slice(0, 8));
           setStatus(body.destinations.length ? 'ready' : 'empty');

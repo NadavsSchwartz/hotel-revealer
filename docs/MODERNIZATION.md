@@ -9,8 +9,8 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
 | Checkpoint | Status | Verification and remaining work |
 | --- | --- | --- |
 | Presentation | Complete | Current homepage capture, rendered README/Mermaid, 27 links/anchors and 19 ignore cases checked; independent review found no consequential defects |
-| Destination responses | In progress | Validate consumed fields and exercise rendering, selection and retry |
-| Dependencies | Pending | Express 5.2.1, dotenv 17.4.2, ESLint 10.10.0; separate commits |
+| Destination responses | Complete | 3 native tests and 16 browser executions passed; existing cancellation/retry preserved; independent review found no consequential defects |
+| Dependencies | In progress | Express startup regression added; Express 5.2.1, dotenv 17.4.2, ESLint 10.10.0 remain separate commits |
 | Shared TypeScript contracts | Pending | Strict no-emit configurations and validated/raw input boundaries |
 | Frontend and browser tests | Pending | Preserve Redux, forms, refs, navigation and request lifecycle |
 | Backend and remaining tests | Pending | Preserve matching, provider work, persistence and diagnostics |
@@ -26,7 +26,14 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
 - Homepage screenshot: production build with provider disabled, 1440×1100,
   JPEG 181,341 bytes. Reloaded homepage had no console errors. Local README
   preview loaded the image and rendered the Mermaid diagram successfully.
-- Baseline capacity measurement is in progress; no performance claim yet.
+- Baseline capacity harness passed: peak RSS **332.63 MiB**, sampled heap
+  **149.92 MiB**, maximum sampled health latency **80.07 ms**. This is a local
+  synthetic comparison, not container capacity proof. Log:
+  `output/verification/modernization/baseline-capacity.log` (ignored).
+- Destination change: 3/3 focused native tests, focused lint, production build,
+  and 16/16 new browser executions passed (four scenarios × four projects).
+  The full existing matrix was not rerun at this checkpoint. The next integrated
+  matrix includes 109 scenarios (436 executions).
 - Existing untracked `sketches/hidden-name/` and `sketches/open-secret/` belong to
   unrelated work and remain untouched.
 
@@ -36,7 +43,13 @@ Each substantial checkpoint receives an independent skeptical review before its
 commit. Record concrete findings, their resolution, the actual checks run and any
 unverified gate below. Keep dependency and behavioral changes separate.
 
+- `85d2aa5`: presentation, current screenshot, docs navigation and ignore cleanup.
+  Independent review found no consequential defects.
+- Destination review found no consequential defects. The validator proves the
+  consumed UI destination fields, not unchecked backend-only fields; preserve
+  that distinction when introducing TypeScript.
+
 ## Next action
 
-Finish and review destination validation, then upgrade dependencies before
-introducing TypeScript. Complete the baseline capacity measurement first.
+Upgrade and independently review Express, dotenv and ESLint before introducing
+TypeScript. Keep each dependency change in its own verified commit.
