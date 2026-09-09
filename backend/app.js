@@ -22,6 +22,7 @@ const contentSecurityPolicy = [
 
 export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now(), clientIdentity = 'socket', admissionNow } = {}) {
   const app = express();
+  let html;
   // One process, ten catalog scans per second, with a burst of ten. Refill on
   // demand; malformed, short and exact-country lookups don't spend this budget.
   let destinationTokens = 10;
@@ -76,6 +77,8 @@ export function createApp({ logger = console, service = createProviderService({ 
   });
   app.get('/health', async (req, res, next) => {
     try {
+      const document = await html;
+      if (document?.error) throw document.error;
       const provider = typeof service.status === 'function' ? await service.status() : { available: false };
       res.set('Cache-Control', 'no-store').json({ status: 'ok', provider: { available: provider.available === true, ...(provider.search ? { search: provider.search } : {}) } });
     } catch (error) { next(error); }
@@ -90,10 +93,10 @@ export function createApp({ logger = console, service = createProviderService({ 
       }
     };
     // Read the immutable build once; direct results/details loads do not need the hero.
-    const html = readFile(path.join(frontendDirectory, 'index.html'), 'utf8').then(
+    html = readFile(path.join(frontendDirectory, 'index.html'), 'utf8').then(
       (home) => ({ home, other: home.replace(/<link\b(?:[^<>"']|"[^"]*"|'[^']*')*>/g,
         (tag) => /\bdata-home-preload\b/.test(tag) ? '' : tag) }),
-      (error) => ({ error }),
+      (cause) => ({ error: new ServiceError('INTERNAL_ERROR', { cause }) }),
     );
     async function sendHtml(req, res, next) {
       try {

@@ -36,11 +36,11 @@ test('production static compression preserves representation negotiation and sta
   await assert.rejects(readFile(path.join(directory, '.encoded', 'br', 'media', 'hero.avif')), { code: 'ENOENT' });
   assert.equal(await readFile(path.join(directory, 'assets', 'app.js'), 'utf8'), script);
 
-  function productionApp(frontendDirectory) {
+  function productionApp(frontendDirectory, logger = null) {
     const previousEnvironment = process.env.NODE_ENV;
     try {
       process.env.NODE_ENV = 'production';
-      return createApp({ logger: null, service: {}, frontendDirectory });
+      return createApp({ logger, service: {}, frontendDirectory });
     } finally {
       if (previousEnvironment === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previousEnvironment;
@@ -146,16 +146,25 @@ test('production static compression preserves representation negotiation and sta
     assert.equal(media.body.toString(), 'already compressed media');
   });
 
-  await t.test('a missing production document returns the existing safe error response', async (t) => {
-    const missing = productionApp(path.join(directory, 'missing')).listen(0, '127.0.0.1');
+  await t.test('a missing production document fails readiness and logs safe server errors', async (t) => {
+    const errors = [];
+    const missing = productionApp(path.join(directory, 'missing'), { error: entry => errors.push(entry) }).listen(0, '127.0.0.1');
     await once(missing, 'listening');
     t.after(() => new Promise((resolve) => { missing.close(resolve); missing.closeAllConnections(); }));
-    for (const url of ['/', '/results', '/index.html']) {
+    for (const url of ['/', '/results', '/index.html', '/health']) {
       const response = await request(url, { Accept: 'text/html' }, 'GET', missing.address().port);
-      assert.equal(response.status, 404);
-      assert.equal(JSON.parse(response.body).error.code, 'NOT_FOUND');
+      assert.equal(response.status, 500);
+      assert.equal(JSON.parse(response.body).error.code, 'INTERNAL_ERROR');
+      assert.ok(!response.body.toString().includes(directory));
       assert.equal(response.headers['cache-control'], 'no-store');
       assert.equal(response.headers['content-encoding'], undefined);
     }
+    assert.equal(errors.length, 4);
+    assert.ok(errors.every(entry => entry.event === 'request_failed' && entry.code === 'INTERNAL_ERROR'));
+    assert.equal((await request('/assets/missing.js', {}, 'GET', missing.address().port)).status, 404);
+    assert.equal((await request('/api/unknown', {}, 'GET', missing.address().port)).status, 404);
+    const healthy = await request('/health');
+    assert.equal(healthy.status, 200);
+    assert.deepEqual(JSON.parse(healthy.body), { status: 'ok', provider: { available: false } });
   });
 });

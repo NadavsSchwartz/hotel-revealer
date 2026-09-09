@@ -28,7 +28,7 @@ docker exec "$name" node --input-type=module -e '
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type"), /text\/html/);
   const markup = await page.text();
-  const script = markup.match(/<script[^>]+src="([^"]+\.js)"/);
+  const script = markup.match(/<script\b(?=[^>]*\btype="module")[^>]*\bsrc="([^"]+\.js)"/);
   assert.ok(script, "Built browser JavaScript is linked from the page");
   const asset = await fetch(new URL(script[1], "http://127.0.0.1:5000"));
   assert.equal(asset.status, 200);
