@@ -42,5 +42,22 @@ docker exec "$name" node --input-type=module -e '
   import fs from "node:fs";
   assert.equal(fs.readFileSync("/app/var/smoke-check", "utf8"), "retained");
   fs.unlinkSync("/app/var/smoke-check");
+  fs.writeFileSync("/app/var/provider-state.json", JSON.stringify({version:1,disabled:true,cooldownUntil:123456}));
+'
+docker stop --time 45 "$name" >/dev/null
+reset_provider() {
+  docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --mount "type=volume,src=$name,dst=/app/var" "$1" node scripts/reset-provider.mjs "${@:2}"
+}
+if reset_provider "$1"; then
+  echo 'Provider reset must refuse without explicit review.' >&2
+  exit 1
+fi
+reset_provider "$1" --after-review
+docker start "$name" >/dev/null
+docker exec "$name" node --input-type=module -e '
+  import assert from "node:assert/strict";
+  import fs from "node:fs";
+  assert.deepEqual(JSON.parse(fs.readFileSync("/app/var/provider-state.json", "utf8")), {version:1,disabled:false,cooldownUntil:0});
 '
 printf '%s\n' 'Image served its built UI and health endpoint without external networking; nonroot, read-only root and state persistence checks passed.'

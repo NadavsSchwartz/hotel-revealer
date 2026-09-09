@@ -28,6 +28,7 @@ COPY backend ./backend
 COPY shared ./shared
 COPY --from=build /app/frontend/dist ./frontend/dist
 COPY data ./data
+COPY scripts/reset-provider.mjs ./scripts/reset-provider.mjs
 RUN mkdir -p /app/var && chown node:node /app/var
 USER node
 EXPOSE 5000

@@ -94,6 +94,36 @@ volumes hold TLS state. Preserve these directories/volumes on replacement or
 restore; losing cooldown state can allow an early retry. Keep the last healthy
 application image in the local Docker cache. There is no automatic image prune.
 
+### Reset a reviewed provider block
+
+Review the block or interrupted request first; resetting must never bypass a
+provider restriction. The runtime image includes the same reset command as local
+development. Run this on the installed host as an administrator. It holds the
+release lock, stops the app, resets the mounted state using the recorded image,
+and restarts only after success. A failure leaves the app stopped for inspection.
+
+```sh
+sudo bash <<'RESET'
+set -euo pipefail
+source /opt/hotel-revealer/deploy/validate.sh
+exec 9>/run/lock/hotel-revealer-release.lock
+flock -n 9 || fail 'Another deployment or reset is in progress.'
+export APP_IMAGE=$(cat /var/lib/hotel-revealer/current-image)
+valid_image "$APP_IMAGE" || fail 'Invalid saved application image.'
+unset CADDY_IMAGE SITE_ADDRESS ACME_EMAIL
+compose() { docker compose --env-file /etc/hotel-revealer/compose.env --file /opt/hotel-revealer/deploy/compose.yaml "$@"; }
+compose stop --timeout 45 app
+compose run --rm --no-deps --pull never app node scripts/reset-provider.mjs --after-review
+compose start app
+RESET
+```
+
+Compose supplies the configured state path and persistent mount. `--no-deps`
+does not disable networking; the reset command itself performs no network calls.
+Local development also loads `.env`, while an inherited `PROVIDER_STATE_FILE`
+takes precedence. CI exercises reset against a disposable volume with container
+networking disabled; real-host recovery remains a separate verification gate.
+
 ## Configure CI and release
 
 - Optional repository variable `NODE_IMAGE`: override the default with a verified

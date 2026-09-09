@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { resetProviderState } from '../backend/provider/state.js';
 
 if (!process.argv.includes('--after-review')) {
