@@ -10,7 +10,7 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
 | --- | --- | --- |
 | Presentation | Complete | Current homepage capture, rendered README/Mermaid, 27 links/anchors and 19 ignore cases checked; independent review found no consequential defects |
 | Destination responses | Complete | 3 native tests and 16 browser executions passed; existing cancellation/retry preserved; independent review found no consequential defects |
-| Dependencies | In progress | Express 5.2.1 verified; dotenv 17.4.2 and ESLint 10.10.0 pending |
+| Dependencies | In progress | Express 5.2.1 and dotenv 17.4.2 verified; ESLint 10.10.0 pending |
 | Shared TypeScript contracts | Pending | Strict no-emit configurations and validated/raw input boundaries |
 | Frontend and browser tests | Pending | Preserve Redux, forms, refs, navigation and request lifecycle |
 | Backend and remaining tests | Pending | Preserve matching, provider work, persistence and diagnostics |
@@ -41,6 +41,10 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
   errors. Logs: `express-check.log`, `express-browser.log`, and
   `startup-express5-before.log` under the ignored modernization output directory.
   The full matrix will run on the completed dependency graph.
+- dotenv 17.4.2: lint, **285 native tests**, and production build passed, including
+  isolated missing-file, file-value and shell-precedence tests, startup failure,
+  and provider reset checks. The shared loader is quiet and runs before app
+  modules. Log: `output/verification/modernization/dotenv-check.log` (ignored).
 - Existing untracked `sketches/hidden-name/` and `sketches/open-secret/` belong to
   unrelated work and remain untouched.
 
@@ -58,6 +62,9 @@ unverified gate below. Keep dependency and behavioral changes separate.
 - `054428f`: destination validation and focused regression tests.
 - Express review found no consequential defects in startup cleanup, wildcard
   routing, the locked dependency changes or the regression test.
+- `d8c4f2d`: Express upgrade and startup binding failure handling.
+- dotenv review found no consequential defects in load order, documented `.env`
+  behavior, quiet logging or test isolation.
 
 ## Next action
 

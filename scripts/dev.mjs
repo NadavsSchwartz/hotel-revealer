@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../backend/env.js';
 import { spawn } from 'node:child_process';
 
 const env = { ...process.env, NODE_ENV: 'development' };

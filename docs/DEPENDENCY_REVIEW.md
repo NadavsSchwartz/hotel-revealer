@@ -1,6 +1,6 @@
 # Dependency security disposition
 
-**Migration in progress:** Express is now 5.2.1. Current checkpoint versions and
+**Migration in progress:** Express is now 5.2.1 and dotenv is 17.4.2. Current checkpoint versions and
 checks are tracked in [modernization status](MODERNIZATION.md). The audit record
 below describes the pre-migration lockfile at `6bf14b2`; it does not certify the
 modified dependency graph. Refresh both saved audits when the upgrade is complete.

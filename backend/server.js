@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env.js';
 import path from 'node:path';
 import { createApp } from './app.js';
 import { createProviderService } from './provider/service.js';
