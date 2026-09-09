@@ -2,6 +2,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['release-build/**']
   pull_request:
   workflow_call:
     inputs:
@@ -59,10 +60,20 @@ jobs:
           docker build --build-arg "NODE_IMAGE=$NODE_IMAGE" --label "org.opencontainers.image.revision=$GITHUB_SHA" --tag "hotel-revealer-ci:$GITHUB_SHA" .
           bash deploy/smoke-image.sh "hotel-revealer-ci:$GITHUB_SHA"
       - name: Save the exact tested image for release
-        if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+        if: >-
+          (inputs.publish == true && github.event_name == 'workflow_dispatch') ||
+          (github.repository == 'NadavsSchwartz/hotel-revealer' &&
+           github.event_name == 'push' && github.ref_type == 'tag' &&
+           startsWith(github.ref, 'refs/tags/release-build/') &&
+           github.event.deleted == false)
         run: docker save "hotel-revealer-ci:$GITHUB_SHA" --output "$RUNNER_TEMP/tested-image.tar"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+        if: >-
+          (inputs.publish == true && github.event_name == 'workflow_dispatch') ||
+          (github.repository == 'NadavsSchwartz/hotel-revealer' &&
+           github.event_name == 'push' && github.ref_type == 'tag' &&
+           startsWith(github.ref, 'refs/tags/release-build/') &&
+           github.event.deleted == false)
         with:
           name: tested-image
           path: ${{ runner.temp }}/tested-image.tar
@@ -79,7 +90,12 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
   publish:
-    if: inputs.publish == true && github.event_name == 'workflow_dispatch'
+    if: >-
+      (inputs.publish == true && github.event_name == 'workflow_dispatch') ||
+      (github.repository == 'NadavsSchwartz/hotel-revealer' &&
+       github.event_name == 'push' && github.ref_type == 'tag' &&
+       startsWith(github.ref, 'refs/tags/release-build/') &&
+       github.event.deleted == false)
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -109,3 +125,4 @@ jobs:
           [[ "$image" =~ @sha256:[a-f0-9]{64}$ ]] || exit 1
           [[ ${image%@sha256:*} == "$repository" ]] || exit 1
           printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
+          printf 'Tested image: `%s`\n' "$image" >> "$GITHUB_STEP_SUMMARY"

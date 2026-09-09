@@ -148,9 +148,28 @@ CI sets `HOTEL_PROVIDER=disabled` for lint, domain/API tests, the build and
 Chromium/Firefox/WebKit journeys.
 It then builds the image and tests its UI, `/health`, nonroot process, read-only
 root and persistent state mount with external container networking disabled.
-Only a manual **Release VPS** workflow saves that tested image and passes it to a
+The manual **Release VPS** workflow saves that tested image and passes it to a
 separate job with package-write permission; production receives its exact digest.
 The deployment job has no package-write or cloud API credential.
+
+For a first build before the workflow exists on `main`, explicitly push a fresh
+`release-build/...` tag pointing at the reviewed commit. In
+`NadavsSchwartz/hotel-revealer`, that tag runs complete CI and publishes the exact
+tested image without deploying. Ordinary pushes, pull requests, fork tag pushes
+and deleted tags cannot publish through this path. The immutable image reference
+appears in the workflow run summary. This leaves `main` and the manual **Release
+VPS** workflow unchanged.
+
+To deploy that digest from an administrator's Mac with SSH access, export
+`DEPLOY_HOST`, `DEPLOY_KEY_FILE` and `DEPLOY_KNOWN_HOSTS_FILE` to the verified host,
+restricted private key and exact-host known_hosts file, then run:
+
+```sh
+bash deploy/ssh-deploy.sh ghcr.io/nadavsschwartz/hotel-revealer@sha256:DIGEST
+```
+
+Replace `DIGEST` with the verified digest from the successful CI run. The tag
+build needs no VPS credentials or SSH access from GitHub runners.
 
 The release script serializes changes, rejects unexpected repositories and
 mutable image references, and pulls the application image before downtime. If
