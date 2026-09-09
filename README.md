@@ -1,8 +1,8 @@
 # Hotel Revealer
 
-A small traveler application for comparing an unnamed Express offer with possible
-named hotels. It keeps the original offer, candidate evidence, and retail hotel
-information separate. A candidate is never presented as a verified identity.
+A small traveler application showing Express deals with one inferred hotel.
+It keeps the original offer and its price separate from the hotel inference.
+An inferred name is never presented as a verified identity.
 
 **Current status:** local search and candidate details use live Priceline responses.
 The cinematic homepage is the actual application entry, not a separate demo.
@@ -40,8 +40,9 @@ NODE_ENV=production npm start
 ```
 
 Open `http://127.0.0.1:5000`. `/health` checks the application without querying a
-hotel provider. HTTP 200 from this endpoint proves the app is responding, not that
-live search is configured. Copy `.env.example` if configuration is needed.
+hotel provider. In production, it also checks the cached HTML-read result: missing
+required HTML returns HTTP 500, while ordinary missing assets remain 404.
+HTTP 200 does not prove live search is configured. Copy `.env.example` if needed.
 
 For a local live session that must stay usable while QA rebuilds `frontend/dist`,
 set `FRONTEND_DIST_DIR` to a separate copied build directory and retain its existing
@@ -84,6 +85,12 @@ corrections and verification.
 - `deploy/`: optional single-VPS deployment preparation. Hostinger managed hosting
   is a separate deployment candidate; do not run VPS scripts against shared hosting.
 
+The frontend uses React 19, declarative React Router 7, the existing Redux reducer
+and thunk middleware, and a styled DayPicker calendar. Native buttons, selects and
+a photo `<dialog>` replace Ant Design; Ant Design and Moment are removed. The
+traveler workflow and date-only state remain; selected-offer recovery keeps
+original pricing and hotel-inference status independent.
+
 Destination autocomplete uses GET `/api/v1/destinations?q=…`, with city/country
 search and stable geographic IDs. See [data provenance and refresh](docs/DATA_SOURCES.md).
 The form supports rooms, adults, and each child’s age; stays are limited to 30
@@ -125,12 +132,24 @@ process-memory bound. Autocomplete admits ten catalog scans per second with a
 burst of ten; short, invalid and exact-country queries do not consume scan capacity.
 Busy scans return `DESTINATIONS_BUSY` (503) with a one-second `Retry-After` hint.
 These are application limits, not verified provider allowances or host capacity.
-No automatic retry is used. Details revalidate the offer/candidate relationship.
-An expired retail quote is hidden and can be refreshed without disabling a still
-fresh original offer; missing retail inventory does not imply Express unavailability.
+No automatic retry is used. Details validate the original selection separately
+from hotel evidence. Expired complete totals are hidden and can be refreshed
+without disabling a safe original-offer link. A failed price refresh preserves the
+hotel content and saved results; missing retail inventory does not imply Express
+unavailability. An unrecoverable original selection offers “Find current deals”.
 
-Only provider cooldown/block control state is persisted in `var/`. Search results
-remain process-local and are lost on restart. The block must survive restart.
+Search results, hotel inferences and prices remain process-local. Separately,
+`selection-records.json` beside the configured provider-state file stores at most
+1,000 records and 256 KiB: an exact trip/offer hash, provider city ID or null, and
+an absolute expiry no later than 30 minutes after issuance. Recovery can request
+the original offer's current price and reconstruct its validated handoff after a
+restart; it never restores a hotel inference or saved price. Reads and price
+refreshes do not extend that validity. Expired records are pruned during operation
+and startup; startup removes only this cache's orphaned temporary snapshots.
+Persistence is best effort: loss falls back to normal selection recovery without
+disabling the provider. Provider cooldown/block state remains separately durable
+and must survive restart; a recovery record cannot bypass it.
+
 Stop the application and review the cause of a block or interrupted upstream call
 before resetting control state:
 
@@ -139,9 +158,12 @@ npm run provider:reset -- --after-review
 ```
 
 Then restart the app. A process killed during an upstream call leaves a conservative
-block for review. Never reset state to bypass provider restrictions.
+block for review. Never reset state to bypass provider restrictions. The runtime
+image includes this command; use the [production reset procedure](deploy/README.md#reset-a-reviewed-provider-block)
+to stop the app, reset its mounted state with the recorded image, and restart only
+after success.
 
-## Security and remaining dependency advisories
+## Security and dependencies
 
 The application renders upstream text as text, accepts only bounded structured
 input, validates handoff/image hosts, does not expose a generic URL proxy, and
@@ -149,19 +171,14 @@ avoids credentials or trip payloads in routine logs. Search/detailed views must 
 be treated as authoritative booking information.
 
 Express stays on major 4; `qs` is overridden to its patched 6.16.0 release.
-Ant Design 4 keeps its existing components. Its transitive `rc-select` is pinned
-to 14.4.3 for correct nonvirtual option semantics while retaining Ant Design 4's
-icon props and normal Tab navigation. Child popups explicitly control open state.
-Moment was already present through Ant Design; it is pinned directly because the
-date controls import it. Neither change introduces a new UI framework.
-The retained React Router 6 line has two advisory entries: the SSR deserialization
-path is not used by this client-only SPA; internal navigation uses fixed local
-paths with encoded query values, and provider navigation uses allowlisted native
-links. Targeted link tests and a source review are required before claiming these
-paths are unreachable. Do not run `npm audit fix --force` and silently change the
-React/router major versions. ESLint 9 is retained for the React plugin's declared
-peer compatibility; it emits an upstream support warning and should be reviewed
-when the plugin supports the next major.
+React Router 7.18.3 removes the two previously reviewed Router advisories from the
+installed dependency path. Full and production-only audits recorded on 2026-09-09
+UTC reported zero findings; see the [dependency disposition](docs/DEPENDENCY_REVIEW.md)
+for exact pins, lockfile identity and limits. Navigation still uses fixed local
+paths with encoded query values and allowlisted native provider links.
+Do not use `npm audit fix --force` to introduce unreviewed compatibility changes.
+ESLint 9 is retained for the React plugin's declared peer compatibility; its
+upstream support warning remains a maintenance item.
 
 ## Release prerequisites
 

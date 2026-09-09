@@ -88,9 +88,11 @@ IP's allowance and needs an explicitly reviewed trust configuration first.
    source, cloud-init or workflow output. CI's temporary publishing token cannot
    serve as persistent host registry authentication.
 
-State belongs in `/var/lib/hotel-revealer/provider`, owned by UID/GID 1000. This is
-only provider block/cooldown state, not hotel or search persistence. Caddy's named
-volumes hold TLS state. Preserve these directories/volumes on replacement or
+State belongs in `/var/lib/hotel-revealer/provider`, owned by UID/GID 1000. It holds
+provider block/cooldown state and the separate, best-effort `selection-records.json`
+recovery cache (at most 1,000 trip/offer hashes, routing city IDs and expiries for
+30 minutes; no hotel evidence or prices). Caddy's named volumes hold TLS state.
+Preserve these directories/volumes on replacement or
 restore; losing cooldown state can allow an early retry. Keep the last healthy
 application image in the local Docker cache. There is no automatic image prune.
 

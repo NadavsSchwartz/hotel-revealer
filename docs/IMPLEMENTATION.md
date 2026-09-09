@@ -4,8 +4,9 @@ Approved scope: Room shows only deals with one inferred hotel in search results,
 fetches complete prices on demand, and preserves the original supplier handoff.
 Unresolved observations remain in the API for diagnostics and revalidation; they
 are excluded from result counts, sorting and pagination.
-The application supports English, USD, worldwide destination search, room/adult
-counts and children’s ages. This milestone covers local implementation and
+The application supports English, USD/EUR/GBP/CAD/AUD, worldwide destination search,
+room/adult counts and children’s ages. Prices are requested in the selected currency,
+with no client-side conversion. This milestone covers local implementation and
 verification; public-release gates remain separate. No demo substitute.
 
 ## Status — 2026-09-08
@@ -29,12 +30,16 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
 ## Shared wire contract
 
 - Context: `{destinationId, cityName, checkIn, checkOut, rooms, adults,
-  childrenAges:[], currency:'USD'}`. Dates are ISO calendar dates. Destination IDs
+  childrenAges:[], currency}`. Currency is one of USD/EUR/GBP/CAD/AUD, defaulting to
+  USD. Dates are ISO calendar dates. Destination IDs
   use `geonames:<ID>` and the server supplies the authoritative label. Legacy
   city/state URLs resolve through the attributable geographic bridge. Successful
   responses reconcile the visible label and URL without changing trip identity.
 - GET `/api/v1/destinations?q=…` searches the server’s GeoNames snapshot and returns
   at most eight suggestions by default. This endpoint makes no hotel-provider call.
+  Two-character word-prefix postings narrow the rows checked; existing full-token
+  matching, country qualification, administrative fallback and ranking still decide
+  the results. Single-character-only tokens retain the existing scan behavior.
   See `docs/DATA_SOURCES.md` for coverage, licensing, memory and refresh evidence.
 - Shared limits: 1–8 rooms, 1–16 adults with at least one per room, up to eight
   children aged 0–17 (0 represents under one). Every child requires an age.
@@ -62,7 +67,7 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
 - Offer: `{offerId,neighborhoodName,stars,clues,quote,handoffUrl,resolution,
   candidates,quoteExpiresAt?}`. Public `clues` contain the normalized
   `guestRating`, `reviewCount` and `amenities` evidence described below.
-  Quote: `{nightlyCents,stayCents,currency:'USD',
+  Quote: `{nightlyCents,stayCents,currency,
   taxesFees:'included'|'excluded'|'unknown'}`; missing amounts are null.
   Verified price-basis metadata is optional: `{roomCount,nightlyBasis:'per-room',
   stayBasis:'all-rooms'}`. The adapter preserves provider stay amounts rather than
@@ -89,9 +94,13 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   Matching is not a guarantee or a measured identification-accuracy claim.
 - Detail input: context fields plus required `offerId` and optional `hotelId`.
   An omitted hotel is valid; supplied empty, null or malformed hotel IDs are not.
-  The server revalidates offer membership in the requested itinerary and, when
-  supplied, the hotel relationship. A rejected hotel returns `INVALID_SELECTION`
-  rather than silently changing the request into a successful named response.
+  The server checks the exact issued trip/offer selection and treats the hotel
+  relationship independently. If the original offer is recoverable but the selected
+  hotel lacks supporting evidence, the response has `candidate:null`, `details:null`
+  and `detailStatus:'unavailable'`; a valid original quote/handoff remains usable.
+  If no issued or newly discovered exact offer is available, return
+  `SELECTION_UNAVAILABLE` (404), never a replacement offer ID. The UI offers
+  “Find current deals” rather than repeatedly requesting the missing selection.
   Offer-only cache/coalescing keys are `[canonicalTripKey,offerId,null]`.
 - Detail response: `{context,retrievedAt,expiresAt,offerExpiresAt,offer,candidate,
   details,detailStatus:'available'|'unavailable'|'not_requested',
@@ -105,8 +114,14 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   That view links explicitly to the hotel-detail view. A missing retail rate does
   not establish Express unavailability. Expected quote failures retain the
   validated offer and usable handoff; unexpected processing failures remain
-  controlled HTTP 500s with private diagnostics. Unavailable totals are not cached,
-  so an explicit retry can request pricing again; concurrent retries still coalesce.
+  controlled HTTP 500s with private diagnostics. A recoverable refresh failure can
+  add `refreshError:{code}` with exactly that one key, only when
+  `quoteStatus:'unavailable'`. Allowed codes are `PROVIDER_UNAVAILABLE`,
+  `PROVIDER_RESPONSE_INVALID`, `PROVIDER_COOLDOWN`, `PROVIDER_BUSY` and
+  `DEADLINE_EXCEEDED`; malformed or contradictory combinations fail client
+  response validation. Optional `backoff:{code,retryAt}` carries a usable retry
+  deadline. Unavailable totals are not cached, so an explicit retry can request
+  pricing again; concurrent retries still coalesce.
   Metadata cache expiry does not shorten the separately revalidated offer expiry.
   An accepted original-offer total replaces `offer.quote` and adds the nested
   `offer.quoteExpiresAt` (60 seconds from retrieval). `offerExpiresAt` still tracks
@@ -160,12 +175,20 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   URLs remain supported for recovery, with no result-card entry point; those
   views retain their null-candidate binding rules and pricing/handoff behavior.
 - The existing Redux structure and singleton request status remain. Request IDs
-  prevent superseded completions from restoring loading or stale results. Detail
-  guards check offer membership for offer-only views and offer-plus-hotel
-  membership for named views. A newer search can reject an older relationship;
-  an older detail response cannot restore it. A rejected identity is hidden while
-  an independently validated offer can retain its handoff. Detail totals stay in
-  detail state/cache and do not replace search snapshots or their object identity.
+  prevent superseded completions from restoring loading or stale results. Only
+  complete, usable same-offer evidence changes an earlier hotel inference;
+  absent search membership, partial coverage, missing facts and transport failures
+  do not contradict it. Newer contradictory evidence hides the selected hotel,
+  including when an older detail response finishes later, without discarding an
+  independently valid original quote or handoff.
+  A recoverable refresh failure preserves prior same-hotel detail content and the
+  previous quote with its original expiry; expired totals remain hidden. Detail
+  responses and errors do not remove the search shortlist or replace its snapshot.
+  A failed search also retains its previous results; successful new searches
+  replace that trip's inventory snapshot.
+  The browser retains five search snapshots by most recent successful fetch:
+  refreshing an existing trip moves it to the end before evicting the oldest.
+  Reading a snapshot does not change its retention order or expiry.
 
 ## Hotel information in Details
 
@@ -178,8 +201,8 @@ copied into the application and no additional review API is called.
 
 The photo grid shows at most four existing URLs. Opening the viewer renders only
 the selected full-size image; Previous/Next and arrow keys navigate, Escape closes,
-and the existing Ant Design modal handles focus. Smaller or empty refreshed image
-sets cannot leave a blank viewer or reopen it unexpectedly. Failed images keep
+and a native modal `<dialog>` contains focus and restores it on close. Smaller or
+empty refreshed image sets cannot leave a blank viewer or reopen it unexpectedly. Failed images keep
 navigation and Close available. Photos describe the inferred property and do not
 promise the room included in the Express rate.
 
@@ -211,9 +234,19 @@ only when actually supplied, and no room, bed or cancellation policy is inferred
   test injection. Service methods `search(input)` and `detail(input)` return wire
   responses. The service factory without an adapter refuses access with
   `PROVIDER_NOT_CONFIGURED` (503); the server explicitly injects the public adapter.
-- Frontend owns `frontend/` except generated lockfiles. Keep React/Redux/antd.
-  The destination combobox, calendar popups, and traveler selector share validation
-  and preserve URL context. Calendar values remain date-only through the adapter boundary.
+- `serializeBoundedJson(value, limitBytes)` returns `{body,bytes}`. The hotel
+  controller sends this bounded JSON string directly; `assertJsonSize` remains the
+  byte-count wrapper for service callers. Cache copies and response limits remain.
+  Controller settlement cannot release admission while held shared work, upstream
+  dispatch/finalization or selection-store I/O is still running, even after its
+  caller's deadline or disconnection.
+- Frontend owns `frontend/` except generated lockfiles. React uses `createRoot`
+  with declarative `BrowserRouter`, the existing Redux reducer and thunk middleware.
+  Native controls replace Ant Design; `@daypicker/react` supplies the styled
+  single-date calendars with bounded month navigation. The destination combobox,
+  calendar popups and traveler selector preserve keyboard behavior, validation and
+  URL context. Calendar values remain date-only through the adapter boundary;
+  conversion to local `Date` values is confined to the picker.
 - Root owns package installation/lockfiles, CI/deployment, docs and integration.
   Only root runs dependency installation to avoid shared-lock races.
 
@@ -237,8 +270,8 @@ only when actually supplied, and no room, bed or cancellation policy is inferred
   retail rates never price the original offer. Legacy original
   `hotelDetails.grandTotal` was removed after a
   multi-room probe undercounted property fees despite correct base arithmetic.
-  The modern original response must follow a USD request, return `$` currency
-  prefixes for root `MIN_PRICE` and `GRAND_TOTAL`, and explicitly describe the
+  The modern original response must follow the selected currency request, return
+  its expected prefix for root `MIN_PRICE` and `GRAND_TOTAL`, and explicitly describe the
   total as including taxes and fees. Exactly one identified room rate must match
   both root amounts through `AVERAGE_NIGHTLY_RATE` and `TOTAL`. Its
   `EXCLUSIVE_PER_STAY` supplies the base stay. Decimal amounts must convert to
@@ -269,20 +302,48 @@ only when actually supplied, and no room, bed or cancellation policy is inferred
   queued requests. Admission-to-response deadlines are 20 seconds for search and
   10 seconds for detail. Streamed upstream JSON and public payloads have a 2 MiB
   bound; search/detail caches hold 25/100 entries with five-minute/one-minute TTLs.
+- Issued offer evidence stays in memory for at most 30 minutes, bounded to 1,000
+  entries and 16 MiB of serialized payload. Prices keep their separate freshness.
+  A best-effort selection snapshot beside `PROVIDER_STATE_FILE` contains only
+  `{version:1,records:[{hash,cityId,expiresAt}]}`. The SHA-256 hash binds the full
+  canonical trip and exact opaque offer ID; `cityId` is the provider city ID or
+  null when the original handoff cannot be reproduced exactly. No raw trip fields,
+  offer IDs, links, prices or hotel evidence are stored.
+  The snapshot is capped at 1,000 records and 256 KiB, with absolute validity no
+  later than 30 minutes after issuance. Reads, quote refreshes and restart do not
+  extend expiry. Startup validates and prunes it before accepting requests, and
+  an active timer prunes without requiring new traffic. Startup removes only this
+  snapshot's UUID-named crash temporary files, never loading them as recovery data.
+  While stopped or after filesystem failure, expired bytes can remain on disk;
+  expired records cannot authorize recovery. Serialized atomic replacements are
+  best effort and separate from the durable provider block: a read/write failure
+  logs sanitized diagnostics and leaves normal provider availability unchanged.
+  Recovery establishes only the previously issued exact selection, with unknown
+  hotel evidence and no price. A fresh valid quote and safely reconstructed
+  original link can work without rediscovering the city; named details require
+  independently available matching evidence. Provider cooldowns/blocks still apply.
 - Before an actual upstream call, the service durably records disabled control
   state, then restores the classified outcome after completion. State writes are
   serialized. A child-process SIGKILL test proves that interruption during the call
   leaves access blocked after restart. Hardware/volume-loss durability is unproven.
   Stop the app, review the cause, run `npm run provider:reset -- --after-review`,
-  then restart. A challenge is not retried or bypassed.
+  then restart. The runtime image includes the reset script; deployed resets use
+  the saved image and persistent mount as described in
+  [the production procedure](../deploy/README.md#reset-a-reviewed-provider-block).
+  A challenge is not retried or bypassed.
 - The selected cinematic homepage is wired into the actual `App`; the production
   flow uses the real search/results/detail routes. Isolated design previews remain
   historical artifacts, not a replacement for that flow.
 
 ## Bounded operational visibility
 
-`/health` keeps its process-health status and `provider.available`, and adds
-`provider.search`: `{status,eligibleOffers,matched,unresolved,
+In production, `/health` and HTML routes share one cached read of required
+`index.html`. A failed read produces a sanitized, logged `INTERNAL_ERROR` (HTTP
+500); ordinary missing assets and unknown API routes remain 404. Health checks
+make no hotel-provider request and do not verify every static asset or live search.
+
+Successful `/health` responses keep the process-health status and
+`provider.available`, with `provider.search`: `{status,eligibleOffers,matched,unresolved,
 lastSuccessfulFreshSearch,consecutiveUnexpectedFailures}`. Startup status is
 `unknown`, counts and last-success time are null, and the failure counter is zero.
 After an observation, status is `observed`. After a successful fresh search,

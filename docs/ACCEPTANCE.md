@@ -1,26 +1,114 @@
 # Acceptance evidence
 
-Updated 2026-09-08 Pacific time. This records observed evidence,
+Updated 2026-09-09 UTC. This records observed evidence,
 not a blanket readiness claim. Local live search, candidate details and provider
 handoff have been exercised. Public release still needs the external verification
 below. Nadav removed the earlier provider-permission implementation gate; no
 permission or exception to the published terms has been established.
+The dated checkpoints below preserve their original evidence. Their test counts,
+Ant Design behavior and performance measurements apply to those revisions, not
+automatically to the current native-control and selected-offer recovery changes.
 
 | Gate | Current status | Required evidence / remaining limit |
 | --- | --- | --- |
-| Domain correctness | Original-rule parity and resolution tests passed | Raw types, ordered amenities/icons, duplicate limits, partial coverage and conflicting identities; known live hotel outcomes still absent |
-| Provider/API | Live adapter implemented; local tests passed | Real public listing/detail responses, geography guard, bounded work, coalescing, freshness, error classification and interrupted-call block persistence; no external API support guarantee |
-| Production build | Local passed | Pinned Node 24/npm workspace install, lint and Vite/Express production build |
-| Browser journeys | 316/316 passed at `a63bd9c` | 79 scenarios across Chromium, mobile Chromium, Firefox and WebKit; final source includes the committed landing and results changes. Earlier failures and their scope are recorded below |
-| Automated accessibility | Local matrix passed with one reviewed exception | The existing exception remains limited to one destination-popup holder and one Axe rule below; manual VoiceOver is open and there is no blanket AA claim |
+| Domain correctness | Original-rule parity and current native tests passed | Raw types, ordered amenities/icons, duplicate limits and matching rules remain; Lifecycle tests distinguish missing observations from same-offer contradictions. Known live hotel outcomes remain absent |
+| Provider/API | Lifecycle and restart checks passed locally | Exact issued selection, fresh original quote, independent inference, shared-work admission and best-effort recovery snapshot; new restart proof uses the real service and synthetic provider, with no live request |
+| Production build | Passed: 278 native tests, lint and production build | Pinned Node 24.20.0/npm 11.19.0; integration-check.log against recovery revision d71e2b6 |
+| Browser journeys | 420/420 passed at 0ba5709 | 105 scenarios across Chromium, mobile Chromium, Firefox and WebKit, including native controls, restart recovery, retained shortlist and unavailable-selection recovery |
+| Automated accessibility | Current browser matrix passed without a destination-popup exception | The native combobox removed the rc-virtual-list holder and its rule exclusion. Popup/dialog checks pass normally; manual VoiceOver remains open and there is no blanket AA claim |
 | Manual accessibility | Partial | Earlier keyboard skip-link and 320px/CSS 2× checks; manual VoiceOver, true text enlargement and a full selected-design audit remain unverified |
 | Browser/device support | Partial | Engine tests and earlier installed Chrome 152 lab checks; actual Edge/Safari and physical iOS/Android remain unverified |
-| Performance | Current homepage meets the local mobile target | LCP 2.300/2.284/2.268s; CLS 0. Local production laboratory protocol below; field/hosted performance remains unverified |
-| Security/privacy | Local tests + reviewed limits | Bounded input/output, allowlisted links/images, sanitized logs/errors; current dependency findings and reachability in DEPENDENCY_REVIEW.md |
+| Performance | Both local improvement targets met | Cold JavaScript −41.9%; representative lookup 2.6× faster. Measured memory/startup costs below; Linux cgroup and field/hosted performance remain unverified |
+| Security/privacy | Current dependency audits report zero findings; application checks remain scoped | Exact pins and lock identity in DEPENDENCY_REVIEW.md; recovery snapshot excludes raw trip/offer payloads, prices and hotel evidence. No blanket security claim |
 | Live provider / accuracy | Local flow verified; accuracy unverified | Original-offer handoff, observed price/clue semantics and separate retail details checked; known outcomes, future provider compatibility and permission remain unresolved |
 | Human usability | Pending Nadav | 3–5 first-time users without coaching; retest consequential confusion |
-| Deployment / operations | Scaffolding validated only | Earlier six simulated release cases; interrupted-upstream SIGKILL/restart test passed locally. Docker, host/TLS, real rollback/reboot, memory and hardware/volume-loss durability remain unverified |
+| Deployment / operations | Application-only release/reset preparation; real runtime gates open | Caddy bootstrap is separate from app upgrades. Docker image/reset/resource checks, host/TLS, real rollback/reboot and hardware/volume-loss durability remain unverified; simulated checks do not establish them |
 | Portfolio release | Open | Actual public live journey and truthful case study tied to the deployed revision, plus the applicable gates above |
+
+## Current remediation and selected-offer recovery
+
+Lifecycle core `51a3ab8` and recovery `d71e2b6` separate an original offer from the inferred hotel and
+its quote. Partial discovery, missing facts, absent membership and transport
+failures do not disprove earlier matching evidence. Complete contradictory
+same-offer evidence can hide a selected hotel without discarding a separately
+valid original quote or handoff. Refresh failures preserve previous same-hotel
+content and quote expiry; detail outcomes do not delete the saved shortlist.
+An unrecoverable exact offer returns `SELECTION_UNAVAILABLE` with “Find current
+deals”, rather than a repeating detail retry. Optional `refreshError` is strictly
+validated as one allowed code and requires `quoteStatus:'unavailable'`.
+
+The current selection store additionally permits restart recovery from only
+`{hash,cityId,expiresAt}` records, capped at 1,000 records/256 KiB with 30-minute
+absolute validity. The hash binds the exact trip and offer; city ID may be null.
+No raw trip, opaque offer ID, hotel inference, price or link is stored. Recovery
+can refresh only the original offer and reconstruct its validated handoff; it
+cannot revive the selected hotel. Active/startup pruning and narrow crash-temp
+cleanup bound usable recovery data. Best-effort snapshot failures do not disable
+the provider or bypass its separately durable block. Pending shared work and
+snapshot I/O keep admission held after an HTTP deadline or disconnect until that
+work actually settles. See [the implementation contract](IMPLEMENTATION.md) for
+the limits, response shapes and stopped-process retention caveat.
+
+The native controls, styled DayPicker and photo `<dialog>` replace Ant Design and
+Moment. The previous rc-virtual-list Axe exception is retired. Missing production
+HTML reports 500, hotel responses reuse bounded serialization, destination
+postings preserve the existing ranking, and refreshed browser searches retain
+their recent position. Exact dependency pins and the saved full/production audits
+are in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md). Integrated verification passed with **278 native tests**, lint, production build
+and **420 browser cases** (105 scenarios across four projects), without retries or
+skips. The first browser run passed 415/420: four obsolete retry-button expectations
+and one editor-autofocus setup race were corrected. The focused nine cases and
+then the complete matrix passed. The restart case uses normal HTTP routes, a real
+service and temporary files with a synthetic provider; rotating discovery after
+restart does not trigger discovery or restore a hotel claim.
+
+Two skeptical reviewers checked correctness and complexity at each migration gate.
+Consequential findings were fixed and re-reviewed, including malformed identity
+responses, incomplete matching evidence, actual-work admission lifetime and crash-left
+recovery snapshots. No new live provider, Docker, hosted or manual assistive-technology
+proof is implied. Logs and screenshots are retained locally under
+`output/verification/remediation-20260909/` (ignored).
+
+### Matched local measurements
+
+Before is `60f0cf7`; final application behavior is `d71e2b6`, with browser setup
+corrections in `0ba5709` and the measured recovery-aware harness in `ca25b22`.
+Node 24.20.0/npm 11.19.0 were used explicitly throughout.
+
+| Measurement | Before | After | Scope |
+| --- | ---: | ---: | --- |
+| Cold-page JavaScript body transfer | 220,002 B | 127,875 B | **41.9% lower**; built entry served with Brotli, calendar loaded initially |
+| Cold-page CSS body transfer | 29,300 B | 12,454 B | **57.5% lower** |
+| Mobile lab LCP, three runs | 2,548 / 2,216 / 2,232 ms | 1,852 / 1,660 / 1,660 ms | Cold Chromium 390×844, 4× CPU slowdown, 150 ms latency, 1.6 Mbps |
+| Warm `san` lookup median | 17.30 ms | 6.64 ms | **2.6× faster**; 2,586 temporary differential checks preserved exact results/order |
+| Catalog import median | 307.1 ms | 512.3 ms | Five alternating fresh Node processes per revision, warm filesystem; +205.2 ms |
+| Catalog retained heap after GC | 59.70 MiB | 72.59 MiB | +12.89 MiB; separate from process RSS |
+| Full capacity-profile peak RSS | 333.08 MiB | 354.02 MiB | Same synthetic full cache/queue scenario; +20.94 MiB |
+
+The already-narrow `Paris France` lookup changed from 0.56 to 0.63 ms; the index
+is not a universal speedup. Matching/ranking policy is unchanged. Capacity passed
+its existing overload, queue, coalescing, cache and health assertions. The final
+run includes recovery hashes in memory but excludes recovery disk I/O, provider
+network/response parsing, TLS and Linux cgroup behavior. It leaves 157.98 MiB to
+the proposed 512 MiB budget locally; this does not validate container capacity.
+Full before/after reports are under `capacity-2026-09-09T04-15-30-937Z` in the
+isolated baseline worktree and `capacity-2026-09-09T04-38-24-094Z` in local output.
+
+Final calendar/month/traveler interactions reported maximum Event Timing event
+durations of 120 / 88 / 80 ms across the three throttled runs (16 ms reporting
+threshold). This is a small lab sample, not field INP or a before/after interaction
+comparison. Final light/dark home, destination, calendar, result and detail
+captures cover 320, 390 and 1440 px; representative renders were inspected, with
+no browser page errors. Keyboard, reduced-motion, date boundaries, DST, child
+ages and photo recovery are covered by the passing browser matrix.
+
+CI now configures a network-disabled image smoke/reset run under 512 MiB, 0.8 CPU
+and 100 PIDs and checks the runtime configuration. Docker is unavailable locally,
+so image execution/reset persistence and resource bounds still need CI evidence;
+the smoke itself does not constitute loaded-container capacity proof. Twelve
+simulated release scenarios verify bootstrap isolation, unchanged existing Caddy,
+rollback behavior and fail-closed release-record mismatch handling. No push,
+deployment, real provider-state reset or live provider request was part of this work.
 
 ## Hotel photos, location and review links
 
@@ -688,6 +776,9 @@ into the actual app and verified as recorded above. Its performance measurements
 and manual release gates remain open.
 
 ### Reviewed combobox check
+
+Historical exception: the current native combobox has removed this holder and
+rule exclusion. This record describes the earlier Ant Design implementation only.
 
 Axe's `scrollable-region-focusable` rule flags the destination popup's
 `.destination-popup .rc-virtual-list-holder`. The combobox keeps DOM focus on its
