@@ -10,7 +10,7 @@ export default function SearchProgress({ variant = 'search' }: { variant?: 'sear
   return (
     <Container className={compact ? 'results-updating' : 'search-progress'} aria-busy="true"
       aria-label={compact ? undefined : preparing ? 'Search preparation' : 'Hotel search progress'}>
-      <BrandIcon className={`search-mark${compact ? ' search-mark-compact' : ''}`} light />
+      <BrandIcon className={`search-mark${compact ? ' search-mark-compact' : ''}`} />
       <div>
         <Heading>{title}</Heading>
         <p>{compact ? 'Your current results remain available.' : preparing ? 'Getting your search ready.' : 'We’ll show the results as soon as they’re ready.'}</p>

@@ -1,13 +1,10 @@
 import { Link } from 'react-router-dom';
 
-export function BrandIcon({ className = 'brand-symbol', light = false }: { className?: string; light?: boolean }) {
+export function BrandIcon({ className = 'brand-symbol' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 40 40" aria-hidden="true" focusable="false">
-      <path d="M4 4h8v11h16V4h8v32h-8V23H12v13H4Z" fill="currentColor" />
-      <path d="m25 25 3-2v13l-3 2Z" fill="currentColor" />
-      {light && <svg x="12" y="23" width="13" height="15" viewBox="0 0 13 15" overflow="hidden">
-        <rect className="brand-light" x="3" width="6" height="15" />
-      </svg>}
+    <svg className={className} viewBox="-2 -2 44 44" aria-hidden="true" focusable="false">
+      <path className="brand-lens" d="M18.797 2.998A10.6 16.8 20 1 0 7.586 33.798L9.015 29.873A6.8 13 20 1 1 17.368 6.922Z" fill="currentColor" />
+      <path className="brand-lens brand-lens-right" d="M21.203 37.002A10.6 16.8 20 1 0 32.414 6.202L30.985 10.127A6.8 13 20 1 1 22.632 33.078Z" fill="currentColor" />
     </svg>
   );
 }

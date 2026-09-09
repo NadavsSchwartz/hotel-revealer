@@ -488,8 +488,12 @@ test('the first search shows progress until the request returns an explicit empt
     await expect(page.getByLabel('Where are you going?')).toBeFocused();
     await page.getByRole('button', { name: 'Close editor', exact: true }).click();
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(progress.locator('.brand-light')).toHaveCSS('animation-name', 'none');
-    await expect(progress.locator('.brand-light')).toHaveCSS('opacity', '1');
+    const lenses = progress.locator('.brand-lens');
+    await expect(lenses).toHaveCount(2);
+    for (const lens of await lenses.all()) {
+      await expect(lens).toHaveCSS('animation-name', 'none');
+      await expect(lens).toHaveCSS('transform', 'none');
+    }
     await expect(page.getByRole('heading', { name: 'No hotel matches found', exact: true })).toHaveCount(0);
     await expect(page.locator('.offer-list > article')).toHaveCount(0);
   } finally {

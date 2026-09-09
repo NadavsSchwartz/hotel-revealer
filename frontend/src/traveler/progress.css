@@ -2,19 +2,23 @@
 .search-mark { display: block; width: 96px; height: 96px; flex-shrink: 0; color: var(--ink); }
 .search-progress > .search-mark { margin-bottom: 24px; }
 .search-mark-compact { width: 24px; height: 24px; }
-.search-mark .brand-light { fill: #b89a66; animation: doorway-search 2600ms linear infinite; }
+.search-mark .brand-lens { transform-origin: 11px 17.6px; animation: split-lens-left 2200ms cubic-bezier(.45, 0, .25, 1) infinite; }
+.search-mark .brand-lens-right { transform-origin: 29px 22.4px; animation-name: split-lens-right; }
 .search-progress h2 { font: 600 24px/1.3 Manrope, sans-serif; letter-spacing: -.025em; margin: 0; }
 .search-progress p { max-width: 42ch; margin: 10px auto 0; color: var(--muted); font-size: 16px; line-height: 1.6; }
-@keyframes doorway-search {
-  0% { transform: translateX(-9px); opacity: 0; }
-  15%, 60% { opacity: 1; }
-  100% { transform: translateX(19px); opacity: 0; }
+@keyframes split-lens-left {
+  0%, 100% { transform: translateX(-1.06px) rotate(-8deg); }
+  50% { transform: translateX(1.06px) rotate(12deg); }
+}
+@keyframes split-lens-right {
+  0%, 100% { transform: translateX(1.06px) rotate(12deg); }
+  50% { transform: translateX(-1.06px) rotate(-8deg); }
 }
 /* Detail retrieval keeps its separate, compact indicator. */
 .detail-progress-dot { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--blue); animation: search-signal 1200ms linear infinite; }
 @keyframes search-signal { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
 @media (max-width: 600px) { .search-progress { min-height: 320px; padding: 32px 16px; } }
 @media (prefers-reduced-motion: reduce) {
-  .search-mark .brand-light { animation: none; transform: none; opacity: 1; }
+  .search-mark .brand-lens { animation: none; }
   .detail-progress-dot { animation: none; opacity: .7; }
 }
