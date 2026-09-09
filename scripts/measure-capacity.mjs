@@ -37,9 +37,9 @@ function assertControlledBurst(requests) {
 }
 
 async function runWorker() {
-  const [{ createApp }, { createProviderService }, { createMemoryStateStore }, domain, { MAX_JSON_BYTES }] = await Promise.all([
+  const [{ createApp }, { createProviderService }, { createMemoryStateStore }, domain, { MAX_JSON_BYTES }, { createSelectionStore }] = await Promise.all([
     import('../backend/app.js'), import('../backend/provider/service.js'), import('../backend/provider/state.js'),
-    import('../backend/domain/index.js'), import('../backend/provider/size.js'),
+    import('../backend/domain/index.js'), import('../backend/provider/size.js'), import('../backend/provider/selection-store.js'),
   ]);
   // If an accidental live adapter is introduced, fail before making its request.
   globalThis.fetch = () => { throw new Error('Capacity worker prohibits all external fetches.'); };
@@ -113,6 +113,7 @@ async function runWorker() {
   };
   const service = createProviderService({
     stateStore: createMemoryStateStore(),
+    selectionStore: createSelectionStore(),
     logger: { info(event) { events.push(event); if (events.length > 300) events.shift(); sampleMemory(); } },
     adapter: {
       listingsPage({ signal }) { return adapterCall('search', signal, () => ({ listings: structuredClone(rows), nextCursor: null })); },
@@ -187,6 +188,7 @@ async function runMeasurement() {
   await mkdir(output, { recursive: true });
   const sourcePaths = ['backend/app.js', 'backend/admission.js', 'backend/controllers/hotelController.js', 'backend/destinations/index.js',
     'backend/provider/size.js', 'backend/provider/service.js', 'backend/provider/cache.js', 'backend/provider/scheduler.js',
+    'backend/provider/selection-store.js',
     'backend/domain/matching.js', 'backend/domain/normalization.js', 'scripts/measure-capacity.mjs'];
   const report = {
     measuredAt, measurementMode: burstsOnly ? 'shared-and-cached-bursts-only' : 'full-cache-and-queue-profile',
@@ -194,7 +196,7 @@ async function runMeasurement() {
       cpu: os.cpus()[0]?.model, logicalCpus: os.cpus().length, machineMemoryBytes: os.totalmem() },
     revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     dirtySourcePaths: execFileSync('git', ['status', '--short', '--', ...sourcePaths], { encoding: 'utf8' }).trim().split('\n').filter(Boolean),
-    scope: 'Mac-local Node server process with the actual GeoNames dataset, real HTTP, production service/cache/scheduler, and a synthetic stub provider. The HTTP load driver is a separate process. No provider requests.',
+    scope: 'Mac-local Node server process with the actual GeoNames dataset, real HTTP, production service/cache/scheduler, in-memory selection recovery records, and a synthetic stub provider. Recovery disk I/O is excluded. The HTTP load driver is a separate process. No provider requests.',
     configuredAppBudgetBytes: appBudgetBytes,
     controls: { maxDataCallers, maxHealthCallers: 1, workerOldSpaceMiB: 384, rssStopThresholdMiB: 480,
       maxAdmittedHotelRequests: 8, clients: 'Distinct synthetic client per HTTP request; per-client fairness is tested separately.',
