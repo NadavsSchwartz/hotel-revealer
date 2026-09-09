@@ -1,5 +1,10 @@
 # Dependency security disposition
 
+**Migration in progress:** Express is now 5.2.1. Current checkpoint versions and
+checks are tracked in [modernization status](MODERNIZATION.md). The audit record
+below describes the pre-migration lockfile at `6bf14b2`; it does not certify the
+modified dependency graph. Refresh both saved audits when the upgrade is complete.
+
 Updated 2026-09-09 UTC against the current root npm workspace lockfile. The
 coordinated React/Router upgrade and removal of Ant Design/Moment supersede the
 previous Router 6 exception. This records dependency state and audit evidence;

@@ -10,7 +10,7 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
 | --- | --- | --- |
 | Presentation | Complete | Current homepage capture, rendered README/Mermaid, 27 links/anchors and 19 ignore cases checked; independent review found no consequential defects |
 | Destination responses | Complete | 3 native tests and 16 browser executions passed; existing cancellation/retry preserved; independent review found no consequential defects |
-| Dependencies | In progress | Express startup regression added; Express 5.2.1, dotenv 17.4.2, ESLint 10.10.0 remain separate commits |
+| Dependencies | In progress | Express 5.2.1 verified; dotenv 17.4.2 and ESLint 10.10.0 pending |
 | Shared TypeScript contracts | Pending | Strict no-emit configurations and validated/raw input boundaries |
 | Frontend and browser tests | Pending | Preserve Redux, forms, refs, navigation and request lifecycle |
 | Backend and remaining tests | Pending | Preserve matching, provider work, persistence and diagnostics |
@@ -34,6 +34,13 @@ No deployment, push, matching change, recovery-key change, or speculative optimi
   and 16/16 new browser executions passed (four scenarios × four projects).
   The full existing matrix was not rerun at this checkpoint. The next integrated
   matrix includes 109 scenarios (436 executions).
+- Express 5.2.1: lint, **282 native tests**, production build and **48 existing
+  Chromium/WebKit journey executions** passed. The occupied-port test failed
+  before the callback fix (incorrect exit 0) and passes with a sanitized failure
+  and exit 1. Existing static tests cover encoding fallback, HEAD, MIME and API
+  errors. Logs: `express-check.log`, `express-browser.log`, and
+  `startup-express5-before.log` under the ignored modernization output directory.
+  The full matrix will run on the completed dependency graph.
 - Existing untracked `sketches/hidden-name/` and `sketches/open-secret/` belong to
   unrelated work and remain untouched.
 
@@ -48,6 +55,9 @@ unverified gate below. Keep dependency and behavioral changes separate.
 - Destination review found no consequential defects. The validator proves the
   consumed UI destination fields, not unchecked backend-only fields; preserve
   that distinction when introducing TypeScript.
+- `054428f`: destination validation and focused regression tests.
+- Express review found no consequential defects in startup cleanup, wildcard
+  routing, the locked dependency changes or the regression test.
 
 ## Next action
 

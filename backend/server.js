@@ -17,7 +17,16 @@ const app = createApp({ service, clientIdentity: process.env.HOTEL_CLIENT_IDENTI
 const port = Number(process.env.PORT || 5000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
 
-const server = app.listen(port, () => {
+const server = app.listen(port, (error) => {
+  if (error) {
+    process.exitCode = 1;
+    console.error({ event: 'server_start_failed',
+      code: ['EADDRINUSE', 'EACCES', 'EADDRNOTAVAIL'].includes(error.code) ? error.code : 'LISTEN_FAILED' });
+    Promise.resolve().then(() => service.close()).catch(() => {
+      console.error({ event: 'server_cleanup_failed' });
+    });
+    return;
+  }
   console.info({ event: 'server_started', port, providerConfigured: providerMode === 'priceline' });
 });
 server.requestTimeout = 30_000;

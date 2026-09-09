@@ -133,7 +133,7 @@ export function createApp({ logger = console, service = createProviderService({ 
       dotfiles: 'deny', index: false,
       setHeaders: staticHeaders,
     }));
-    app.get('*', (req, res, next) => {
+    app.get('/{*splat}', (req, res, next) => {
       if (path.extname(req.path) || !req.accepts('html')) return next();
       return sendHtml(req, res, next);
     });

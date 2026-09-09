@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "dotenv": "16.6.1",
-    "express": "4.22.2"
+    "express": "5.2.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
