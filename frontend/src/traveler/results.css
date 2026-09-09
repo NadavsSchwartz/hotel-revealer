@@ -28,23 +28,7 @@
 }
 .results-page .results-heading-prefix { font: inherit; }
 .results-page .trip-summary { font-size: 13px; gap: 8px; color: var(--muted); }
-.results-page .results-search { padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.results-page .trip-form.trip-form { padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-family: Manrope, sans-serif; }
-.results-page .trip-control { padding: 10px 16px; }
-.results-page .trip-control > label { margin-bottom: 5px; font-size: 14px; font-family: inherit; color: var(--muted); }
-.results-page .trip-control-invalid > label { color: #b42332; }
-.results-page .trip-control:focus-within { border-radius: 6px; background: var(--surface-muted); }
-.results-page .trip-search-fields .search-button.ui-button {
-  min-height: 54px;
-  align-self: center;
-  margin: 0 0 0 12px;
-  padding: 11px 19px;
-  border-radius: var(--radius-control);
-  border-color: var(--blue);
-  background: var(--blue);
-  font-size: 14px;
-}
-.results-page .trip-search-fields .search-button.ui-button:hover { background: var(--forest); border-color: var(--forest); }
+
 .results-page .results-content { min-width: 0; }
 .results-page .results-toolbar { margin: 37px 0 13px; gap: 20px; }
 .results-page .results-toolbar h2 { font-size: 24px; font-weight: 650; letter-spacing: -.7px; margin: 0 0 7px; scroll-margin-top: 24px; }
@@ -53,11 +37,19 @@
 .results-page .results-refresh { display: inline-flex; align-items: center; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .results-page .results-refresh:disabled { color: var(--muted); cursor: not-allowed; text-decoration: none; }
 .results-page .sort-control { gap: 12px; font-size: 13px; }
-.results-page .sort-control label { color: var(--muted); }
-.results-page .sort-select { position: relative; display: flex; min-width: 0; }
-.results-page .sort-control select { appearance: none; width: 205px; border: 1px solid #a9b29b; background: var(--surface); border-radius: var(--radius-control); min-width: 0; min-height: 44px; padding: 10px 39px 10px 13px; max-width: 100%; font-size: 14px; cursor: pointer; }
+.results-page .sort-control > span { color: var(--muted); white-space: nowrap; }
+.results-page .sort-select { position: relative; width: 205px; min-width: 0; }
+.results-page .sort-trigger { position: relative; width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--radius-control); min-height: 44px; padding: 10px 36px 10px 13px; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.results-page .sort-trigger:hover, .results-page .sort-trigger[aria-expanded='true'] { border-color: var(--blue); }
+.results-page .sort-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 10; width: max-content; min-width: 100%; max-width: calc(100vw - 64px); overflow-y: auto; overscroll-behavior: contain; padding: 7px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 16px 48px #25302326; }
+.results-page .sort-menu[data-above='true'] { top: auto; bottom: calc(100% + 8px); }
+.results-page .sort-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 10px 9px; border-radius: 7px; font-size: 14px; line-height: 20px; cursor: pointer; }
+.results-page .sort-option[data-active='true'] { background: var(--surface-muted); }
+.results-page .sort-option[aria-selected='true'] { font-weight: 650; }
+.results-page .sort-option svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: var(--blue); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .results-page .control-chevron, .results-page .action-icon { display: block; width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .results-page .sort-select .control-chevron { position: absolute; top: 50%; right: 11px; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
+.results-page .sort-trigger[aria-expanded='true'] .control-chevron { transform: translateY(-50%) rotate(180deg); }
 .results-page .results-comparison-intro { margin: 0 0 29px; max-width: 780px; font-size: 14px; line-height: 1.8; color: var(--muted); }
 .results-page .offer-list { display: grid; gap: 24px; }
 .results-page .offer-card { padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: 0 12px 32px #23372b06; }
@@ -147,11 +139,6 @@
 .results-page .notice-panel p { color: var(--muted); font-size: 14px; }
 .results-page .notice-panel .ui-button { border-radius: var(--radius-control); min-height: 44px; }
 @media (max-width: 1100px) {
-  .results-page .trip-search-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-  .results-page .destination-control, .results-page .travel-dates { grid-column: 1 / -1; }
-  .results-page .travel-dates > .trip-control:first-child, .results-page .travelers-control { border-left: 0; }
-  .results-page .trip-search-fields .search-button.ui-button { grid-column: auto; min-height: 46px; margin: 14px 0 0; }
-  .results-page .trip-control { padding-inline: 12px; }
   .results-page .offer-overview { column-gap: 30px; grid-template-columns: minmax(0, 1fr) 249px; }
   .results-page .offer-booking { padding-left: 22px; }
   .results-page .candidate-preview { grid-template-columns: 142px minmax(0, 1fr); gap: 18px; }
@@ -173,16 +160,12 @@
   .results-page .results-heading-prefix { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .results-page .edit-trip-toggle { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 44px; height: auto; border-radius: var(--radius-control); border-color: var(--line); background: transparent; font-size: 13px; }
   .results-page .trip-summary { font-size: 13px; gap: 6px; line-height: 1.8; }
-  .results-page .results-search { display: none; padding: 12px; background: var(--surface); }
+  .results-page .results-search { display: none; }
   .results-page .results-search.is-editing { display: block; }
-  .results-page .trip-search-fields { grid-template-columns: minmax(0, 1fr); }
-  .results-page .trip-control { padding: 12px 10px; }
-  .results-page .trip-control > label { font-size: 14px; margin-bottom: 5px; }
-  .results-page .trip-search-fields .search-button.ui-button { margin: 8px 0 0; min-height: 48px; }
   .results-page .results-toolbar { margin-top: 18px; flex-direction: column; align-items: stretch; gap: 12px; }
   .results-page .results-toolbar h2 { font-size: 20px; }
   .results-page .sort-control { justify-content: space-between; min-width: 0; width: 100%; }
-  .results-page .sort-control select { font-size: 13px; }
+  .results-page .sort-trigger { font-size: 13px; }
   .results-page .results-comparison-intro { margin-bottom: 20px; font-size: 13px; line-height: 1.65; }
   .results-page .offer-list { gap: 18px; }
   .results-page .offer-card { padding: 18px 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; }

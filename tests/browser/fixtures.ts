@@ -44,6 +44,11 @@ export async function mockOffers(page: Page, response: unknown = searchResponse(
   await page.route('**/api/v1/deal', (route) => route.fulfill({ json: detailResponse() }));
 }
 
+export async function chooseSort(page: Page, label: string) {
+  await page.getByRole('combobox', { name: 'Sort by', exact: true }).click();
+  await page.getByRole('option', { name: label, exact: true }).click();
+}
+
 export async function openTripEditor(page: Page) {
   const form = page.locator('form[aria-label="Search hotels"]');
   await expect(form).toBeAttached();

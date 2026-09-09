@@ -19,13 +19,12 @@ export interface SearchFormProps {
   compact?: boolean;
   draftRef?: RefObject<SearchDraft | null>;
   blockedSearchKey?: string | null;
-  submitLabel?: string;
 }
 const tripFields: TripField[] = ['cityName', 'destinationId', 'checkIn', 'checkOut', 'rooms', 'adults', 'childrenAges', 'currency'];
 
 const emptyTrip: TripDraft = { cityName: '', checkIn: '', checkOut: '', ...DEFAULT_OCCUPANCY, childrenAges: [] };
 
-export default function SearchForm({ initial = emptyTrip, currency = initial.currency, compact = false, draftRef, blockedSearchKey = null, submitLabel = 'Search' }: SearchFormProps) {
+export default function SearchForm({ initial = emptyTrip, currency = initial.currency, compact = false, draftRef, blockedSearchKey = null }: SearchFormProps) {
   const navigate = useNavigate();
   const initialValue = JSON.stringify({ ...emptyTrip, ...initial });
   const previousInitial = useRef({ value: initialValue, trip: { ...emptyTrip, ...initial } });
@@ -105,7 +104,7 @@ export default function SearchForm({ initial = emptyTrip, currency = initial.cur
         <Travelers ref={travelersRef} trip={trip} errors={errors} onChange={update} />
         <button type="submit" className="ui-button ui-button-primary search-button" disabled={blocked}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
-          {submitLabel}
+          Search hotels
         </button>
       </div>
       {errors.currency && <p className="trip-currency-error">{errors.currency}{' '}<button type="button" onClick={() => update({ currency: 'USD' })}>Use USD</button></p>}

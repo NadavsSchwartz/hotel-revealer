@@ -13,7 +13,7 @@ export default function Home({ draftRef, currency }: Pick<SearchFormProps, 'draf
         </div>
         <section className="room-reception" id="unboxed-search" aria-labelledby="search-title">
           <h2 id="search-title" tabIndex={-1}>Start with your trip</h2>
-          <SearchForm draftRef={draftRef} currency={currency} submitLabel="Find hotel deals" />
+          <SearchForm draftRef={draftRef} currency={currency} />
         </section>
         <figure className="room-view">
           <picture>
@@ -61,7 +61,7 @@ export default function Home({ draftRef, currency }: Pick<SearchFormProps, 'draf
 
       <section className="room-closing room-content" aria-labelledby="closing-title">
         <h2 id="closing-title">Take a closer look.</h2>
-        <Link className="room-button" to="/#unboxed-search">Find hotel deals <span aria-hidden="true">↗</span></Link>
+        <Link className="room-button" to="/#unboxed-search">Search hotels <span aria-hidden="true">↗</span></Link>
       </section>
     </div>
   );

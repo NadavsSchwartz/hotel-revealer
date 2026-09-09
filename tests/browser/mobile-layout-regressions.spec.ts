@@ -61,7 +61,7 @@ test('invalid travel links reveal the mobile editor and the landing copy uses re
     elements.map(element => parseFloat(getComputedStyle(element).fontSize)));
   expect(values.length).toBeGreaterThan(0);
   expect(values.every(size => size >= 16)).toBe(true);
-  const start = present(await page.getByRole('button', { name: 'Find hotel deals', exact: true }).boundingBox());
+  const start = present(await page.getByRole('button', { name: 'Search hotels', exact: true }).boundingBox());
   expect(start.height).toBeGreaterThanOrEqual(44);
   const hero = present(await page.locator('.room-scene').boundingBox());
   expect(start.y + start.height).toBeLessThanOrEqual(hero.y + hero.height);
@@ -75,7 +75,7 @@ test('the search stays substantial on wide screens and reachable on a short desk
   expect(form.width).toBeGreaterThanOrEqual(600);
   await page.screenshot({ path: testInfo.outputPath('home-wide.png') });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await expect(page.getByRole('button', { name: 'Find hotel deals', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Search hotels', exact: true })).toBeInViewport({ ratio: 1 });
   const headline = page.locator('#home-title');
   await expect(headline).toBeInViewport({ ratio: 1 });
   expect(await headline.evaluate(element => {

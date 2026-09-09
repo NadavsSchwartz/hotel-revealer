@@ -76,7 +76,7 @@ test('reloading an original offer across a real service restart recovers its pri
     await expect(page.getByRole('heading', { name: 'Example Hotel', exact: true })).toBeVisible();
     await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$240 total');
     const originalUrl = page.url();
-    const handoff = await page.getByRole('link', { name: /Check price on Priceline/ }).getAttribute('href');
+    const handoff = await page.getByRole('link', { name: /View deal on Priceline/ }).getAttribute('href');
     await stop();
     rotated = true;
     await start(port);
@@ -86,7 +86,7 @@ test('reloading an original offer across a real service restart recovers its pri
     await expect(page.getByRole('heading', { name: 'Example Hotel', exact: true })).toHaveCount(0);
     await expect(page.getByText('We couldn’t verify the selected hotel.', { exact: false })).toBeVisible();
     await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$240 total');
-    await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', present(handoff));
+    await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(handoff));
     expect(listingCalls).toBe(1);
     expect(detailInputs).toHaveLength(2);
     expect(detailInputs[1].offerId).toBe(offerId);

@@ -1,5 +1,6 @@
 .trip-form.trip-form {
-  padding: 8px;
+  margin: 0;
+  padding: 20px 24px;
   border: 1px solid var(--line, #d4d6cb);
   border-radius: 12px;
   background: var(--surface, #fff);
@@ -8,15 +9,16 @@
 }
 .trip-search-fields {
   display: grid;
-  grid-template-columns: minmax(200px, 1.55fr) minmax(290px, 1.7fr) minmax(175px, 1fr) auto;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.6fr) minmax(0, 1fr) 200px;
   align-items: start;
   gap: 0;
 }
-.trip-control { min-width: 0; padding: 11px 18px 9px; position: relative; }
-.trip-control > label { display: block; margin: 0 0 3px; font-size: 11px; font-weight: 700; line-height: 18px; color: var(--muted, #687483); }
-.trip-control:focus-within { background: #edf0e7; border-radius: 8px; }
+.trip-control { min-width: 0; padding: 10px 16px; position: relative; }
+.destination-control { padding-left: 0; }
+.trip-control > label { display: block; margin: 0 0 4px; font-size: 14px; font-weight: 500; line-height: 1.35; color: var(--muted, #687483); }
+.trip-control:focus-within { background: var(--surface-muted); border-radius: 6px; }
 .trip-control-invalid > label { color: #b42332; }
-.travel-dates { display: grid; grid-template-columns: 1fr 1fr; min-width: 0; }
+.travel-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
 .travel-dates > .trip-control, .travelers-control { border-left: 1px solid var(--line, #d4d6cb); }
 .destination-control input::placeholder, .date-control input::placeholder { color: #5b6854; opacity: 1; font-weight: 400; }
 .trip-control input:focus-visible { outline: 0; }
@@ -25,9 +27,11 @@
 .trip-control .field-error { margin: 7px 0 0; color: #b42332; font-size: 11px; line-height: 1.5; }
 .travelers-trigger { display: flex; width: 100%; min-height: 32px; padding: 0; align-items: center; justify-content: space-between; gap: 7px; border: 0; background: transparent; color: var(--ink, #253023); font-size: 16px; font-weight: 500; text-align: left; }
 .travelers-trigger svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.travelers-trigger > span { overflow-wrap: anywhere; }
 .travelers-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
-.trip-search-fields .search-button.ui-button { min-width: 116px; min-height: 62px; display: flex; align-items: center; justify-content: center; gap: 9px; align-self: start; margin: 4px; padding: 13px 17px; border: 1px solid var(--blue, #34482f); border-radius: 9px; background: var(--blue, #34482f); color: white; font-size: 14px; font-weight: 650; }
-.trip-search-fields .search-button.ui-button:hover { background: #263b22; border-color: #263b22; }
+.trip-search-fields .search-button.ui-button { min-width: 0; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 9px; align-self: center; margin: 0 0 0 20px; padding: 14px; border: 1px solid var(--blue, #34482f); border-radius: var(--radius-control); background: var(--blue, #34482f); color: var(--on-accent, white); font-size: 16px; font-weight: 650; }
+.trip-search-fields .search-button.ui-button:hover { background: var(--forest); border-color: var(--forest); }
+.trip-search-fields .search-button.ui-button:disabled { background: var(--surface-muted); border-color: var(--line); color: var(--muted); cursor: not-allowed; }
 .search-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .trip-currency-error { margin: 10px 16px 4px; font-size: 12px; color: #b42332; }
 .trip-currency-error button { padding: 0; border: 0; color: var(--blue, #34482f); background: none; text-decoration: underline; }
@@ -64,28 +68,23 @@
 .travelers-panel-footer > span { color: #5b6854; font-size: 10px; max-width: 150px; }
 .travelers-panel-footer .ui-button { border-radius: 7px; min-height: 40px; padding: 7px 22px; font-size: 13px; background: #34482f; border-color: #34482f; color: white; }
 .travelers-panel button:focus-visible, .travelers-trigger:focus-visible { outline: 2px solid #34482f; outline-offset: 3px; }
-@media (max-width: 1100px) {
-  .trip-search-fields { grid-template-columns: minmax(210px, 1.2fr) minmax(285px, 1.5fr) minmax(180px, 1fr); }
-  .trip-search-fields .search-button.ui-button { grid-column: 1 / -1; min-height: 46px; margin-top: 8px; }
-  .trip-control { padding-inline: 14px; }
+@media (max-width: 1120px) {
+  .trip-search-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .destination-control, .travel-dates { grid-column: 1 / -1; }
+  .trip-control { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .travel-dates > .trip-control, .travelers-control { border-left: 0; }
+  .travel-dates { gap: 24px; }
+  .trip-search-fields .search-button.ui-button { margin-left: 0; }
 }
 @media (max-width: 760px) {
-  .trip-form.trip-form { padding: 10px; border-radius: 14px; }
-  .trip-search-fields { grid-template-columns: 1fr; }
-  .trip-control { padding: 12px; }
-  .destination-control { border-bottom: 1px solid var(--line, #d4d6cb); }
-  .travel-dates { border-bottom: 1px solid var(--line, #d4d6cb); }
-  .travel-dates > .trip-control:first-child { border-left: 0; }
-  .travelers-control { border-left: 0; }
-  .trip-control > label { font-size: 11px; }
-  .trip-search-fields .search-button.ui-button { min-height: 48px; margin: 8px 0 0; width: 100%; }
+  .trip-form.trip-form { padding: 16px; }
+  .trip-search-fields { grid-template-columns: minmax(0, 1fr); }
+  .trip-search-fields .search-button.ui-button { margin-top: 14px; width: 100%; }
   .destination-status-panel { left: 0; width: 100%; max-width: 100%; }
 }
 @media (max-width: 350px) {
-  .trip-control { padding-inline: 8px; }
   .travelers-panel { padding: 16px; }
 }
 @media (max-width: 400px) {
-  .travel-dates { grid-template-columns: minmax(0, 1fr); }
-  .travel-dates > .trip-control { border-left: 0; }
+  .travel-dates { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }

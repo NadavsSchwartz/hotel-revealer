@@ -66,7 +66,7 @@ export function Quote({
       <span className="eyebrow">{title}</span>
       {expired ? <div className="quote-refresh" role="status">
         <p>The quoted price needs a refresh.</p>
-        {onRefresh && <button type="button" className="ui-button" onClick={onRefresh} disabled={refreshing || refreshDisabled}>{refreshing ? 'Updating price…' : 'Refresh total price'}</button>}
+        {onRefresh && <button type="button" className="ui-button" onClick={onRefresh} disabled={refreshing || refreshDisabled}>{refreshing ? 'Updating price…' : 'Update price'}</button>}
       </div> : <>
         {discount && <span className="quote-discount" title="Priceline's advertised room-rate discount against its comparison rate, which may be estimated. Before taxes and fees.">{discount}% off room rate <span>· Priceline</span></span>}
         <p className="quote-price">
@@ -339,7 +339,7 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
     <div className="provider-handoff">
       {href ? (
         <a className="button-link" href={href} target="_blank" rel="noopener noreferrer">
-          {currentPrice ? 'Check current price on Priceline' : 'Check price on Priceline'}
+          View deal on Priceline
           <svg className="action-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 4h5v5M9 11l7-7" /></svg>
           <span className="sr-only"> (opens a new tab)</span>
         </a>

@@ -79,7 +79,7 @@ test('location and reviews link to the named property while amenities retain the
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   }
-  await expect(page.getByRole('link', { name: /Check price on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
+  await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
   const amenities = page.locator('#hotel-amenities');
   await expect(amenities.getByRole('listitem')).toHaveCount(6);
   await expect(amenities).toContainText('Valet parking (charges may apply)');
@@ -131,7 +131,7 @@ test('a retained gallery survives a smaller photo response and disappears with w
   await page.goto(detailPath(data));
   await expect(page.getByRole('button', { name: 'View all 8 photos' })).toBeVisible();
   await page.clock.fastForward(61000);
-  await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
+  await page.getByRole('button', { name: 'Update price', exact: true }).click();
   await expect.poll(() => calls).toBe(2);
   await page.getByRole('button', { name: 'View all 8 photos' }).click();
   const viewer = page.getByRole('dialog', { name: 'Harbor & Pine photos', exact: true });
@@ -151,19 +151,19 @@ test('a retained gallery survives a smaller photo response and disappears with w
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'View all 2 photos' })).toBeFocused();
   await page.clock.fastForward(60000);
-  await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
+  await page.getByRole('button', { name: 'Update price', exact: true }).click();
   await expect.poll(() => calls).toBe(3);
   await page.getByRole('button', { name: 'View all 2 photos' }).click();
   await expect(viewer).toBeVisible();
   release();
   await expect(viewer).toHaveCount(0);
   await page.clock.fastForward(60000);
-  await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
+  await page.getByRole('button', { name: 'Update price', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View all 2 photos' })).toBeVisible();
   await expect(viewer).toHaveCount(0);
   await page.clock.fastForward(60000);
-  await page.getByRole('button', { name: 'Refresh total price', exact: true }).click();
+  await page.getByRole('button', { name: 'Update price', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Harbor & Pine', exact: true })).toHaveCount(0);
   await expect(page.locator('.property-photos, .detail-external-link')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
+  await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
 });

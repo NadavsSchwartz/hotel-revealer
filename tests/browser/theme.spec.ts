@@ -96,14 +96,14 @@ test('dark results, selected calendar dates, hotel details and policy remain rea
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await mockOffers(page);
   await page.goto(searchPath);
-  await expect(page.getByRole('link', { name: 'View hotel & prices', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View hotel details', exact: true })).toBeVisible();
   await expectReadable(page, 'results');
   await openTripEditor(page);
   await page.getByLabel('Check-in', { exact: true }).click();
   await expect(page.locator('.travel-calendar-popup:visible')).toHaveCSS('opacity', '1');
   await expectReadable(page, 'calendar including selected date');
   await page.keyboard.press('Escape');
-  await page.getByRole('link', { name: 'View hotel & prices', exact: true }).click();
+  await page.getByRole('link', { name: 'View hotel details', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Juniper House' })).toBeVisible();
   await expectReadable(page, 'hotel details');
   await page.screenshot({ path: testInfo.outputPath('dark-details.png'), fullPage: true });

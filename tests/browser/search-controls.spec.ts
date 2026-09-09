@@ -131,7 +131,7 @@ test('keyboard destination selection keeps the canonical city and waits for expl
   await expect(input).toHaveValue('Tel Aviv, Israel');
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
   expect(searches).toHaveLength(1);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hotel deals in Tel Aviv' })).toBeVisible();
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toEqual({ ...context, destinationId: 'geonames:293397', cityName: 'Tel Aviv, Israel' });
@@ -143,7 +143,7 @@ test('editing a selected destination cannot reuse its identity for an unknown ci
   await openTripEditor(page);
   await page.getByLabel('Where are you going?').fill('NoSuchDestinationzzzz');
   await expect(page.getByText('No destinations found. Try a city or country name.', { exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page.getByLabel('Where are you going?')).toBeFocused();
   await expect(page.getByText('Choose a destination from the suggestions.', { exact: true }).first()).toBeVisible();
   expect(searches).toHaveLength(1);
@@ -166,7 +166,7 @@ test('children require ages and the full trip survives API requests, URL, detail
   await page.getByRole('button', { name: 'Increase children', exact: true }).click();
   await page.getByRole('button', { name: 'Increase children', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Who’s traveling?' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toBeFocused();
   await expect(page.getByText('Enter an age from 0 to 17 for every child. Use 0 for infants under 1.', { exact: true }).first()).toBeVisible();
@@ -175,7 +175,7 @@ test('children require ages and the full trip survives API requests, URL, detail
   await chooseAge(page, 2, 7);
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Travelers, 5 guests · 2 rooms', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
   const expected = { ...context, rooms: 2, adults: 3, childrenAges: [0, 7] };
   expect(searches[1]).toEqual(expected);
@@ -232,7 +232,7 @@ for (const [name, changes, message] of [
     const searches = await recordSearches(page);
     await page.goto(tripPath(changes));
     await expect(page.getByRole('heading', { name: 'Check your trip details', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
     await expect(page.getByRole('form', { name: 'Search hotels' }).getByRole('alert')).toContainText(message);
     expect(searches).toHaveLength(0);
   });
@@ -250,7 +250,7 @@ test('checkout calendar disables reversed dates and night 31 while allowing nigh
   await expect(await findCalendarDay(page, dateAfter(61))).toBeDisabled();
   await lastAllowed.click();
   await expect(page.getByLabel('Check-out', { exact: true })).toHaveValue(formattedDate(dateAfter(60)));
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toMatchObject({ checkIn: dateAfter(30), checkOut: dateAfter(60) });
 });
@@ -281,12 +281,12 @@ test('changing check-in clears an incompatible checkout and requires a new date'
   await expect(calendar(page)).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(calendar(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page.getByLabel('Check-out', { exact: true })).toBeFocused();
   expect(searches).toHaveLength(1);
   await chooseDate(page, 'Check-out', dateAfter(42));
   await expect(page.getByLabel('Check-out', { exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toMatchObject({ checkIn: dateAfter(40), checkOut: dateAfter(42) });
 });
@@ -379,7 +379,7 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   await expect(input).toBeFocused();
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
   expect(searches).toHaveLength(1);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toEqual({ ...context, destinationId: selected.id, cityName: selected.label });
   await expect(page.getByRole('heading', { name: `Hotel deals in ${selected.name}` })).toBeVisible();
@@ -416,7 +416,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
   await expect.poll(() => new URL(page.url()).searchParams.get('cityName')).toBe(context.cityName);
-  await expect(page.getByLabel('Sort by')).toHaveValue('price');
+  await expect(page.getByLabel('Sort by')).toHaveText('Lowest room rate');
   expect(searches).toHaveLength(1);
   expect(searches[0]).toEqual({ ...context, cityName: 'Paris, France' });
   await page.getByRole('link', { name: /View likely hotel:.*Juniper House/ }).click();
@@ -427,7 +427,7 @@ test('a valid destination ID with the wrong label adopts the server label throug
   await page.getByRole('link', { name: /Back to results/ }).click();
   await openTripEditor(page);
   await expect(page.getByLabel('Where are you going?')).toHaveValue(context.cityName);
-  await expect(page.getByLabel('Sort by')).toHaveValue('price');
+  await expect(page.getByLabel('Sort by')).toHaveText('Lowest room rate');
   expect(searches).toHaveLength(1);
 
   const directDetail = `/deal?${queryParams({ ...context, cityName: 'Paris, France', offerId: 'offer-one', hotelId: 'hotel-one' })}`;
@@ -466,7 +466,7 @@ test('same-label Shenzhen suggestions select their own destination IDs', async (
     await expect(option).toContainText('Guangdong, China');
     await option.click();
     await expect(page.getByLabel('Where are you going?')).toHaveValue('Shenzhen, Guangdong, China');
-    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
     await expect.poll(() => searches.length).toBe(index + 2);
     expect(searches[index + 1]).toEqual({ ...context, destinationId: destination.id, cityName: 'Shenzhen, Guangdong, China' });
     expect(new URL(page.url()).searchParams.get('destinationId')).toBe(destination.id);

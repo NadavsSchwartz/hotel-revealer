@@ -44,7 +44,7 @@ for (const destination of ['home', 'privacy']) {
 
 test('hash navigation focuses the requested Home and Terms content', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
+  await page.getByRole('link', { name: 'Search hotels', exact: true }).click();
   await expect(page).toHaveURL(/\/#unboxed-search$/);
   await expect(page.locator('#search-title')).toBeFocused();
   await expect(page.locator('#unboxed-search')).toBeInViewport();
@@ -54,7 +54,7 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await page.goBack();
   await expect(page.locator('#search-title')).toBeFocused();
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
-  await page.getByRole('link', { name: 'Find hotel deals', exact: true }).click();
+  await page.getByRole('link', { name: 'Search hotels', exact: true }).click();
   await expect(page.locator('#search-title')).toBeFocused();
   await page.getByRole('link', { name: 'Back to home', exact: true }).click();
   await expect(page.locator('#home-title')).toBeFocused();
@@ -116,7 +116,7 @@ test('New trip clears the Home draft once and later edits still survive Back', a
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: searchResponse() }));
   await page.goto('/');
   await chooseHomeTrip(page);
-  await page.getByRole('button', { name: 'Find hotel deals', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page).toHaveURL(/\/results\?/);
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await page.getByRole('link', { name: /New trip/ }).click();
@@ -141,7 +141,7 @@ test('cooldown blocks only the unchanged trip and still validates edited drafts'
   });
   await page.goto(searchPath);
   await openTripEditor(page);
-  const search = page.getByRole('button', { name: 'Search', exact: true });
+  const search = page.getByRole('button', { name: 'Search hotels', exact: true });
   await expect(search).toBeDisabled();
   await page.getByRole('form', { name: 'Search hotels', exact: true }).evaluate(form => {
     if (!(form instanceof HTMLFormElement)) throw new Error('Expected a search form');
@@ -180,7 +180,7 @@ test('the unchanged search becomes available when its cooldown ends', async ({ p
   });
   await page.goto(searchPath);
   await openTripEditor(page);
-  const search = page.getByRole('button', { name: 'Search', exact: true });
+  const search = page.getByRole('button', { name: 'Search hotels', exact: true });
   await expect(search).toBeDisabled();
   await page.clock.fastForward(61000);
   await expect(search).toBeEnabled();

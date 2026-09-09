@@ -129,8 +129,8 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   determine whether a safe supplier URL can be opened. Cached inclusive quotes
   are reused only while their own expiry
   is fresh. Expired complete totals in Details are withdrawn while a separately validated, safe
-  supplier URL remains usable, including during refresh. The action becomes
-  “Check current price on Priceline” for stale or unavailable prices. An unsafe or
+  supplier URL remains usable, including during refresh. “View deal on Priceline”
+  opens the original offer even when its displayed price needs an update. An unsafe or
   missing URL remains unavailable. A named hotel’s retail URL never substitutes
   for the opaque Express offer.
   Address rendering does not depend on description availability; the current
@@ -165,17 +165,22 @@ and remaining compatibility risks are recorded in [LIVE_ACCESS.md](LIVE_ACCESS.m
   unavailable values last and stable price/ID ties. Discounts use only Priceline's
   advertised room-rate percentages, before taxes and fees. Sorting resets to page
   one; the choice survives detail/back navigation, reload, and currency changes.
-  Sorting and paging do not issue provider requests.
+  Sorting and paging do not issue provider requests. The custom sort list uses the
+  same surface and highlighted rows as destination suggestions, supports keyboard
+  selection and dismissal, and opens above the trigger when space below is limited.
 - The five-minute search-cache expiry no longer hides historical listing prices
   or raises a page-wide alert. Cards label them “Last seen room rate”; one short
   date/time and “Update prices” action appear above the list. Updates respect the
   existing service cache and cooldown. The one-minute complete-total expiry in
   Details is unchanged. No automatic pricing or polling is added.
-- “View hotel & prices” is the primary card action and opens `/deal` with trip,
+- Home and results share form padding, dividers, label/value typography and the
+  “Search hotels” button. Results retains its collapsible editor on mobile.
+- “View hotel details” is the primary card action and opens `/deal` with trip,
   offer and hotel IDs. The original Priceline offer is a secondary external link.
   The technical “About these results” disclosure is retired. Existing offer-only
   URLs remain supported for recovery, with no result-card entry point; those
   views retain their null-candidate binding rules and pricing/handoff behavior.
+  Deal-page price refresh and retry actions consistently say “Update price”.
 - The existing Redux structure and singleton request status remain. Request IDs
   prevent superseded completions from restoring loading or stale results. Only
   complete, usable same-offer evidence changes an earlier hotel inference;

@@ -215,11 +215,11 @@ export default function Details() {
                   {!bindingRejected && <Quote quote={offer.quote} expired={priceStale} onRefresh={priceUpdateFailed ? undefined : retry} refreshing={loading} refreshDisabled={coolingDown} />}
                   {priceUpdateFailed && <div className="detail-total-unavailable" role="status">
                     <p>We couldn’t update this price. Try again or check the current price on Priceline.</p>
-                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Try again</button>
+                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Update price</button>
                   </div>}
                   {!bindingRejected && !priceUpdateFailed && data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
                     <p>A complete total is unavailable. Check the current price on Priceline or try again.</p>
-                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Retry total price</button>
+                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Update price</button>
                   </div>}
                   <TripSummary context={context} />
                   <ProviderLink offer={offer} stale={stale || priceStale} unavailable={data?.quoteStatus === 'unavailable'} refreshing={loading} />

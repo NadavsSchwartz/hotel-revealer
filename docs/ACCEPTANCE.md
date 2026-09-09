@@ -5,6 +5,26 @@ claim. The current modernization results below supersede the earlier 278-native 
 420-browser summary. Historical sections retain the results and limitations of
 their original revisions; they are not repeated verification of the current tree.
 
+## Search form and action consistency — 2026-09-09
+
+Home and results now share search-field padding, divider placement, typography,
+responsive layout, and the “Search hotels” button. The custom sorting list matches
+destination suggestions, supports keyboard selection/dismissal, preserves browser
+shortcuts, and opens above its trigger when needed. The requested discount sentence
+is removed. Actions now say “View hotel details”, “View deal on Priceline”, and
+“Update price” for deal-price refresh/retry.
+
+Final `HOTEL_PROVIDER=disabled npm run check` passed typechecking, lint, 291 native
+tests, and build. The full browser run passed 451/452; its only failure was a
+0.00002px Firefox button-height comparison, corrected with subpixel tolerance.
+After final menu-placement and button-width fixes, all 28 affected checks passed
+across Chromium, mobile Chromium, Firefox, and WebKit, including the corrected
+form test. Home/results form captures were visually compared at desktop/mobile
+sizes; both menu themes and short viewports were checked, including keyboard
+navigation without page scrolling. Logs and representative screenshots are in
+ignored `output/verification/ui-consistency/`. This is local synthetic-response
+evidence; live provider, hosted, physical-device, and VoiceOver checks were not run.
+
 ## Results sorting — 2026-09-09
 
 Added highest star rating and biggest advertised room-rate discount alongside

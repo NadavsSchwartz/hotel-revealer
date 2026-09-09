@@ -37,8 +37,8 @@ for (const [code, heading] of [
     await page.goto(`/deal?${queryParams({ ...context, offerId: 'offer-one', hotelId: 'hotel-one' })}`);
     await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
-    await expect(page.getByRole('button', { name: 'Retry total price', exact: true })).toBeDisabled();
+    await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(data.offer.handoffUrl));
+    await expect(page.getByRole('button', { name: 'Update price', exact: true })).toBeDisabled();
     await page.getByRole('link', { name: /Back to results/ }).click();
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();

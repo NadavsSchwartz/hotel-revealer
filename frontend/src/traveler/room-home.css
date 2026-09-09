@@ -26,27 +26,10 @@
 .room-introduction { z-index: 1; padding-block: 134px 32px; }
 .room-introduction h1 { max-width: 680px; font-size: clamp(60px, 6.7vw, 90px); font-weight: 500; line-height: 1.02; letter-spacing: -.055em; }
 .room-home .room-description { max-width: 440px; margin-top: 24px; color: #e5e9dd; font-size: 18px; line-height: 1.65; }
-.room-reception { --ink: #263b2d; --muted: #5b6b5b; --blue: #2d4d37; --forest: #1e3928; --line: #d8ddcf; --surface: #fffef8; z-index: 2; }
+.room-reception { z-index: 2; }
 .room-reception h2 { margin-bottom: 12px; color: #f8f5ea; font-size: 14px; font-weight: 500; line-height: 1.4; }
 .room-reception :focus-visible { outline-color: var(--blue); }
 .room-reception h2:focus-visible { outline-color: #f8f5ea; }
-.room-reception .trip-form.trip-form { padding: 20px 24px; border: 1px solid #ffffff70; border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 12px 36px #0a1c1820; }
-.room-reception .trip-search-fields { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.6fr) minmax(0, 1fr) 180px; gap: 0; }
-.room-reception .trip-control { padding: 8px 16px; min-width: 0; border: 0; border-right: 1px solid var(--line); }
-.room-reception .destination-control { padding-left: 0; }
-.room-reception .trip-control > label { margin-bottom: 4px; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.35; }
-.room-reception .trip-control:focus-within { background: #eef2e8; border-radius: 6px; }
-.room-reception .travel-dates { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: auto; gap: 0; border: 0; }
-.room-reception .travelers-trigger { font-size: 16px; font-weight: 500; }
-.room-reception .travelers-trigger { min-height: 32px; }
-.room-reception .travelers-trigger > span { overflow-wrap: anywhere; }
-.room-reception .trip-control-invalid > label { color: #b42332; }
-.room-reception .trip-currency-error { margin: 14px 0 0; }
-.room-reception .search-button.ui-button { grid-column: auto; align-self: center; width: auto; min-width: 0; min-height: 54px; margin: 0 0 0 20px; padding: 14px; border: 1px solid var(--blue); border-radius: 8px; color: #fffef8; background: var(--blue); font-size: 16px; font-weight: 650; }
-.room-reception .search-button.ui-button:hover, .room-reception .search-button.ui-button:focus { color: #fffef8; background: var(--forest); border-color: var(--forest); }
-.room-reception .search-button.ui-button:disabled { background: #e4e7dd; border-color: #bdc6b3; color: #626d5a; }
-.room-reception .search-button svg { display: none; }
-.room-reception .destination-status-panel { width: 100%; max-width: 100%; border-color: #cdd6c6; border-radius: 8px; }
 
 /* Actual saved property details show what the product makes available. */
 .room-example { display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 100px; padding-block: 104px; }
@@ -88,11 +71,6 @@
 @media (max-width: 1120px) {
   .room-introduction { padding-top: 124px; }
   .room-introduction h1 { font-size: clamp(48px, 7vw, 72px); }
-  .room-reception .trip-search-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-  .room-reception .destination-control, .room-reception .travel-dates { grid-column: 1 / -1; }
-  .room-reception .trip-control { padding: 10px 0; border-right: 0; border-bottom: 1px solid var(--line); }
-  .room-reception .travel-dates { gap: 24px; }
-  .room-reception .search-button.ui-button { margin-left: 0; }
   .room-view::after { background: linear-gradient(90deg, #14251cf5, #14251cc9 68%, #14251c66); }
   .room-example { gap: 48px; }
   .room-property-body { padding: 24px; }
@@ -115,9 +93,6 @@
   .room-introduction { padding-block: 106px 28px; }
   .room-introduction h1 { font-size: clamp(40px, 11vw, 52px); }
   .room-home .room-description { margin-top: 20px; font-size: 17px; line-height: 1.65; }
-  .room-reception .trip-form.trip-form { padding: 16px; }
-  .room-reception .trip-search-fields { grid-template-columns: minmax(0, 1fr); }
-  .room-reception .search-button.ui-button { margin-top: 14px; }
   .room-example { padding-block: 56px; }
   .room-example h2 { font-size: 36px; }
   .room-preview-benefits { grid-template-columns: minmax(0, 1fr); gap: 20px; }
@@ -131,7 +106,4 @@
   .room-steps { grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 28px; }
   .room-closing { flex-direction: column; align-items: flex-start; gap: 28px; padding: 28px; }
   .room-closing .room-button { width: 100%; gap: 16px; }
-}
-@media (max-width: 400px) {
-  .room-reception .travel-dates { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }

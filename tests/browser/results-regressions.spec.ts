@@ -1,6 +1,7 @@
-import { present } from './fixtures.ts';
+import { present, chooseSort } from './fixtures.ts';
 import type { BrowserRequest } from './fixtures.ts';
 import { test, expect } from '@playwright/test';
+import { AxeBuilder } from '@axe-core/playwright';
 import { context, detailResponse, searchPath, searchResponse, tripRequest } from './fixtures.ts';
 
 test('star and discount sorts use known values, break ties by room rate, and survive navigation', async ({ page }, testInfo) => {
@@ -29,23 +30,23 @@ test('star and discount sorts use known values, break ties by room rate, and sur
   await page.goto(searchPath);
   const sort = page.getByLabel('Sort by', { exact: true });
   const names = page.locator('.candidate-preview-copy > strong');
-  await expect(sort).toHaveValue('price');
+  await expect(sort).toHaveText('Lowest room rate');
   await expect(names).toHaveText(['No discount', 'Invalid discount', 'Unknown', 'Budget', 'Value', 'Luxury']);
-  await sort.selectOption('stars');
+  await chooseSort(page, 'Highest star rating');
   await expect(names).toHaveText(['Value', 'Luxury', 'No discount', 'Invalid discount', 'Budget', 'Unknown']);
   await page.getByRole('link', { name: 'View likely hotel: Value', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Value', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Back to results/ }).click();
-  await expect(sort).toHaveValue('stars');
+  await expect(sort).toHaveText('Highest star rating');
   await expect(names.first()).toHaveText('Value');
-  await sort.selectOption('discount');
+  await chooseSort(page, 'Biggest discount');
   const discountedOrder = ['Value', 'Luxury', 'Budget', 'No discount', 'Invalid discount', 'Unknown'];
   await expect(names).toHaveText(discountedOrder);
-  await expect(sort).toHaveAccessibleDescription('Discounts are Priceline’s advertised room-rate percentages, before taxes and fees.');
+  await expect(page.locator('.results-comparison-intro')).toHaveText('Hotel names are inferred, not guaranteed.');
   await expect(page.locator('.results-page > [role="status"]')).toContainText('Sorted by biggest discount.');
   expect(searches).toBe(1);
   await page.reload();
-  await expect(sort).toHaveValue('discount');
+  await expect(sort).toHaveText('Biggest discount');
   await expect(names).toHaveText(discountedOrder);
   expect(searches).toBe(2);
   for (const width of [1440, 390, 320]) {
@@ -56,6 +57,70 @@ test('star and discount sorts use known values, break ties by room rate, and sur
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`sort-discount-${width}.png`) });
   }
+});
+
+test('sort menu supports keyboard selection, dismissal, and both themes on narrow screens', async ({ page }, testInfo) => {
+  let searches = 0;
+  await page.route('**/api/v1/hotelDeals', route => { searches++; return route.fulfill({ json: searchResponse() }); });
+  await page.goto(searchPath);
+  const sort = page.getByRole('combobox', { name: 'Sort by', exact: true });
+  const menu = page.getByRole('listbox', { name: 'Sort by', exact: true });
+  await sort.focus();
+  await sort.press('Space');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('option', { selected: true })).toHaveText('Lowest room rate');
+  await sort.press('ArrowDown');
+  await sort.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(sort).toHaveText('Lowest room rate');
+  await expect(sort).toBeFocused();
+  await sort.press('End');
+  await sort.press('Enter');
+  await expect(sort).toHaveText('Biggest discount');
+  await sort.press('h');
+  await sort.press('Enter');
+  await expect(sort).toHaveText('Highest guest rating');
+  await sort.press('Home');
+  await sort.press('Tab');
+  await expect(sort).toHaveText('Lowest room rate');
+  await expect(menu).toHaveCount(0);
+  await expect(sort).not.toBeFocused();
+  await sort.click();
+  await page.locator('#results-count').click();
+  await expect(menu).toHaveCount(0);
+  const shortcutsPreserved = await sort.evaluate(element => [
+    { key: 'f', ctrlKey: true }, { key: 'r', metaKey: true }, { key: 'b', altKey: true },
+  ].every(shortcut => element.dispatchEvent(new KeyboardEvent('keydown', { ...shortcut, bubbles: true, cancelable: true }))));
+  expect(shortcutsPreserved).toBe(true);
+  await expect(menu).toHaveCount(0);
+  await chooseSort(page, 'Highest star rating');
+  for (const theme of ['light', 'dark']) {
+    if (theme === 'dark') await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await sort.click();
+      await expect(menu).toBeInViewport({ ratio: 1 });
+      await expect(menu.getByRole('option', { selected: true })).toHaveText('Highest star rating');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`sort-menu-${theme}-${width}.png`) });
+      if (width === 320) expect((await new AxeBuilder({ page }).include('.sort-control').analyze()).violations).toEqual([]);
+      await sort.press('Escape');
+    }
+  }
+  for (const viewport of [{ width: 700, height: 360 }, { width: 320, height: 260 }]) {
+    await page.setViewportSize(viewport);
+    await sort.scrollIntoViewIfNeeded();
+    const before = await page.evaluate(() => scrollY);
+    await sort.click();
+    await expect(menu).toBeInViewport({ ratio: 1 });
+    await sort.press('End');
+    await expect(menu.getByRole('option', { name: 'Biggest discount', exact: true })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => scrollY)).toBeCloseTo(before, 1);
+    await page.screenshot({ path: testInfo.outputPath(`sort-menu-short-${viewport.width}.png`) });
+    await sort.press('Escape');
+    await expect(sort).toHaveText('Highest star rating');
+  }
+  expect(searches).toBe(1);
 });
 
 test('maximum-length offer IDs keep pagination and reload usable', async ({ page }) => {
@@ -87,7 +152,7 @@ test('an old expanded link drops retired comparison state without refetching', a
   await page.goto(`${searchPath}&sort=price&expanded=${data.offers[0].offerId}`);
   await expect(page.getByRole('link', { name: /View likely hotel:/ })).toBeVisible();
   expect(new URL(page.url()).searchParams.has('expanded')).toBe(false);
-  await expect(page.getByLabel('Sort by')).toHaveValue('price');
+  await expect(page.getByLabel('Sort by')).toHaveText('Lowest room rate');
   expect(searches).toBe(1);
 });
 
@@ -107,17 +172,17 @@ test('all same-trip refresh controls honor cooldown and recover at its deadline'
   await page.getByRole('button', { name: 'Update prices', exact: true }).click();
   await expect(page.getByRole('button', { name: /Try again in/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Update prices', exact: true })).toBeDisabled();
-  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toBeVisible();
   const edit = page.getByRole('button', { name: 'Edit trip', exact: true });
   if (await edit.isVisible()) await edit.click();
-  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Search hotels', exact: true })).toBeDisabled();
   await page.clock.fastForward(61000);
-  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Search hotels', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Update prices', exact: true })).toBeEnabled();
   expect(searches).toBe(2);
   await page.getByRole('button', { name: 'Update prices', exact: true }).click();
   await expect.poll(() => searches).toBe(3);
-  await expect(page.getByRole('link', { name: /Check (current )?price on Priceline/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toBeVisible();
 });
 
 test('returning to a cooling-down trip preserves its retry after expiry without an automatic request', async ({ page }) => {
@@ -141,7 +206,7 @@ test('returning to a cooling-down trip preserves its retry after expiry without 
   if (await edit.isVisible()) await edit.click();
   await page.getByRole('combobox', { name: 'Check-out', exact: true }).click();
   await page.locator(`.travel-calendar-popup:visible [data-day="${tripB.checkOut}"] button`).click();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect(page.getByRole('heading', { name: '1 hotel deal', exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'The provider needs a short pause', exact: true })).toBeVisible();
@@ -179,7 +244,7 @@ test('a fresh offer without a listing rate still offers the current supplier pri
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
   await page.goto(searchPath);
   await expect(page.getByText('Rate unavailable', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Check current price on Priceline/ })).toHaveAttribute('href', present(data.offers[0].handoffUrl));
+  await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(data.offers[0].handoffUrl));
   await expect(page.locator('.booking-note')).toHaveText('Check current price and terms on Priceline.');
 });
 

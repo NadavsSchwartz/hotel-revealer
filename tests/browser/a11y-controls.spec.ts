@@ -20,12 +20,12 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Tokyo']) {
         return route.fulfill({ json: searchResponse({ context: input }) });
       });
       await page.goto(`/results?${queryParams(trip)}`);
-      await expect(page.getByRole('link', { name: 'View hotel & prices', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'View hotel details', exact: true })).toBeVisible();
       await openTripEditor(page);
       await page.getByLabel('Check-in', { exact: true }).click();
       await page.getByRole('dialog', { name: 'Check-in calendar' }).locator('[data-day="2026-11-01"] button').click();
       await page.getByRole('dialog', { name: 'Check-out calendar' }).locator('[data-day="2026-11-03"] button').click();
-      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
       await expect.poll(() => searches.length).toBe(2);
       expect(searches[1]).toEqual({ ...trip, checkIn: '2026-11-01', checkOut: '2026-11-03' });
     });
@@ -109,7 +109,7 @@ test('calendar buttons announce selected dates and preserve keyboard and pointer
   await expect(dialog).toBeHidden();
   await expect(checkOut).toBeFocused();
   expect(searches).toHaveLength(1);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search hotels', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
   expect(searches[1]).toEqual({ ...context, checkIn: newCheckIn, checkOut: pointerCheckOut });
 });

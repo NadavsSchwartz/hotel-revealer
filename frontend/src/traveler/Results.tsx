@@ -10,6 +10,7 @@ import type { TripDraft } from '../../../shared/contracts.ts';
 import type { ViewCandidate as Candidate, ViewOffer as Offer } from './responseValidation.ts';
 import SearchForm from './SearchForm.tsx';
 import SearchProgress from './SearchProgress.tsx';
+import SortSelect, { SORT_LABELS } from './SortSelect.tsx';
 import {
   contextFromSearch,
   contextKey,
@@ -33,12 +34,6 @@ import {
 import './results.css';
 
 const PAGE_SIZE = 12;
-const SORT_LABELS: Record<OfferSort, string> = {
-  price: 'Lowest room rate',
-  rating: 'Highest guest rating',
-  stars: 'Highest star rating',
-  discount: 'Biggest discount',
-};
 
 function CandidatePhoto({ candidate, eager }: { candidate: Candidate; eager: boolean }) {
   const source = safeHref(candidate.thumbnailUrl);
@@ -328,27 +323,11 @@ export default function Results() {
                 {offers.length > 0 && <button type="button" className="ui-button results-refresh" onClick={refresh} disabled={loading || coolingDown}>{loading ? 'Updating…' : 'Update prices'}</button>}
               </p>
             </div>
-            {offers.length > 0 && (
-              <div className="sort-control">
-                <label htmlFor="offer-sort">Sort by</label>
-                <div className="sort-select">
-                  <select
-                    id="offer-sort"
-                    value={sort}
-                    aria-describedby={sort === 'discount' ? 'discount-sort-note' : undefined}
-                    onChange={(event) => updateView(parseOfferSort(event.target.value), 1)}
-                  >
-                    {Object.entries(SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
-                  <svg className="control-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
-                </div>
-              </div>
-            )}
+            {offers.length > 0 && <SortSelect value={sort} onChange={value => updateView(value, 1)} />}
           </div>
           {offers.length > 0 && (
             <p className="results-comparison-intro">
               Hotel names are inferred, not guaranteed.
-              {sort === 'discount' && <span id="discount-sort-note"> Discounts are Priceline’s advertised room-rate percentages, before taxes and fees.</span>}
             </p>
           )}
           {offers.length === 0 && (
@@ -392,7 +371,7 @@ export default function Results() {
                     <div className="offer-booking">
                       <Quote quote={offer.quote} compact trip={data.context} title={stale ? 'Last seen room rate' : 'Room rate'} />
                       <Link className="offer-detail-link button-link" {...candidateLink(offer, candidate, `details-${encodeURIComponent(offer.offerId)}`)}>
-                        View hotel &amp; prices
+                        View hotel details
                         <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>
                       </Link>
                       <ProviderLink offer={offer} stale={stale} refreshing={loading} compact />
