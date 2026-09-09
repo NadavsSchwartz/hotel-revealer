@@ -152,7 +152,7 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
         aria-describedby={error ? 'cityName-error' : 'destination-hint'}
         value={trip.cityName}
         onChange={(event) => { onChange({ cityName: event.target.value.slice(0, 200), destinationId: undefined }); setOpen(true); }}
-        onFocus={() => setOpen(true)}
+        onFocus={(event) => { event.currentTarget.scrollIntoView({ block: 'nearest' }); setOpen(true); }}
         onClick={() => setOpen(true)}
         onKeyDown={handleKeyDown}
       />
