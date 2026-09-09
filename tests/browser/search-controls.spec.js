@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { context, detailResponse, openTripEditor, searchPath, searchResponse } from './fixtures.js';
 
-const destinationOptions = page => page.locator('.destination-popup .ant-select-item-option');
-const calendar = page => page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
+const destinationOptions = page => page.getByRole('listbox', { name: 'Destination suggestions' }).getByRole('option');
+const calendar = page => page.getByRole('dialog', { name: /^(Check-in|Check-out) calendar$/ });
 const tripPath = changes => `/results?${new URLSearchParams({ ...context, ...changes })}`;
 const dateAfter = days => {
   const date = new Date();
@@ -15,9 +15,9 @@ const formattedDate = value => new Intl.DateTimeFormat('en-US', { month: 'short'
 async function findCalendarDay(page, date) {
   await expect(calendar(page)).toHaveCount(1);
   await expect(calendar(page)).toBeVisible();
-  const day = calendar(page).locator(`td[title="${date}"]`);
+  const day = calendar(page).locator(`td[data-day="${date}"] button`);
   for (let month = 0; month < 13 && await day.count() === 0; month++) {
-    await calendar(page).locator('.ant-picker-header-next-btn').click();
+    await calendar(page).getByRole('button', { name: 'Next month', exact: true }).click();
   }
   await expect(day).toBeVisible();
   return day;
@@ -26,15 +26,14 @@ async function findCalendarDay(page, date) {
 async function chooseDate(page, label, date) {
   await page.getByLabel(label, { exact: true }).click();
   const day = await findCalendarDay(page, date);
-  await expect(day).not.toHaveClass(/ant-picker-cell-disabled/);
-  await day.locator('.ant-picker-cell-inner').click();
+  await expect(day).toBeEnabled();
+  await day.click();
 }
 
 async function chooseAge(page, child, age) {
-  await page.getByRole('combobox', { name: `Child ${child} age`, exact: true }).click();
-  const field = page.locator('.child-age-field').filter({ has: page.getByText(`Child ${child} age`, { exact: true }) });
-  await field.locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .filter({ hasText: new RegExp(`^${age === 0 ? 'Under 1' : age}$`) }).click();
+  const input = page.getByRole('combobox', { name: `Child ${child} age`, exact: true });
+  await input.selectOption(String(age));
+  await expect(input).toHaveValue(String(age));
 }
 
 async function recordSearches(page) {
@@ -123,9 +122,9 @@ test('keyboard destination selection keeps the canonical city and waits for expl
   const input = page.getByLabel('Where are you going?');
   await input.fill('Israel');
   await expect(destinationOptions(page).first()).toContainText('Jerusalem');
-  await input.press('ArrowDown');
-  await expect(page.locator('.destination-popup .ant-select-item-option-active')).toContainText('Tel Aviv');
-  await input.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await expect(destinationOptions(page).filter({ has: page.getByText('Tel Aviv', { exact: true }) })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Enter');
   await expect(input).toHaveValue('Tel Aviv, Israel');
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
   expect(searches).toHaveLength(1);
@@ -190,8 +189,8 @@ test('children require ages and the full trip survives API requests, URL, detail
   await page.getByRole('link', { name: /Back to results/ }).click();
   await openTripEditor(page);
   await page.getByRole('button', { name: 'Travelers, 5 guests · 2 rooms', exact: true }).click();
-  await expect(page.locator('.child-age-field').filter({ has: page.getByText('Child 1 age', { exact: true }) })).toContainText('Under 1');
-  await expect(page.locator('.child-age-field').filter({ has: page.getByText('Child 2 age', { exact: true }) })).toContainText('7');
+  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toHaveValue('0');
+  await expect(page.getByRole('combobox', { name: 'Child 2 age', exact: true })).toHaveValue('7');
   expect(searches).toHaveLength(2);
 });
 
@@ -242,11 +241,11 @@ test('checkout calendar disables reversed dates and night 31 while allowing nigh
   await expect(page.getByText('$119', { exact: false }).first()).toBeVisible();
   await openTripEditor(page);
   await page.getByLabel('Check-out', { exact: true }).click();
-  await expect(await findCalendarDay(page, dateAfter(30))).toHaveClass(/ant-picker-cell-disabled/);
+  await expect(await findCalendarDay(page, dateAfter(30))).toBeDisabled();
   const lastAllowed = await findCalendarDay(page, dateAfter(60));
-  await expect(lastAllowed).not.toHaveClass(/ant-picker-cell-disabled/);
-  await expect(await findCalendarDay(page, dateAfter(61))).toHaveClass(/ant-picker-cell-disabled/);
-  await lastAllowed.locator('.ant-picker-cell-inner').click();
+  await expect(lastAllowed).toBeEnabled();
+  await expect(await findCalendarDay(page, dateAfter(61))).toBeDisabled();
+  await lastAllowed.click();
   await expect(page.getByLabel('Check-out', { exact: true })).toHaveValue(formattedDate(dateAfter(60)));
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect.poll(() => searches.length).toBe(2);
@@ -260,10 +259,9 @@ test('both calendars disable days beyond 365 days and can dismiss with Escape', 
   await openTripEditor(page);
   for (const label of ['Check-in', 'Check-out']) {
     await page.getByLabel(label, { exact: true }).click();
-    await expect(await findCalendarDay(page, dateAfter(365))).not.toHaveClass(/ant-picker-cell-disabled/);
-    await expect(await findCalendarDay(page, dateAfter(366))).toHaveClass(/ant-picker-cell-disabled/);
-    await calendar(page).locator('.ant-picker-header-next-btn').click();
-    await expect(calendar(page).locator('td.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)')).toHaveCount(0);
+    await expect(await findCalendarDay(page, dateAfter(365))).toBeEnabled();
+    await expect(await findCalendarDay(page, dateAfter(366))).toBeDisabled();
+    await expect(calendar(page).getByRole('button', { name: 'Next month', exact: true })).toBeDisabled();
     await page.keyboard.press('Escape');
     await expect(calendar(page)).toHaveCount(0);
   }
@@ -291,7 +289,7 @@ test('changing check-in clears an incompatible checkout and requires a new date'
 });
 
 
-test('open destination and traveler controls pass Axe with one reviewed combobox exception', async ({ page }) => {
+test('open destination and traveler controls pass Axe without exceptions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/');
@@ -304,19 +302,10 @@ test('open destination and traveler controls pass Axe with one reviewed combobox
       await Promise.all(finite.map(animation => animation.finished.catch(() => {})));
     });
     const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
-    // APG comboboxes keep DOM focus on the input, outside the popup's Tab sequence.
-    // The all-eight-suggestions test verifies owned active IDs, scrolling, selection,
-    // and Tab/Escape exit. This disposition applies to this rule and holder only.
-    // https://www.w3.org/WAI/ARIA/apg/patterns/combobox/
-    const onlyDestinationHolder = stage === 'Open destination suggestions'
-      && await page.locator('.rc-virtual-list-holder').count() === 1
-      && await page.locator('.destination-popup .rc-virtual-list-holder').count() === 1;
     const violations = result.violations.map(({ id, nodes }) => ({
       id,
-      nodes: nodes.filter(node => !(onlyDestinationHolder && id === 'scrollable-region-focusable'
-        && node.target.length === 1 && node.target[0] === '.rc-virtual-list-holder'))
-        .map(({ html, target }) => ({ html, target })),
-    })).filter(({ nodes }) => nodes.length > 0);
+      nodes: nodes.map(({ html, target }) => ({ html, target })),
+    }));
     expect.soft(violations, stage).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   };
@@ -324,8 +313,6 @@ test('open destination and traveler controls pass Axe with one reviewed combobox
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /^Travelers,/ }).click();
   await expect(page.getByRole('dialog', { name: 'Who’s traveling?' })).toBeVisible();
-  // The popup DOM can pass visibility/stability checks during its opacity-0 prepare phase.
-  await expect.poll(() => page.locator('.travelers-popup:visible').evaluate(element => getComputedStyle(element).opacity)).toBe('1');
   const addChild = page.getByRole('button', { name: 'Increase children', exact: true });
   await expect(addChild).toBeEnabled();
   await expect(addChild).toBeInViewport({ ratio: 1 });
@@ -337,9 +324,8 @@ test('open destination and traveler controls pass Axe with one reviewed combobox
   await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toBeVisible();
   await checkAccessibility('Open travelers with a required child age');
   await chooseAge(page, 1, 0);
-  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.locator('.child-age-field .ant-select-dropdown:visible')).toHaveCount(0);
-  await checkAccessibility('Selected child age with its dropdown closed');
+  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toHaveValue('0');
+  await checkAccessibility('Selected child age');
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Travelers, 3 guests · 1 room', exact: true })).toBeFocused();
 });
@@ -361,16 +347,16 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   await expect(destinationOptions(page)).toHaveCount(8);
   const visited = [];
   for (let index = 0; index < destinations.length; index++) {
-    if (index > 0) await input.press('ArrowDown');
+    if (index > 0) await page.keyboard.press('ArrowDown');
     const option = destinationOptions(page).nth(index);
-    await expect(option).toHaveClass(/ant-select-item-option-active/);
+    await expect(option).toHaveAttribute('aria-selected', 'true');
     await expect(option).toContainText(destinations[index].name);
     const optionId = await option.getAttribute('id');
     expect(optionId).toBeTruthy();
     await expect(input).toHaveAttribute('aria-activedescendant', optionId);
     await expect(input).toBeFocused();
     await expect.poll(async () => option.evaluate(element => {
-      const holder = element.closest('.rc-virtual-list-holder');
+      const holder = element.closest('[role="listbox"]');
       if (!holder || !holder.closest('.destination-popup')) return false;
       const input = document.getElementById('cityName');
       const ownedIds = `${input.getAttribute('aria-controls') || ''} ${input.getAttribute('aria-owns') || ''}`.trim().split(/\s+/);
@@ -384,7 +370,7 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   }
   expect(new Set(visited).size).toBe(8);
   const selected = destinations.at(-1);
-  await input.press('Enter');
+  await page.keyboard.press('Enter');
   await expect(input).toHaveValue(selected.label);
   await expect(input).toBeFocused();
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
@@ -398,12 +384,12 @@ test('every destination suggestion is keyboard reachable, scrolled into view, an
   await openTripEditor(page);
   await input.fill('Israel');
   await expect(destinationOptions(page).first()).toBeVisible();
-  await input.press('Tab');
+  await page.keyboard.press('Tab');
   await expect(page.getByLabel('Check-in', { exact: true })).toBeFocused();
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
   await input.fill('Israel');
   await expect(destinationOptions(page).first()).toBeVisible();
-  await input.press('Escape');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.destination-popup:visible')).toHaveCount(0);
   await expect(input).toBeFocused();
   expect(searches).toHaveLength(2);

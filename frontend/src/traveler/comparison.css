@@ -12,9 +12,9 @@
 .quote-breakdown dl > div:last-child { border-top: 1px solid var(--line); padding-top: 10px; font-weight: 750; }
 .quote-breakdown p { font-size: 12px; line-height: 1.6; }
 .quote-refresh p { font-size: 14px; }
-.quote-refresh .ant-btn { min-height: 44px; white-space: normal; height: auto; }
+.quote-refresh .ui-button { min-height: 44px; white-space: normal; height: auto; }
 .candidate-show-more { display: flex; justify-content: center; padding: 22px 0 0; }
-.candidate-show-more .ant-btn { height: auto; min-height: 44px; white-space: normal; font-size: 13px; }
+.candidate-show-more .ui-button { height: auto; min-height: 44px; white-space: normal; font-size: 13px; }
 .evidence-matrix { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: left; font-size: 13px; line-height: 1.55; }
 .evidence-matrix th, .evidence-matrix td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 .evidence-matrix thead th { color: var(--muted); font-size: 12px; font-weight: 700; }
@@ -26,8 +26,8 @@
 .evidence-note { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
 .evidence-label { margin: 0 0 10px; font-weight: 700; font-size: 12px; }
 .unboxed-application .provider-handoff > p { margin-bottom: 0; font-size: 12px; line-height: 1.55; }
-.unboxed-application .provider-handoff .ant-btn, .unboxed-application .provider-handoff .button-link { min-height: 44px; }
-.unboxed-application .notice-panel .ant-alert { border-radius: 12px; }
+.unboxed-application .provider-handoff .ui-button, .unboxed-application .provider-handoff .button-link { min-height: 44px; }
+.unboxed-application .notice-panel .ui-notice { border-radius: 12px; }
 @media (max-width: 600px) {
   .evidence-matrix { font-size: 12px; }
   .evidence-matrix th, .evidence-matrix td { padding: 12px 7px; }

@@ -38,22 +38,13 @@ html:root {
 .direction-footer nav { display: flex; gap: 26px; }
 .direction-footer a { display: inline-flex; align-items: center; min-height: 44px; }
 .unboxed-application button:focus-visible, .unboxed-application a:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
-.ant-select, .ant-picker, .ant-popover { font-family: Manrope, sans-serif; }
-.destination-popup .ant-select-item-option-content { white-space: normal; }
 .travelers-panel button { min-width: 38px; min-height: 38px; }
-.travel-calendar-popup .ant-picker-header button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
-.travel-calendar-popup .ant-picker-header-view button { font-weight: 750; }
-.travel-calendar-popup .ant-picker-cell { padding: 5px 0; }
-.travel-calendar-popup .ant-picker-cell-inner { min-height: 30px; min-width: 30px; line-height: 30px !important; }
 .travelers-panel-heading h3 { font-family: Manrope, sans-serif; }
 .travelers-panel small { color: var(--muted); }
-.travel-calendar-popup .ant-picker-body, .travel-calendar-popup .ant-picker-header, .travel-calendar-popup .ant-picker-footer { background: #fff; }
-html:root .destination-popup, html:root .travel-calendar-popup .ant-picker-panel-container, html:root .travelers-popup .ant-popover-inner { border-radius: 12px; }
+html:root .destination-popup { border-radius: 12px; }
 html:root .traveler-counter button { border-color: var(--line); border-radius: var(--radius-control); color: var(--blue); }
-html:root .child-age-field .ant-select:not(.ant-select-customize-input) .ant-select-selector { border-color: #a6b291; border-radius: var(--radius-control); }
 html:root .travelers-panel-heading > button { border-radius: var(--radius-control); background: var(--surface-muted); color: var(--ink); }
-html:root .travelers-panel-footer .ant-btn { border-radius: var(--radius-control); background: var(--blue); border-color: var(--blue); }
-html:root .child-age-field .ant-select-item-option-selected { background: var(--surface-muted); }
+html:root .travelers-panel-footer .ui-button { border-radius: var(--radius-control); background: var(--blue); border-color: var(--blue); }
 @media (max-width: 760px) {
   .direction-header { width: calc(100% - 64px); height: 72px; }
   .brand-type { font-size: 14px; }
@@ -65,9 +56,6 @@ html:root .child-age-field .ant-select-item-option-selected { background: var(--
   .direction-footer a { min-height: 44px; }
 }
 
-html:root .travel-calendar-popup .ant-picker-cell-selected .ant-picker-cell-inner,html:root .travelers-panel-footer .ant-btn{background:var(--blue);border-color:var(--blue)}
+html:root .travelers-panel-footer .ui-button{background:var(--blue);border-color:var(--blue)}
 html:root .traveler-counter button{color:var(--blue);border-color:var(--line)}
-html:root .travel-calendar-popup .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner { background: var(--blue); }
-html:root .travel-calendar-popup .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before { border-color: var(--blue); }
-html:root .destination-popup .ant-select-item-option-active:not(.ant-select-item-option-disabled) { background: var(--surface-muted); }
 html:root .travelers-panel button:focus-visible, html:root .travelers-trigger:focus-visible { outline-color: var(--blue); }

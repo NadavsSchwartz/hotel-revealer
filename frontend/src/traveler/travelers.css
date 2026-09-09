@@ -1,0 +1,21 @@
+.travelers-popup {
+  position: fixed;
+  z-index: 1050;
+  box-sizing: border-box;
+  border: 1px solid var(--line, #d4d6cb);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--ink, #253023);
+  box-shadow: 0 16px 48px #25302326;
+  font: 14px/1.6 Manrope, sans-serif;
+}
+.travelers-popup[data-placement='top'] { transform: translateY(-100%); }
+.travelers-popup .travelers-panel { box-sizing: border-box; width: 100%; max-width: 100%; border-radius: inherit; }
+.child-age-select { position: relative; display: flex; align-items: center; }
+.child-age-select select { appearance: none; width: 100%; min-height: 40px; padding: 0 30px 0 11px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--surface, #fff); color: var(--ink, #253023); font: inherit; font-size: 13px; cursor: pointer; }
+.child-age-select select:has(option:checked[value='']) { color: var(--muted, #5b6854); }
+.child-age-select select[aria-invalid='true'] { border-color: var(--error, #b42332); }
+.child-age-select option { background: var(--surface, #fff); color: var(--ink, #253023); }
+.child-age-select svg { position: absolute; right: 10px; width: 14px; height: 14px; pointer-events: none; color: var(--muted, #5b6854); }
+.child-age-select select:focus-visible { outline: 2px solid var(--blue, #34482f); outline-offset: 3px; }
+.travelers-panel-footer .ui-button { min-height: 40px; padding: 7px 22px; font-size: 13px; }

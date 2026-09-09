@@ -6,7 +6,7 @@ async function chooseHomeTrip(page) {
   const destination = getDestination(context.destinationId);
   await page.route('**/api/v1/destinations?*', route => route.fulfill({ json: { destinations: [destination] } }));
   await page.getByLabel('Where are you going?').fill('Las');
-  await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: destination.name }).click();
+  await page.locator('.destination-popup [role="option"]').filter({ hasText: destination.name }).click();
   for (const [label, field] of [['Check-in', 'checkIn'], ['Check-out', 'checkOut']]) {
     const input = page.getByRole('combobox', { name: label, exact: true });
     if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
@@ -91,8 +91,7 @@ test('an unsubmitted Home draft survives Terms and Back without validating the f
   await page.getByRole('button', { name: 'Increase adults', exact: true }).click();
   await page.getByRole('button', { name: 'Increase rooms', exact: true }).click();
   await page.getByRole('button', { name: 'Increase children', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Child 1 age', exact: true }).click();
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Under 1' }).click();
+  await page.getByRole('combobox', { name: 'Child 1 age', exact: true }).selectOption('0');
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(travelers).toHaveAccessibleName('Travelers, 4 guests · 2 rooms');
   await page.getByRole('link', { name: 'Privacy', exact: true }).click();
@@ -102,7 +101,7 @@ test('an unsubmitted Home draft survives Terms and Back without validating the f
   await expect(page.getByRole('combobox', { name: 'Check-out', exact: true })).toHaveValue(beforeDates[1]);
   await expect(travelers).toHaveAccessibleName('Travelers, 4 guests · 2 rooms');
   await travelers.click();
-  await expect(page.locator('.child-age-field .ant-select-selection-item')).toHaveText('Under 1');
+  await expect(page.locator('.child-age-field option:checked')).toHaveText('Under 1');
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   expect(searches).toBe(0);
   await page.reload();
@@ -152,7 +151,7 @@ test('cooldown blocks only the unchanged trip and still validates edited drafts'
   await page.route('**/api/v1/destinations?*', route => route.fulfill({ json: { destinations: [destination] } }));
   await page.getByLabel('Where are you going?').fill('Las');
   await page.clock.runFor(300);
-  await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: destination.name }).click();
+  await page.locator('.destination-popup [role="option"]').filter({ hasText: destination.name }).click();
   await expect(search).toBeDisabled();
   await page.getByRole('button', { name: /^Travelers,/ }).click();
   await page.getByRole('button', { name: 'Increase adults', exact: true }).click();

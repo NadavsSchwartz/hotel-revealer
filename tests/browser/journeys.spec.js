@@ -5,7 +5,7 @@ import { context, detailResponse, mockOffers, openTripEditor, searchPath, search
 
 async function chooseDestination(page, query, region) {
   await page.getByLabel('Where are you going?').fill(query);
-  const option = page.locator('.destination-popup .ant-select-item-option').filter({ has: page.locator('strong').getByText(query, { exact: true }), hasText: region });
+  const option = page.locator('.destination-popup [role="option"]').filter({ has: page.locator('strong').getByText(query, { exact: true }), hasText: region });
   await expect(option).toBeVisible();
   await option.click();
 }
@@ -13,15 +13,15 @@ async function chooseDestination(page, query, region) {
 async function chooseDate(page, label, date) {
   const input = page.getByLabel(label, { exact: true });
   if (await input.getAttribute('aria-expanded') !== 'true') await input.click();
-  const calendar = page.locator('.travel-calendar-popup:visible:not(.ant-slide-up-leave)');
+  const calendar = page.locator('.travel-calendar-popup:visible');
   await expect(calendar).toHaveCount(1);
   await expect(calendar).toBeVisible();
-  const day = calendar.locator(`td[title="${date}"]`);
+  const day = calendar.locator(`[data-day="${date}"]`);
   for (let month = 0; month < 13 && await day.count() === 0; month++) {
-    await calendar.locator('.ant-picker-header-next-btn').click();
+    await calendar.getByRole('button', { name: 'Next month', exact: true }).click();
   }
-  await expect(day).not.toHaveClass(/ant-picker-cell-disabled/);
-  await day.locator('.ant-picker-cell-inner').click();
+  await expect(day.locator('button')).toBeEnabled();
+  await day.locator('button').click();
 }
 
 test('cleared inputs are validated and focused without an API request', async ({ page }) => {

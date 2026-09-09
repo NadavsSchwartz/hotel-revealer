@@ -1,16 +1,15 @@
-import React, { forwardRef, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import AutoComplete from 'antd/es/auto-complete';
-import Input from 'antd/es/input';
-import Spin from 'antd/es/spin';
-import 'antd/es/auto-complete/style/css';
-import 'antd/es/input/style/css';
-import 'antd/es/spin/style/css';
+import React, { forwardRef, useLayoutEffect, useImperativeHandle, useRef, useState } from 'react';
+import './destination-search.css';
 
 const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, onChange }, ref) {
   const input = useRef(null);
+  const control = useRef(null);
+  const popup = useRef(null);
   const sequence = useRef(0);
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [position, setPosition] = useState(null);
   const [status, setStatus] = useState('idle');
   const [retry, setRetry] = useState(0);
   const query = trip.cityName.trim();
@@ -22,6 +21,7 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
   useLayoutEffect(() => {
     const request = ++sequence.current;
     setResults((current) => current.length ? [] : current);
+    setActiveIndex(0);
     if (!open || trip.destinationId || query.length < 2) {
       setStatus('idle');
       return undefined;
@@ -35,7 +35,7 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
         const body = await response.json();
         if (!Array.isArray(body.destinations)) throw new Error('Invalid destination response');
         if (request === sequence.current && !controller.signal.aborted) {
-          setResults(body.destinations);
+          setResults(body.destinations.slice(0, 8));
           setStatus(body.destinations.length ? 'ready' : 'empty');
         }
       } catch (failure) {
@@ -45,21 +45,78 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
     return () => { clearTimeout(timeout); controller.abort(); };
   }, [query, open, trip.destinationId, retry]);
 
-  const options = useMemo(() => results.map((destination) => ({
-    key: destination.id,
-    value: destination.id,
-    destination,
-    label: (
-      <span className="destination-option">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
-        <span><strong>{destination.name}</strong><small>{[destination.regionName, destination.countryName].filter(Boolean).join(', ')}</small>
-          {results.some((other) => other.id !== destination.id && other.label === destination.label) && (
-            <small>{Math.abs(destination.latitude).toFixed(2)}°{destination.latitude < 0 ? 'S' : 'N'}, {Math.abs(destination.longitude).toFixed(2)}°{destination.longitude < 0 ? 'W' : 'E'}</small>
-          )}
-        </span>
-      </span>
-    ),
-  })), [results]);
+  const showPopup = open && !trip.destinationId;
+  const showOptions = showPopup && results.length > 0;
+
+  useLayoutEffect(() => {
+    if (!showPopup) return undefined;
+    const positionPopup = (event) => {
+      if (event?.target === popup.current) return;
+      const anchor = input.current.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const leftEdge = (viewport?.offsetLeft || 0) + 12;
+      const topEdge = (viewport?.offsetTop || 0) + 12;
+      const rightEdge = leftEdge + (viewport?.width || window.innerWidth) - 24;
+      const bottomEdge = topEdge + (viewport?.height || window.innerHeight) - 24;
+      if (anchor.bottom < topEdge || anchor.top > bottomEdge) { setOpen(false); return; }
+      const width = Math.min(Math.max(anchor.width, 270), rightEdge - leftEdge);
+      popup.current.style.width = `${width}px`;
+      const below = Math.max(0, bottomEdge - anchor.bottom - 8);
+      const above = Math.max(0, anchor.top - topEdge - 8);
+      const height = Math.min(popup.current.scrollHeight + 2, 314);
+      const upwards = below < height && above > below;
+      const maxHeight = Math.min(314, upwards ? above : below);
+      setPosition({
+        width,
+        left: Math.max(leftEdge, Math.min(anchor.left, rightEdge - width)),
+        top: upwards ? anchor.top - Math.min(height, maxHeight) - 8 : anchor.bottom + 8,
+        maxHeight,
+      });
+    };
+    const dismissOutside = (event) => {
+      if (!control.current.contains(event.target)) setOpen(false);
+    };
+    positionPopup();
+    window.addEventListener('resize', positionPopup);
+    window.addEventListener('scroll', positionPopup, true);
+    window.visualViewport?.addEventListener('resize', positionPopup);
+    window.visualViewport?.addEventListener('scroll', positionPopup);
+    document.addEventListener('pointerdown', dismissOutside);
+    return () => {
+      window.removeEventListener('resize', positionPopup);
+      window.removeEventListener('scroll', positionPopup, true);
+      window.visualViewport?.removeEventListener('resize', positionPopup);
+      window.visualViewport?.removeEventListener('scroll', positionPopup);
+      document.removeEventListener('pointerdown', dismissOutside);
+    };
+  }, [showPopup, results, status]);
+
+  useLayoutEffect(() => {
+    if (!showOptions) return;
+    const option = popup.current.children[activeIndex];
+    if (!option) return;
+    const bounds = popup.current.getBoundingClientRect();
+    const item = option.getBoundingClientRect();
+    if (item.top < bounds.top + 8) popup.current.scrollTop -= bounds.top + 8 - item.top;
+    else if (item.bottom > bounds.bottom - 8) popup.current.scrollTop += item.bottom - bounds.bottom + 8;
+  }, [activeIndex, showOptions, position]);
+
+  function select(destination) {
+    onChange({ destinationId: destination.id, cityName: destination.label || destination.name });
+    setOpen(false);
+  }
+
+  function handleKeyDown(event) {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setOpen(true);
+      if (showOptions) setActiveIndex(index => Math.max(0, Math.min(results.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1))));
+    } else if (event.key === 'Enter' && open && !trip.destinationId) {
+      event.preventDefault();
+      if (showOptions) select(results[activeIndex]);
+    } else if (event.key === 'Tab' && status !== 'error') setOpen(false);
+  }
   const message = status === 'loading' ? 'Finding destinations…'
     : status === 'empty' ? 'No destinations found. Try a city or country name.'
       : status === 'error' ? 'Destinations could not load. Try again.'
@@ -68,39 +125,71 @@ const DestinationSearch = forwardRef(function DestinationSearch({ trip, error, o
             : `${results.length} destination${results.length === 1 ? '' : 's'} found. Use the arrow keys to choose.`;
 
   return (
-    <div className={`trip-control destination-control ${error ? 'trip-control-invalid' : ''}`}>
+    <div
+      ref={control}
+      className={`trip-control destination-control ${error ? 'trip-control-invalid' : ''}`}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') { event.preventDefault(); input.current.focus(); setOpen(false); }
+      }}
+    >
       <label htmlFor="cityName">Where are you going?</label>
-      <AutoComplete
+      <input
+        ref={input}
         id="cityName"
-        {...(!(open && options.length > 0) ? { 'aria-activedescendant': undefined, 'aria-controls': undefined, 'aria-owns': undefined } : {})}
+        name="cityName"
+        className="destination-input"
+        type="text"
+        role="combobox"
+        placeholder="City or country"
+        autoComplete="off"
+        aria-autocomplete="list"
+        aria-expanded={showOptions}
+        aria-controls={showOptions ? 'destination-suggestions' : undefined}
+        aria-activedescendant={showOptions ? `destination-option-${activeIndex}` : undefined}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? 'cityName-error' : 'destination-hint'}
         value={trip.cityName}
-        options={options}
-        open={open && options.length > 0}
-        popupClassName="destination-popup"
-        dropdownMatchSelectWidth
-        listHeight={300}
-        virtual={false}
-        defaultActiveFirstOption
-        onDropdownVisibleChange={setOpen}
-        onChange={(cityName) => { onChange({ cityName: cityName.slice(0, 200), destinationId: undefined }); setOpen(true); }}
-        onSelect={(_value, option) => {
-          onChange({ destinationId: option.destination.id, cityName: option.destination.label || option.destination.name });
-          setOpen(false);
-        }}
+        onChange={(event) => { onChange({ cityName: event.target.value.slice(0, 200), destinationId: undefined }); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onInputKeyDown={(event) => {
-          if (event.key === 'Enter' && open && !trip.destinationId) event.preventDefault();
-          if (event.key === 'Escape') setOpen(false);
-        }}
-      >
-        <Input ref={input} id="cityName" name="cityName" placeholder="City or country" autoComplete="off" aria-invalid={Boolean(error)} aria-describedby={error ? 'cityName-error' : 'destination-hint'} />
-      </AutoComplete>
-      {open && !trip.destinationId && options.length === 0 && (
-        <div className="destination-status-panel" onMouseDown={(event) => event.preventDefault()}>
-          {status === 'loading' && <Spin size="small" />}
-          <span>{message}</span>
-          {status === 'error' && <button type="button" onClick={() => setRetry((value) => value + 1)}>Try again</button>}
+        onClick={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {showPopup && (
+        <div
+          ref={popup}
+          id={showOptions ? 'destination-suggestions' : undefined}
+          className={`destination-panel ${showOptions ? 'destination-popup' : 'destination-status-panel'}`}
+          role={showOptions ? 'listbox' : undefined}
+          tabIndex={-1}
+          aria-label={showOptions ? 'Destination suggestions' : undefined}
+          style={position || { visibility: 'hidden' }}
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          {showOptions ? results.map((destination, index) => (
+            <div
+              key={destination.id}
+              id={`destination-option-${index}`}
+              className="destination-suggestion"
+              role="option"
+              aria-selected={activeIndex === index}
+              onMouseMove={() => setActiveIndex(index)}
+              onClick={() => select(destination)}
+            >
+              <span className="destination-option">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                <span><strong>{destination.name}</strong><small>{[destination.regionName, destination.countryName].filter(Boolean).join(', ')}</small>
+                  {results.some((other) => other.id !== destination.id && other.label === destination.label) && (
+                    <small>{Math.abs(destination.latitude).toFixed(2)}°{destination.latitude < 0 ? 'S' : 'N'}, {Math.abs(destination.longitude).toFixed(2)}°{destination.longitude < 0 ? 'W' : 'E'}</small>
+                  )}
+                </span>
+              </span>
+            </div>
+          )) : <>
+            {status === 'loading' && <span className="destination-spinner" aria-hidden="true" />}
+            <span>{message}</span>
+            {status === 'error' && <button type="button" onClick={() => { input.current.focus(); setRetry((value) => value + 1); }}>Try again</button>}
+          </>}
         </div>
       )}
       <span className="sr-only" id="destination-hint" role="status">{open ? message : 'Search by city or country, then choose a destination.'}</span>

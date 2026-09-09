@@ -37,14 +37,14 @@
 .room-reception .trip-control > label { margin-bottom: 4px; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.35; }
 .room-reception .trip-control:focus-within { background: #eef2e8; border-radius: 6px; }
 .room-reception .travel-dates { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: auto; gap: 0; border: 0; }
-.room-reception .destination-control .ant-input, .room-reception .date-control .ant-picker-input > input, .room-reception .travelers-trigger { font-size: 16px; font-weight: 500; }
+.room-reception .travelers-trigger { font-size: 16px; font-weight: 500; }
 .room-reception .travelers-trigger { min-height: 32px; }
 .room-reception .travelers-trigger > span { overflow-wrap: anywhere; }
 .room-reception .trip-control-invalid > label { color: #b42332; }
 .room-reception .trip-currency-error { margin: 14px 0 0; }
-.room-reception .search-button.ant-btn { grid-column: auto; align-self: center; width: auto; min-width: 0; min-height: 54px; margin: 0 0 0 20px; padding: 14px; border: 1px solid var(--blue); border-radius: 8px; color: #fffef8; background: var(--blue); font-size: 16px; font-weight: 650; }
-.room-reception .search-button.ant-btn:hover, .room-reception .search-button.ant-btn:focus { color: #fffef8; background: var(--forest); border-color: var(--forest); }
-.room-reception .search-button.ant-btn:disabled { background: #e4e7dd; border-color: #bdc6b3; color: #626d5a; }
+.room-reception .search-button.ui-button { grid-column: auto; align-self: center; width: auto; min-width: 0; min-height: 54px; margin: 0 0 0 20px; padding: 14px; border: 1px solid var(--blue); border-radius: 8px; color: #fffef8; background: var(--blue); font-size: 16px; font-weight: 650; }
+.room-reception .search-button.ui-button:hover, .room-reception .search-button.ui-button:focus { color: #fffef8; background: var(--forest); border-color: var(--forest); }
+.room-reception .search-button.ui-button:disabled { background: #e4e7dd; border-color: #bdc6b3; color: #626d5a; }
 .room-reception .search-button svg { display: none; }
 .room-reception .destination-status-panel { width: 100%; max-width: 100%; border-color: #cdd6c6; border-radius: 8px; }
 
@@ -92,7 +92,7 @@
   .room-reception .destination-control, .room-reception .travel-dates { grid-column: 1 / -1; }
   .room-reception .trip-control { padding: 10px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .room-reception .travel-dates { gap: 24px; }
-  .room-reception .search-button.ant-btn { margin-left: 0; }
+  .room-reception .search-button.ui-button { margin-left: 0; }
   .room-view::after { background: linear-gradient(90deg, #14251cf5, #14251cc9 68%, #14251c66); }
   .room-example { gap: 48px; }
   .room-property-body { padding: 24px; }
@@ -117,7 +117,7 @@
   .room-home .room-description { margin-top: 20px; font-size: 17px; line-height: 1.65; }
   .room-reception .trip-form.trip-form { padding: 16px; }
   .room-reception .trip-search-fields { grid-template-columns: minmax(0, 1fr); }
-  .room-reception .search-button.ant-btn { margin-top: 14px; }
+  .room-reception .search-button.ui-button { margin-top: 14px; }
   .room-example { padding-block: 56px; }
   .room-example h2 { font-size: 36px; }
   .room-preview-benefits { grid-template-columns: minmax(0, 1fr); gap: 20px; }

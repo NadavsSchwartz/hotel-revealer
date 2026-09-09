@@ -18,7 +18,7 @@ test('a new home search uses the selected currency with the entered trip', async
   await page.goto('/');
   await selectCurrency(page).selectOption('CAD');
   await page.getByLabel('Where are you going?').fill('Las Vegas');
-  await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: destination.name }).click();
+  await page.locator('.destination-popup [role="option"]').filter({ hasText: destination.name }).click();
   for (const [label, value] of [['Check-in', context.checkIn], ['Check-out', context.checkOut]]) {
     const input = page.getByRole('combobox', { name: label, exact: true });
     if (await input.getAttribute('aria-expanded') !== 'true') await input.click();

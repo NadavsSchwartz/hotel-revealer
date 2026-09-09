@@ -6,7 +6,6 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import Button from 'antd/es/button';
 import SearchForm from './SearchForm.jsx';
 import SearchProgress from './SearchProgress.jsx';
 import {
@@ -267,8 +266,8 @@ export default function Results() {
           <h1 id="results-title" tabIndex="-1">
             {valid ? <><span className="results-heading-prefix">Hotel deals in </span>{context.cityName.split(',')[0]}</> : 'Check your trip details'}
           </h1>
-          {valid && <Button className="edit-trip-toggle" aria-expanded={editing} aria-controls="results-search"
-            onClick={editing ? () => setEditing(false) : editTrip}>{editing ? 'Close editor' : 'Edit trip'}</Button>}
+          {valid && <button type="button" className="ui-button edit-trip-toggle" aria-expanded={editing} aria-controls="results-search"
+            onClick={editing ? () => setEditing(false) : editTrip}>{editing ? 'Close editor' : 'Edit trip'}</button>}
         </div>
         {valid && <TripSummary context={context} />}
       </header>
@@ -302,7 +301,7 @@ export default function Results() {
               <p className="results-updated">
                 Prices checked {new Date(data.retrievedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 {pageCount > 1 && ` · Showing ${firstOffer + 1}–${Math.min(firstOffer + PAGE_SIZE, offers.length)}`}
-                {offers.length > 0 && <Button className="results-refresh" onClick={refresh} disabled={loading || coolingDown}>{loading ? 'Updating…' : 'Update prices'}</Button>}
+                {offers.length > 0 && <button type="button" className="ui-button results-refresh" onClick={refresh} disabled={loading || coolingDown}>{loading ? 'Updating…' : 'Update prices'}</button>}
               </p>
             </div>
             {offers.length > 0 && (
@@ -333,7 +332,7 @@ export default function Results() {
               <p>{data.coverage.status === 'partial'
                 ? 'The search did not finish, so we could not identify hotels reliably. Try again.'
                 : 'We could not identify a hotel for these dates. Try different dates or a nearby destination.'}</p>
-              {data.coverage.status === 'partial' && <Button onClick={refresh} disabled={loading || coolingDown}>Try search again</Button>}
+              {data.coverage.status === 'partial' && <button type="button" className="ui-button" onClick={refresh} disabled={loading || coolingDown}>Try search again</button>}
             </div>
           )}
           <div className="offer-list">
@@ -380,9 +379,9 @@ export default function Results() {
           </div>
           {pageCount > 1 && (
             <nav className="results-pagination" aria-label="Results pages">
-              <Button onClick={() => changePage(page - 1)} disabled={page === 1}><svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4m5-5-5 5 5 5" /></svg> Previous</Button>
+              <button type="button" className="ui-button" onClick={() => changePage(page - 1)} disabled={page === 1}><svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4m5-5-5 5 5 5" /></svg> Previous</button>
               <span>Page <strong>{page}</strong> of {pageCount}</span>
-              <Button onClick={() => changePage(page + 1)} disabled={page === pageCount}>Next <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg></Button>
+              <button type="button" className="ui-button" onClick={() => changePage(page + 1)} disabled={page === pageCount}>Next <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg></button>
             </nav>
           )}
         </section>

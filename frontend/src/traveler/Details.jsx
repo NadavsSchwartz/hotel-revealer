@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import Button from 'antd/es/button';
 import PropertyPhotos from './PropertyPhotos.jsx';
 import { MAX_OFFER_ID_LENGTH, validIdentifier } from '../../../shared/identifiers.js';
 import {
@@ -37,9 +36,9 @@ function PropertyAmenities({ amenities }) {
       <ul id="hotel-amenities">
         {(expanded ? names : names.slice(0, 6)).map(name => <li key={name}><span aria-hidden="true">•</span>{name}</li>)}
       </ul>
-      {names.length > 6 && <Button className="detail-text-button" aria-expanded={expanded} aria-controls="hotel-amenities" onClick={() => setExpanded(!expanded)}>
+      {names.length > 6 && <button type="button" className="ui-button detail-text-button" aria-expanded={expanded} aria-controls="hotel-amenities" onClick={() => setExpanded(!expanded)}>
         {expanded ? 'Show fewer amenities' : `Show all ${names.length} amenities`}
-      </Button>}
+      </button>}
     </section>
   );
 }
@@ -212,11 +211,11 @@ export default function Details() {
                   {!bindingRejected && <Quote quote={offer.quote} expired={priceStale} onRefresh={priceUpdateFailed ? undefined : retry} refreshing={loading} refreshDisabled={coolingDown} />}
                   {priceUpdateFailed && <div className="detail-total-unavailable" role="status">
                     <p>We couldn’t update this price. Try again or check the current price on Priceline.</p>
-                    <Button onClick={retry} disabled={loading || coolingDown}>Try again</Button>
+                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Try again</button>
                   </div>}
                   {!bindingRejected && !priceUpdateFailed && data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
                     <p>A complete total is unavailable. Check the current price on Priceline or try again.</p>
-                    <Button onClick={retry} disabled={loading || coolingDown}>Retry total price</Button>
+                    <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Retry total price</button>
                   </div>}
                   <TripSummary context={context} />
                   <ProviderLink offer={offer} stale={stale || priceStale} unavailable={data?.quoteStatus === 'unavailable'} refreshing={loading} />

@@ -198,7 +198,7 @@
   border: 0;
 }
 
-.detail-page .detail-quote-panel .provider-handoff :is(.button-link, .ant-btn) {
+.detail-page .detail-quote-panel .provider-handoff :is(.button-link, .ui-button) {
   width: 100%;
   min-height: 46px;
   height: auto;
@@ -501,5 +501,5 @@
 
 .detail-external-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--blue); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 .detail-external-link:hover { color: var(--forest); }
-.detail-page .detail-text-button.ant-btn { margin-top: 16px; min-height: 44px; padding: 8px 14px; border-color: var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font-size: 13px; }
+.detail-page .detail-text-button.ui-button { margin-top: 16px; min-height: 44px; padding: 8px 14px; border-color: var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font-size: 13px; }
 .detail-page .detail-property-section > section + section { margin-top: 28px; }

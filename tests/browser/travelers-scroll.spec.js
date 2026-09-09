@@ -65,8 +65,8 @@ for (const width of [390, 1440]) {
       await expectPanelInViewport(page);
       await expect(trigger).toBeFocused();
       await expectNoPageScroll(page, initialScroll);
-      const placement = await page.locator('.travelers-popup:visible').getAttribute('class');
-      const side = placement.match(/ant-popover-placement-(\w+)/)[1];
+      const side = await page.locator('.travelers-popup:visible').getAttribute('data-placement');
+      expect(['top', 'bottom']).toContain(side);
 
       await clickWithoutScrolling(page.getByRole('button', { name: 'Increase adults', exact: true }));
       await expect(trigger).toHaveAccessibleName('Travelers, 3 guests · 1 room');
@@ -75,7 +75,7 @@ for (const width of [390, 1440]) {
         await clickWithoutScrolling(page.getByRole('button', { name: 'Increase children', exact: true }));
         await expect(page.getByRole('combobox', { name: `Child ${child} age`, exact: true })).toBeAttached();
         await expectPanelInViewport(page);
-        await expect(page.locator('.travelers-popup:visible')).toHaveClass(new RegExp(`ant-popover-placement-${side}`));
+        await expect(page.locator('.travelers-popup:visible')).toHaveAttribute('data-placement', side);
         await expectNoPageScroll(page, initialScroll);
       }
       expect(await travelerDialog(page).evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
@@ -166,14 +166,14 @@ async function enterFreshHomeTrip(page, width) {
   await page.setViewportSize({ width, height: 844 });
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Where are you going?', exact: true }).fill('Las Vegas');
-  await page.locator('.destination-popup .ant-select-item-option').filter({ hasText: 'Nevada' }).first().click();
+  await page.getByRole('option').filter({ hasText: 'Nevada' }).first().click();
   const checkIn = addCalendarDays(localToday(), 14);
   const checkOut = addCalendarDays(checkIn, 3);
   await page.getByRole('combobox', { name: 'Check-in', exact: true }).click();
   for (const [label, date] of [['Check-in', checkIn], ['Check-out', checkOut]]) {
     const calendar = page.getByRole('dialog', { name: `${label} calendar`, exact: true });
     await expect(calendar).toBeVisible();
-    const day = calendar.locator(`td[title="${date}"] button`);
+    const day = calendar.locator(`[data-day="${date}"] button`);
     for (let month = 0; month < 12 && await day.count() === 0; month++) {
       await calendar.getByRole('button', { name: 'Next month', exact: true }).click();
     }
@@ -214,15 +214,16 @@ test('the enabled child-age placeholder meets text contrast and the opened panel
   await travelerTrigger(page).click();
   await expectPanelInViewport(page);
   await clickWithoutScrolling(page.getByRole('button', { name: 'Increase children', exact: true }));
-  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toBeEnabled();
-  const placeholder = travelerDialog(page).locator('.ant-select-selection-placeholder');
-  await expect(placeholder).toHaveText('Select age');
+  const childAge = page.getByRole('combobox', { name: 'Child 1 age', exact: true });
+  await expect(childAge).toBeEnabled();
+  await expect(childAge).toHaveValue('');
+  await expect(childAge.locator('option:checked')).toHaveText('Select age');
   await expect.poll(() => page.locator('.travelers-popup:visible').evaluate(element => getComputedStyle(element).opacity)).toBe('1');
-  const colors = await placeholder.evaluate(element => {
+  const colors = await childAge.evaluate(element => {
     const channels = color => color.match(/[\d.]+/g).map(Number);
     const foreground = channels(getComputedStyle(element).color);
     let background = [255, 255, 255, 1];
-    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    for (let parent = element; parent; parent = parent.parentElement) {
       const color = channels(getComputedStyle(parent).backgroundColor);
       if ((color[3] ?? 1) === 1) { background = color; break; }
     }
@@ -235,7 +236,7 @@ test('the enabled child-age placeholder meets text contrast and the opened panel
     const levels = [luminance(rendered), luminance(background)].sort((a, b) => b - a);
     return { foreground: rendered, background: background.slice(0, 3), opacity, contrast: (levels[0] + 0.05) / (levels[1] + 0.05) };
   });
-  expect(colors.background).toEqual([255, 255, 255]);
+  expect(colors.background).toEqual([255, 254, 248]);
   expect(colors.opacity).toBe(1);
   expect(colors.contrast, JSON.stringify(colors)).toBeGreaterThanOrEqual(4.5);
   const audit = await new AxeBuilder({ page }).include('.travelers-popup').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();

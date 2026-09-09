@@ -1,7 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Button from 'antd/es/button';
-import Alert from 'antd/es/alert';
-import 'antd/es/alert/style/css';
 import { displayDate, money, nights, safeHref } from './context.js';
 import './comparison.css';
 
@@ -55,7 +52,7 @@ export function Quote({
       <span className="eyebrow">{title}</span>
       {expired ? <div className="quote-refresh" role="status">
         <p>The quoted price needs a refresh.</p>
-        {onRefresh && <Button onClick={onRefresh} disabled={refreshing || refreshDisabled}>{refreshing ? 'Updating price…' : 'Refresh total price'}</Button>}
+        {onRefresh && <button type="button" className="ui-button" onClick={onRefresh} disabled={refreshing || refreshDisabled}>{refreshing ? 'Updating price…' : 'Refresh total price'}</button>}
       </div> : <>
         {discount && <span className="quote-discount" title="Priceline's advertised room-rate discount against its comparison rate, which may be estimated. Before taxes and fees.">{discount}% off room rate <span>· Priceline</span></span>}
         <p className="quote-price">
@@ -265,11 +262,9 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
   const actionLabel = returnToResults ? (onReturn ? 'Return to results' : 'Refresh search') : editSearch ? 'Edit search' : remaining > 0 ? `Try again in ${remaining}s` : 'Try again';
   return (
     <section className="notice-panel" aria-label="Search status">
-      <Alert
-        type={unavailable ? 'info' : 'warning'}
-        message={<h2>{title}</h2>}
-        description={
-          <>
+      <div className={`ui-notice${unavailable ? ' ui-notice-info' : ''}`} role="alert">
+        <h2>{title}</h2>
+        <div className="ui-notice-description">
             <p>{description}</p>
             {Number.isFinite(retryAt) && (
               <p>
@@ -283,13 +278,12 @@ export function ErrorNotice({ error, onRetry, onEdit, onReturn }) {
               </p>
             )}
             {action && (
-              <Button onClick={action} disabled={remaining > 0 && action === onRetry}>
+              <button type="button" className="ui-button" onClick={action} disabled={remaining > 0 && action === onRetry}>
                 {actionLabel}
-              </Button>
+              </button>
             )}
-          </>
-        }
-      />
+        </div>
+      </div>
     </section>
   );
 }
@@ -317,7 +311,7 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
         </a>
       ) : (
         <>
-          <Button disabled>Original offer unavailable</Button>
+          <button type="button" className="ui-button" disabled>Original offer unavailable</button>
           {!compact && <p>The provider did not supply a usable link to this offer.</p>}
         </>
       )}

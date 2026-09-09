@@ -63,8 +63,8 @@ test('dark home and its destination and traveler portals remain readable', async
   await expect(page.locator('.travelers-popup:visible')).toHaveCSS('opacity', '1');
   await page.getByRole('button', { name: 'Increase children', exact: true }).click();
   await expectReadable(page, 'travelers');
-  await page.getByRole('combobox', { name: 'Child 1 age', exact: true }).click();
-  await expect(page.locator('.child-age-field .ant-select-dropdown:visible')).toHaveCSS('opacity', '1');
+  await page.getByRole('combobox', { name: 'Child 1 age', exact: true }).selectOption('0');
+  await expect(page.getByRole('combobox', { name: 'Child 1 age', exact: true })).toHaveValue('0');
   await expectReadable(page, 'child ages');
 });
 

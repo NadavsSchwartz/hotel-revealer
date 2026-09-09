@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Button from 'antd/es/button';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_OCCUPANCY, contextKey, searchUrl, validateContext } from './context.js';
 import DestinationSearch from './DestinationSearch.jsx';
@@ -87,10 +86,10 @@ export default function SearchForm({ initial = emptyTrip, currency = initial.cur
         <DestinationSearch ref={destinationRef} trip={trip} error={errors.cityName} onChange={update} />
         <TravelDates ref={datesRef} trip={trip} errors={errors} onChange={update} />
         <Travelers ref={travelersRef} trip={trip} errors={errors} onChange={update} />
-        <Button type="primary" htmlType="submit" className="search-button" disabled={blocked}>
+        <button type="submit" className="ui-button ui-button-primary search-button" disabled={blocked}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
           {submitLabel}
-        </Button>
+        </button>
       </div>
       {errors.currency && <p className="trip-currency-error">{errors.currency}{' '}<button type="button" onClick={() => update({ currency: 'USD' })}>Use USD</button></p>}
       {validationMessages.length > 0 && <p className="sr-only" role="alert">{validationMessages.join(' ')}</p>}
