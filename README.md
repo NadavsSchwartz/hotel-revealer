@@ -4,6 +4,8 @@ Explore Priceline Express deals before booking, with one inferred hotel when the
 available clues support it. **Hotel identity is inferred, not verified.** The
 original offer, its current price, and the hotel inference remain separate.
 
+[Open Hotel Revealer](https://hotelrevealer.tech) · [Dated deployment evidence](docs/LIVE_DEPLOYMENT.md)
+
 ![Hotel Revealer homepage with destination, dates, and traveler controls](docs/media/homepage.jpg)
 
 ## Engineering highlights
@@ -109,8 +111,9 @@ The [acceptance record](docs/ACCEPTANCE.md) binds results to tested revisions an
 distinguishes native tests, browser scenarios, live observations, and unresolved
 gates. The TypeScript checkpoint passed 291 native tests and 436 browser
 executions, plus local development and production-only runtime checks. A clean
-install reproduced the browser-tested build byte-for-byte. Docker image execution
-remains unverified. Browser configurations cover Chromium, mobile Chromium emulation, Firefox,
+install reproduced the browser-tested build byte-for-byte. Later CI and hosted
+Docker execution are recorded in [deployment evidence](docs/LIVE_DEPLOYMENT.md).
+Browser configurations cover Chromium, mobile Chromium emulation, Firefox,
 and WebKit; they do not establish physical-device or manual accessibility support.
 Generated evidence stays in ignored `output/`, `test-results/`, and `playwright-report/`.
 
@@ -120,17 +123,21 @@ Generated evidence stays in ignored `output/`, `test-results/`, and `playwright-
   identity. Missing facts stay unknown, price cannot establish identity, and
   retrieved pagination is not exhaustive provider inventory. Final booking terms
   and totals must be checked with the provider.
-- **Live compatibility is a separate gate.** Local live searches, details, and
-  handoffs are recorded in [live integration evidence](docs/LIVE_ACCESS.md).
+- **Live compatibility is a separate gate.** Local observations are recorded in
+  [live integration evidence](docs/LIVE_ACCESS.md), and the public search, details,
+  and handoff journey is recorded in [deployment evidence](docs/LIVE_DEPLOYMENT.md).
   They do not establish future compatibility or permission for public use.
 - **Operate one application process.** Queue, cache, request, and payload limits
   are application safeguards, not measured hosting capacity or provider allowances.
   Review an interrupted call or block before using the
   [stopped-process reset procedure](deploy/README.md#reset-a-reviewed-provider-block).
-- **Public release remains open.** Container and hosted operation, rollback/reboot,
-  real devices, manual assistive technology, known hotel outcomes, and first-time
-  user sessions require their own evidence. Deployment files are preparation, not
-  proof of a running public service.
+- **Hosting is live; remaining gates stay explicit.** Public HTTPS, the hosted
+  traveler journey, restart/reboot recovery, and failure-email delivery are
+  recorded in [deployment evidence](docs/LIVE_DEPLOYMENT.md), including the actual
+  rollback drill and its temporary public 503. A private off-host recovery archive
+  passed isolated extraction; full-machine restoration remains untested.
+  Real devices, manual assistive technology, known hotel outcomes, and first-time
+  user sessions require their own evidence.
 
 Use the [documentation index](docs/README.md) for API contracts, dependency decisions,
 data attribution, deployment preparation, and detailed verification history.

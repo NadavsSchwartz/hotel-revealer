@@ -1,7 +1,10 @@
 # Live integration evidence
 
-**Updated 2026-09-07 Pacific time (2026-09-08 UTC): local live search, candidate
-details and original-offer handoff verified; hosted release remains unverified.**
+**Updated 2026-09-09 UTC: public HTTPS and a hosted search, details, price-update,
+and original-offer handoff journey are verified.** See the dated
+[deployment record](LIVE_DEPLOYMENT.md) for the exact release, recovery checks,
+monitoring, rollback, and backup evidence. The observations below retain
+the dates and limits of their original local runs.
 
 Nadav confirmed there is no existing partner agreement and explicitly directed
 normal public-endpoint implementation for the public open-source app. That removes

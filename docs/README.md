@@ -14,7 +14,8 @@ the evidence behind them.
 | [Modernization status](MODERNIZATION.md) | Completed checkpoints, current work, verification, and remaining migration gates |
 | [Acceptance evidence](ACCEPTANCE.md) | Revision-specific checks, measurements, historical results, and remaining release gates |
 | [Live integration evidence](LIVE_ACCESS.md) | Observed provider behavior, handoff interpretation, and unresolved access risks |
-| [Deployment preparation](../deploy/README.md) | Single-process packaging, optional VPS preparation, smoke checks, and reviewed state reset |
+| [Live deployment evidence](LIVE_DEPLOYMENT.md) | Dated public release, exact images, hosted journey, recovery, monitoring, rollback limits, and backup checks |
+| [Deployment runbook](../deploy/README.md) | Single-process packaging, VPS setup, health notifications, release procedures, and reviewed state reset |
 
 ## Supporting records
 

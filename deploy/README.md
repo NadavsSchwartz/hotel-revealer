@@ -5,9 +5,17 @@ and API; Caddy terminates HTTPS. Normal startup uses the public Priceline adapte
 `/health` reports process and provider state without contacting the provider.
 See [live integration evidence and limits](../docs/LIVE_ACCESS.md).
 Hostinger managed Node hosting cannot run these Docker/VPS scripts; it requires
-its own platform setup. No host has been provisioned or released by this work.
+its own platform setup. The [2026-09-09 live deployment record](../docs/LIVE_DEPLOYMENT.md)
+identifies the Hostinger release, verified hosted behavior, recovery backup, and remaining limits.
 
 ## Review and provision
+
+The existing Hostinger installation is documented in the
+[live deployment record](../docs/LIVE_DEPLOYMENT.md). The DigitalOcean commands
+below are an optional provisioning path for a new host; do not run them against
+the existing Hostinger installation. Its actual access model uses a key-only root
+administrator and a forced-command deploy account, with SSH restricted to one
+approved administrator IPv4 address in both firewalls.
 
 The initial sizing candidate is one `s-1vcpu-1gb` Ubuntu 24.04 Droplet. Container
 limits are 512 MiB for the app and 128 MiB for Caddy; this is an unmeasured starting
@@ -252,19 +260,32 @@ closed in this state; do not blindly copy the running image into the record.
 
 Set repository variables `HEALTH_HOST` and `HEALTHCHECK_ENABLED=true` after release.
 `HEALTH_HOST` must be a plain lowercase DNS name or IPv4 address, without a scheme,
-port or path. The scheduled workflow makes one HTTPS `/health` request twice hourly
-and requires HTTP 200, `status: "ok"` and `provider.available: true`. A disabled or
-blocked live provider therefore fails the monitor even when the process responds.
-The check has a 20-second deadline, a 4 KiB response limit, rejects redirects and
-does not retry. It never runs a search, refreshes inventory or resets provider state.
-This verifies the application's reported readiness, not current provider inventory
-or the ability to complete a booking. Run the same check manually with
-`HEALTH_HOST=hotel.example.com node scripts/check-health.mjs`, replacing the example
-host with the deployed hostname. Enable failed-workflow email notifications in your
-GitHub notification settings and manually run a failure/recovery drill to verify
-delivery. GitHub schedules can be delayed or disabled after inactivity, so this
-is lightweight monitoring, not an uptime guarantee. No message destination is
-configured automatically.
+port or path. The workflow is scheduled every five minutes and makes one HTTPS
+`/health` request requiring HTTP 200, `status: "ok"` and `provider.available: true`.
+A disabled or blocked live provider therefore fails the monitor even when the
+process responds. The check has a 20-second deadline, a 4 KiB response limit,
+rejects redirects and does not retry. It never runs a search, refreshes inventory
+or resets provider state. This verifies the application's reported readiness,
+not current provider inventory or the ability to complete a booking. Run the
+same check manually with
+`HEALTH_HOST=hotel.example.com node scripts/check-health.mts`, replacing the example
+host with the deployed hostname.
+
+In GitHub notification settings, under **System → Actions**, enable **Email** and
+**Only notify for failed workflows**, using the intended verified notification
+address. Scheduled-run notifications go to the user who last modified the cron
+syntax, so verify delivery with that account. To test without taking the app down,
+open **Actions → Public health → Run workflow** on `main` and select `test_alert`.
+That optional input deliberately fails the first step before any application request. Confirm
+the failure email arrives, then run again with `test_alert=false` (the default)
+and verify the ordinary health check succeeds. No message destination is stored
+in the workflow. See [GitHub Actions notification settings](https://docs.github.com/en/subscriptions-and-notifications/how-tos/managing-github-actions-notifications).
+
+The workflow must exist on the default branch for scheduled runs. GitHub schedules
+are best effort: runs can be delayed or dropped during high load, and schedules
+in public repositories are automatically disabled after 60 days without repository
+activity. Five minutes is the requested cadence, not a guaranteed detection time.
+See [scheduled workflow limitations](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
 Host security updates are automatic; automatic reboot is disabled. Schedule and
 verify reboots when updates require them. Logs are bounded (Docker local logs

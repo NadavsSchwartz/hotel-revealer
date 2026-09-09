@@ -5,6 +5,27 @@ claim. The current modernization results below supersede the earlier 278-native 
 420-browser summary. Historical sections retain the results and limitations of
 their original revisions; they are not repeated verification of the current tree.
 
+## Hosted deployment — 2026-09-09
+
+[Hotel Revealer](https://hotelrevealer.tech) now has verified public HTTPS,
+path/query-preserving domain redirects, and an actual browser search → details →
+price update → Priceline handoff journey. Application restart and VPS reboot
+recovered persistent provider state and the current-image record. The external
+health check passed, and an intentional failure delivered its notification email
+without contacting the application. A real failed-start release automatically
+restored the previous image and record. Its immediate public check returned 503;
+a later check returned 200 with the provider available without manual repair.
+
+Released-image CI at `58f9c1f` passed 291 native tests, all 452 browser executions,
+12 release simulations, and actual Docker/Caddy validation. The final normal
+release of that image completed healthy through the restricted deployment key.
+Exact digests, run links, operating controls, and scope are in [live deployment evidence](LIVE_DEPLOYMENT.md).
+A private off-host archive passed isolated extraction, file checksums, and JSON
+validation. The first weekly backup and full-machine restoration remain
+unverified. This supersedes earlier
+hosting/container/reboot-unverified statements only for the recorded checks;
+historical results below and unrelated product acceptance gates remain intact.
+
 ## Search form and action consistency — 2026-09-09
 
 Home and results now share search-field padding, divider placement, typography,
