@@ -93,6 +93,18 @@ test('destination API serves bounded geographic suggestions without provider cal
   assert.equal(JSON.stringify(app.logs).includes('Israel'), false);
 });
 
+test('hotel JSON responses preserve UTF-8, escaped text and response headers', async t => {
+  const payload = { offers: [{ name: '東京 "Hotel"\n😀', quote: null }] };
+  const app = await serve(t, { service: { search: async () => payload } });
+  const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
+  assert.equal(response.status, 200);
+  assert.equal(response.text, JSON.stringify(payload));
+  assert.deepEqual(response.body, payload);
+  assert.match(response.headers['content-type'], /^application\/json; charset=utf-8$/);
+  assert.equal(Number(response.headers['content-length']), Buffer.byteLength(response.text));
+  assert.equal(response.headers['cache-control'], 'no-store');
+});
+
 test('destination scan budget rejects bursts and refills without charging cheap or invalid queries', async t => {
   let now = 0;
   const app = await serve(t, { destinationNow: () => now });

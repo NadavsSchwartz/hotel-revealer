@@ -5,7 +5,7 @@ export const MAX_JSON_BYTES = 2 * 1024 * 1024;
 // Count while JSON.stringify walks the value. The replacer throws before the
 // serializer can build a huge string from repeated candidate names/metadata.
 // Separator accounting is conservative by at most one byte per child value.
-export function assertJsonSize(value, limitBytes = MAX_JSON_BYTES) {
+export function serializeBoundedJson(value, limitBytes = MAX_JSON_BYTES) {
   let bytes = 0;
   let first = true;
   const add = (amount) => {
@@ -32,5 +32,9 @@ export function assertJsonSize(value, limitBytes = MAX_JSON_BYTES) {
   if (serialized === undefined) throw new ServiceError('PROVIDER_RESPONSE_INVALID');
   const measuredBytes = Buffer.byteLength(serialized, 'utf8');
   if (measuredBytes > limitBytes) throw new ServiceError('RESULT_TOO_LARGE');
-  return measuredBytes;
+  return { body: serialized, bytes: measuredBytes };
+}
+
+export function assertJsonSize(value, limitBytes = MAX_JSON_BYTES) {
+  return serializeBoundedJson(value, limitBytes).bytes;
 }

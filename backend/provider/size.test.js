@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertJsonSize, MAX_JSON_BYTES } from './size.js';
+import { assertJsonSize, serializeBoundedJson, MAX_JSON_BYTES } from './size.js';
 
 test('serialized size guard counts UTF-8 and JSON escapes and rejects a single huge field', () => {
   const sample = { text: '東京\n😀', value: null };
+  assert.deepEqual(serializeBoundedJson(sample), { body: JSON.stringify(sample), bytes: Buffer.byteLength(JSON.stringify(sample), 'utf8') });
   assert.equal(assertJsonSize(sample), Buffer.byteLength(JSON.stringify(sample), 'utf8'));
   assert.doesNotThrow(() => assertJsonSize({ value: 'a'.repeat(1_000) }));
   for (const value of ['a'.repeat(MAX_JSON_BYTES), '😀'.repeat(MAX_JSON_BYTES / 4), '\u0000'.repeat(MAX_JSON_BYTES / 6)]) {

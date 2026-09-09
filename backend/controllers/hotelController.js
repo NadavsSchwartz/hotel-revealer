@@ -1,5 +1,5 @@
 import { validateSearch, validateDetail } from '../domain/index.js';
-import { assertJsonSize } from '../provider/size.js';
+import { serializeBoundedJson } from '../provider/size.js';
 
 const handler = (validate, method, service) => async (req, res, next) => {
   try {
@@ -7,8 +7,8 @@ const handler = (validate, method, service) => async (req, res, next) => {
     req.hotelAdmission?.dispatch();
     const result = await service[method](input, { requestId: req.requestId, admitUpstream: req.hotelAdmission?.admitUpstream });
     if (res.destroyed) return;
-    assertJsonSize(result);
-    res.set('Cache-Control', 'no-store').json(result);
+    const { body } = serializeBoundedJson(result);
+    res.set('Cache-Control', 'no-store').type('application/json').send(body);
   } catch (error) {
     if (res.destroyed) return;
     next(error instanceof Error ? error : new Error('Non-Error service failure', { cause: error }));
