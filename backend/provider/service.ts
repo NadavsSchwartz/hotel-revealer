@@ -51,6 +51,29 @@ function normalizeOriginalQuote(value: unknown, context: TripContext) {
     ? quote : null;
 }
 
+function buildRecoveredIssuedOffer(offerId: string, expiresAt: number, handoffUrl: string | null): IssuedOffer {
+  return {
+    offer: {
+      offerId, neighborhoodName: null, stars: null,
+      clues: { guestRating: { kind: 'unknown' }, reviewCount: { kind: 'unknown' }, amenities: null },
+      quote: normalizeQuote(null), handoffUrl,
+      resolution: { status: 'unresolved', reason: 'missing_facts' }, candidates: [],
+    },
+    offerExpiresAt: iso(expiresAt - ISSUED_OFFER_TTL + SEARCH_TTL),
+  };
+}
+
+function buildCachedDetailResponse(cached: DetailResponse, issued: IssuedOffer, candidate: DetailResponse['candidate'], hotelId: string | undefined, now: number): DetailResponse {
+  const cachedQuoteFresh = Date.parse(cached.offer.quoteExpiresAt ?? '') > now;
+  const offer = cachedQuoteFresh
+    ? { ...issued.offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : issued.offer;
+  return {
+    ...cached, offer, candidate,
+    ...(!candidate && hotelId !== undefined ? { details: null, detailStatus: 'unavailable' } : {}),
+    quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: issued.offerExpiresAt,
+  };
+}
+
 function withDeadline<Value>(operation: PromiseLike<Value>, deadline: number, clock: ProviderClock): Promise<Value> {
   return new Promise<Value>((resolve, reject) => {
     const timer = clock.setTimeout(() => reject(new ServiceError('DEADLINE_EXCEEDED')), Math.max(0, deadline - clock.now()));
@@ -364,12 +387,8 @@ export function createProviderService({ adapter = null, clock = realClock, state
           if (record && record.expiresAt > clock.now()) {
             // Recovery proves the original selection, never a hotel inference
             // or price. The caller supplies the trip and opaque offer ID again.
-            issued = { offer: { offerId, neighborhoodName: null, stars: null,
-              clues: { guestRating: { kind: 'unknown' }, reviewCount: { kind: 'unknown' }, amenities: null },
-              quote: normalizeQuote(null),
-              handoffUrl: record.cityId === null ? null : adapter!.originalOfferUrl?.({ context, offerId, cityId: record.cityId }) ?? null,
-              resolution: { status: 'unresolved', reason: 'missing_facts' }, candidates: [],
-            }, offerExpiresAt: iso(record.expiresAt - ISSUED_OFFER_TTL + SEARCH_TTL) };
+            const handoffUrl = record.cityId === null ? null : adapter!.originalOfferUrl?.({ context, offerId, cityId: record.cityId }) ?? null;
+            issued = buildRecoveredIssuedOffer(offerId, record.expiresAt, handoffUrl);
             issuedOffers.set(selectionKey, issued, { bytes: assertJsonSize(issued), expiresAt: record.expiresAt });
           }
         }
@@ -388,12 +407,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
         const cached = details.get(key);
         if (cached) {
           metrics.detailCache = 'hit';
-          const cachedQuoteFresh = Date.parse(cached.offer.quoteExpiresAt ?? '') > clock.now();
-          const refreshedOffer = cachedQuoteFresh
-            ? { ...offer, quote: cached.offer.quote, quoteExpiresAt: cached.offer.quoteExpiresAt } : offer;
-          const result: DetailResponse = { ...cached, offer: refreshedOffer, candidate,
-            ...(!candidate && hotelId !== undefined ? { details: null, detailStatus: 'unavailable' } : {}),
-            quoteStatus: cachedQuoteFresh ? 'available' : 'unavailable', offerExpiresAt: issued!.offerExpiresAt };
+          const result = buildCachedDetailResponse(cached, issued!, candidate, hotelId, clock.now());
           assertJsonSize(result);
           return result;
         }
