@@ -81,3 +81,6 @@ data and makes no network requests. Capture and report files under
 `output/original-matching/` are ignored local artifacts. A fresh clone can run the
 deterministic tests without a capture. This work does not establish worldwide
 coverage, family-search accuracy, provider uptime or public readiness.
+
+The [dated Priceline shortlist check](../../docs/SHORTLIST_CHECK.md) separately
+compares displayed matches with the original offer page’s named-hotel shortlist.

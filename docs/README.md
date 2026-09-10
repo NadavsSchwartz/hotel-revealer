@@ -19,6 +19,8 @@ the evidence behind them.
 
 ## Supporting records
 
+- [Priceline shortlist check](SHORTLIST_CHECK.md) records the bounded property-shortlist comparison and uncheckable cases.
+
 - [Legacy PR audit](PR_CLEANUP.md) records why the 78 old dependency PRs are superseded.
 
 - [Audit fixes](AUDIT_FIXES.md) maps reviewed defects to their corrections and checks.
