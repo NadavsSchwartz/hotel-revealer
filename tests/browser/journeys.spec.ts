@@ -455,10 +455,15 @@ test('only matched deals count toward local sorting, pagination, and returning f
   await expect(page.getByRole('heading', { name: '24 hotel deals', exact: true })).toBeFocused();
   await expect(page.getByText('We couldn’t identify this hotel.', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Check total price/ })).toHaveCount(0);
-  await cards.first().getByRole('link', { name: 'View likely hotel: Hotel 02', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Hotel 02', exact: true })).toBeVisible();
+  const selectedLink = cards.nth(8).getByRole('link', { name: 'View likely hotel: Hotel 10', exact: true });
+  await selectedLink.scrollIntoViewIfNeeded();
+  const savedScrollY = await page.evaluate(() => window.scrollY);
+  expect(savedScrollY).toBeGreaterThan(0);
+  await selectedLink.click();
+  await expect(page.getByRole('heading', { name: 'Hotel 10', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Back to results/ }).click();
-  await expect(cards.first().getByRole('link', { name: 'View likely hotel: Hotel 02', exact: true })).toBeFocused();
+  await expect(selectedLink).toBeFocused();
+  await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - savedScrollY)).toBeLessThanOrEqual(2);
   await chooseSort(page, 'Highest guest rating');
   await expect(cards.first()).toHaveAccessibleName('Area 25');
   await expect(cards.last()).toHaveAccessibleName('Area 14');

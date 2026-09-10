@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Link,
   useLocation,
@@ -7,7 +7,7 @@ import {
 } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/index.ts';
 import type { TripDraft } from '../../../shared/contracts.ts';
-import type { ViewCandidate as Candidate, ViewOffer as Offer } from './responseValidation.ts';
+import type { ViewCandidate as Candidate, ViewOffer as Offer, ViewSearchResponse as SearchResponse } from './responseValidation.ts';
 import SearchForm from './SearchForm.tsx';
 import SearchProgress from './SearchProgress.tsx';
 import SortSelect, { SORT_LABELS } from './SortSelect.tsx';
@@ -77,6 +77,59 @@ function comparableDiscount(offer: Offer) {
     ? discount.percent : -Infinity;
 }
 
+function useResultsViewRestoration({ tripKey, data, loading, searchRevision, restore, search }: {
+  tripKey: string;
+  data: SearchResponse | undefined;
+  loading: boolean;
+  searchRevision: unknown;
+  restore: unknown;
+  search: string;
+}) {
+  const restoredKey = useRef<string | null>(null);
+  const focusResults = useRef(false);
+
+  useEffect(() => {
+    if (!data || loading || restoredKey.current === tripKey) return undefined;
+    restoredKey.current = tripKey;
+    const saved = readView(tripKey);
+    const shouldRestore = restore || !searchRevision;
+    if (!shouldRestore) {
+      window.scrollTo(0, 0);
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      if (saved.focusId)
+        document.getElementById(saved.focusId)?.focus({ preventScroll: true });
+      window.scrollTo(0, Number(saved.scrollY) || 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [data, loading, tripKey, searchRevision, restore]);
+
+  useEffect(() => {
+    if (!focusResults.current) return undefined;
+    focusResults.current = false;
+    const frame = requestAnimationFrame(() => {
+      const heading = document.getElementById('results-count');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [search]);
+
+  // Remove this listener before a shorter route can overwrite the saved scroll position.
+  useLayoutEffect(() => {
+    const saveScroll = () => saveView(tripKey, { scrollY: window.scrollY });
+    window.addEventListener('scroll', saveScroll, { passive: true });
+    return () => window.removeEventListener('scroll', saveScroll);
+  }, [tripKey]);
+
+  function focusAfterPageChange() {
+    focusResults.current = true;
+  }
+
+  return focusAfterPageChange;
+}
+
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -109,8 +162,6 @@ export default function Results() {
   const rawPage = Number(params.get('page') || 1);
   const requestedPage = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const stale = useExpired(data?.expiresAt);
-  const restoredKey = useRef<string | null>(null);
-  const focusResults = useRef(false);
   const searchRevision = location.state?.searchRevision;
   const lastRevision = useRef<unknown>(null);
 
@@ -145,39 +196,9 @@ export default function Results() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, valid, hasData, searchRevision, dispatch]);
 
-  useEffect(() => {
-    if (!data || loading || restoredKey.current === key) return undefined;
-    restoredKey.current = key;
-    const saved = readView(key);
-    const restore = location.state?.restore || !searchRevision;
-    if (!restore) {
-      window.scrollTo(0, 0);
-      return undefined;
-    }
-    const frame = requestAnimationFrame(() => {
-      if (saved.focusId)
-        document.getElementById(saved.focusId)?.focus({ preventScroll: true });
-      window.scrollTo(0, Number(saved.scrollY) || 0);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [data, loading, key, searchRevision, location.state?.restore]);
-
-  useEffect(() => {
-    if (!focusResults.current) return undefined;
-    focusResults.current = false;
-    const frame = requestAnimationFrame(() => {
-      const heading = document.getElementById('results-count');
-      heading?.focus({ preventScroll: true });
-      heading?.scrollIntoView({ block: 'start' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [location.search]);
-
-  useEffect(() => {
-    const saveScroll = () => saveView(key, { scrollY: window.scrollY });
-    window.addEventListener('scroll', saveScroll, { passive: true });
-    return () => window.removeEventListener('scroll', saveScroll);
-  }, [key]);
+  const focusAfterPageChange = useResultsViewRestoration({
+    tripKey: key, data, loading, searchRevision, restore: location.state?.restore, search: location.search,
+  });
 
   const offers = (data?.offers || [])
     .filter((offer): offer is Extract<Offer, { candidates: [Candidate] }> => validResolution(offer) && offer.resolution.status === 'matched')
@@ -229,7 +250,7 @@ export default function Results() {
   }
 
   function changePage(nextPage: number) {
-    focusResults.current = true;
+    focusAfterPageChange();
     updateView(sort, nextPage);
   }
 
