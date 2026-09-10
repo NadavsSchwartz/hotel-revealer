@@ -62,11 +62,6 @@
 .room-steps li::marker { color: var(--muted); font-size: 14px; font-weight: 600; }
 .room-steps h3 { font-size: 18px; font-weight: 650; line-height: 1.4; }
 .room-steps p { margin-top: 12px; color: var(--muted); font-size: 16px; line-height: 1.7; }
-.room-closing { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 44px 48px; border-radius: 16px; background: #e8edde; }
-.room-closing h2 { font-size: clamp(30px, 3vw, 42px); font-weight: 500; line-height: 1.15; letter-spacing: -.035em; }
-.room-button { display: inline-flex; align-items: center; justify-content: center; gap: 28px; min-height: 54px; padding: 16px 24px; border-radius: 8px; background: #2d4d37; color: #fffef8; font-size: 15px; font-weight: 650; white-space: nowrap; }
-.room-button:hover { color: #fffef8; background: #1e3928; }
-.room-button span { font-size: 20px; line-height: 1; }
 
 @media (max-width: 1120px) {
   .room-introduction { padding-top: 124px; }
@@ -80,7 +75,6 @@
   .room-example-copy { max-width: 600px; }
   .room-preview-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
   .room-steps { gap: 28px; }
-  .room-closing { padding: 36px; }
 }
 @media (max-width: 650px) {
   .room-content { width: calc(100% - 64px); }
@@ -104,6 +98,4 @@
   .room-property-address p { font-size: 15px; }
   .room-guide { padding-block: 40px 48px; }
   .room-steps { grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 28px; }
-  .room-closing { flex-direction: column; align-items: flex-start; gap: 28px; padding: 28px; }
-  .room-closing .room-button { width: 100%; gap: 16px; }
 }

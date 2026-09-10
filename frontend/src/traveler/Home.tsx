@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import SearchForm from './SearchForm.tsx';
 import type { SearchFormProps } from './SearchForm.tsx';
 import './room-home.css';
@@ -57,11 +56,6 @@ export default function Home({ draftRef, currency }: Pick<SearchFormProps, 'draf
           <li><h3>Look behind the offer.</h3><p>Explore one likely hotel and its available details. Deals that can’t be resolved stay unidentified.</p></li>
           <li><h3>Decide, then book.</h3><p>Check the total price, then review the room and booking terms on Priceline.</p></li>
         </ol>
-      </section>
-
-      <section className="room-closing room-content" aria-labelledby="closing-title">
-        <h2 id="closing-title">Take a closer look.</h2>
-        <Link className="room-button" to="/#unboxed-search">Search hotels <span aria-hidden="true">↗</span></Link>
       </section>
     </div>
   );

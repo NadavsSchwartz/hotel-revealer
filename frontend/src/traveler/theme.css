@@ -28,7 +28,7 @@ html[data-theme='dark'] {
 /* The home form sets local colors for the photograph; let it inherit in dark mode. */
 html[data-theme='dark'] .room-reception { --ink: inherit; --muted: inherit; --blue: inherit; --forest: inherit; --line: inherit; --surface: inherit; }
 html[data-theme='dark'] :is(.room-property-preview, .destination-status-panel) { background: var(--surface); border-color: var(--line); }
-html[data-theme='dark'] :is(.room-property-address, .room-closing, .quote-discount, .trip-control:focus-within) { background: var(--surface-muted); }
+html[data-theme='dark'] :is(.room-property-address, .quote-discount, .trip-control:focus-within) { background: var(--surface-muted); }
 html[data-theme='dark'] :is(.room-preview-header, .room-property-location, .room-property-body > h3 span, .room-property-address svg, .destination-status-panel, .destination-option small, .destination-option svg) { color: var(--muted); }
 html[data-theme='dark'] :is(.room-preview-header > span:first-child, .destination-option strong, .destination-status-panel button) { color: var(--ink); }
 html[data-theme='dark'] :is(.room-preview-header, .traveler-counter-row, .child-ages) { border-color: var(--line); }
@@ -39,8 +39,8 @@ html[data-theme='dark'] :is(.field-error, .trip-control .field-error, .trip-curr
 /* Accent fills and their text change together; ordinary links retain the accent. */
 html[data-theme='dark'] .button-link { color: var(--on-accent); }
 html[data-theme='dark'] .button-link:hover { color: var(--on-accent); }
-html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button, .room-button) { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
-html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button, .room-button):is(:hover, :focus) { background: var(--forest); border-color: var(--forest); color: var(--on-accent); }
+html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button) { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+html[data-theme='dark'] :is(.ui-button-primary, .trip-search-fields .search-button.ui-button, .offer-detail-link.button-link, .detail-quote-panel .button-link, .travelers-panel-footer .ui-button):is(:hover, :focus) { background: var(--forest); border-color: var(--forest); color: var(--on-accent); }
 html[data-theme='dark'] .ui-button:not(.ui-button-primary):hover { background: var(--surface-muted); }
 html[data-theme='dark'] :is(.ui-button[disabled], .trip-search-fields .search-button.ui-button[disabled], .traveler-counter button:disabled) { background: var(--surface-muted); border-color: var(--line); color: var(--muted); }
 html[data-theme='dark'] :is(.quote-discount, .clue-status-match, .tier-supported) { color: var(--blue); }
