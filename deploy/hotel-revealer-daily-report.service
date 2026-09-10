@@ -1,0 +1,19 @@
+[Unit]
+Description=Hotel Revealer retained-log daily report
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /opt/hotel-revealer/deploy/daily-report.py
+UMask=0077
+StateDirectory=hotel-revealer/reports
+StateDirectoryMode=0700
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/hotel-revealer/reports
+NoNewPrivileges=true
+TimeoutStartSec=120
+MemoryMax=128M

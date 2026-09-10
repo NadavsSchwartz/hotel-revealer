@@ -49,7 +49,7 @@ error 498; no supported coordinate-only route was established.
 ## Search behavior and storage
 
 The 13,367,078-byte worldwide catalog lives in `data/destinations.json` and is loaded
-only by `backend/destinations/index.js`. The frontend requests a bounded result list
+only by `backend/destinations/index.ts`. The frontend requests a bounded result list
 from the application's destination endpoint; it does not import the world catalog.
 Records use stable `geonames:<numeric ID>` IDs, city and country names, region,
 coordinates, and source time zone. Labels include the region when a city name repeats
@@ -113,7 +113,7 @@ region disambiguation, all legacy mappings, invalid IDs, malformed queries, and
 result bounds. Run them with:
 
 ```sh
-node --test backend/destinations/*.test.js
+node --test backend/destinations/*.test.ts
 ```
 
 A local measurement loaded the full catalog once, warmed each of eight representative

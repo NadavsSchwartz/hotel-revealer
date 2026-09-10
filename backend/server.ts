@@ -4,15 +4,17 @@ import { createApp } from './app.ts';
 import { createProviderService } from './provider/service.ts';
 import { createPricelineAdapter } from './provider/priceline.ts';
 import { createSelectionStore } from './provider/selection-store.ts';
+import { jsonLogger as logger } from './logging.ts';
 
 const providerMode = process.env.HOTEL_PROVIDER || 'priceline';
 if (!['priceline', 'disabled'].includes(providerMode)) throw new Error('HOTEL_PROVIDER must be priceline or disabled');
 const selectionStore = providerMode === 'priceline' ? createSelectionStore({
   filePath: path.resolve(path.dirname(process.env.PROVIDER_STATE_FILE || 'var/provider-state.json'), 'selection-records.json'),
+  logger,
 }) : null;
 await selectionStore?.ready();
-const service = createProviderService({ adapter: providerMode === 'priceline' ? createPricelineAdapter() : null, selectionStore });
-const app = createApp({ service, clientIdentity: process.env.HOTEL_CLIENT_IDENTITY || 'socket',
+const service = createProviderService({ adapter: providerMode === 'priceline' ? createPricelineAdapter() : null, selectionStore, logger });
+const app = createApp({ service, logger, clientIdentity: process.env.HOTEL_CLIENT_IDENTITY || 'socket',
   frontendDirectory: process.env.FRONTEND_DIST_DIR ? path.resolve(process.env.FRONTEND_DIST_DIR) : undefined });
 const port = Number(process.env.PORT || 5000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
@@ -20,14 +22,14 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT m
 const server = app.listen(port, (error?: NodeJS.ErrnoException) => {
   if (error) {
     process.exitCode = 1;
-    console.error({ event: 'server_start_failed',
+    logger.error({ event: 'server_start_failed',
       code: error.code && ['EADDRINUSE', 'EACCES', 'EADDRNOTAVAIL'].includes(error.code) ? error.code : 'LISTEN_FAILED' });
     Promise.resolve().then(() => service.close()).catch(() => {
-      console.error({ event: 'server_cleanup_failed' });
+      logger.error({ event: 'server_cleanup_failed' });
     });
     return;
   }
-  console.info({ event: 'server_started', port, providerConfigured: providerMode === 'priceline' });
+  logger.info({ event: 'server_started', port, providerConfigured: providerMode === 'priceline' });
 });
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
@@ -49,7 +51,7 @@ function shutdown() {
   server.close(async () => {
     await Promise.race([service.close(), grace]);
     clearTimeout(forceClose);
-    console.info({ event: 'server_stopped' });
+    logger.info({ event: 'server_stopped' });
   });
   server.closeIdleConnections();
 }

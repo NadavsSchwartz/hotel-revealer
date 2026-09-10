@@ -1,6 +1,6 @@
 # Original matching rules in production
 
-The study imports `matchObservations` from `backend/domain/matching.js`. There is
+The study imports `matchObservations` from `backend/domain/matching.ts`. There is
 one production implementation and an independent test oracle, `original.mjs`,
 which reproduces the conjunction in `728f9ed:backend/util/helpers.js`.
 
@@ -67,7 +67,7 @@ removed. No performance improvement or identification accuracy is claimed.
 Use Node 24.20.0 from `.nvmrc` and the existing root workspace dependencies:
 
 ```sh
-node --test backend/domain/matching.test.js backend/domain/normalization.test.js scripts/matching-study/*.test.mts
+node --test backend/domain/matching.test.ts backend/domain/normalization.test.ts scripts/matching-study/*.test.mts
 node scripts/matching-study/compare.mjs output/original-matching/current-listings.json
 ```
 
@@ -81,3 +81,6 @@ data and makes no network requests. Capture and report files under
 `output/original-matching/` are ignored local artifacts. A fresh clone can run the
 deterministic tests without a capture. This work does not establish worldwide
 coverage, family-search accuracy, provider uptime or public readiness.
+
+The [dated Priceline shortlist check](../../docs/SHORTLIST_CHECK.md) separately
+compares displayed matches with the original offer page’s named-hotel shortlist.

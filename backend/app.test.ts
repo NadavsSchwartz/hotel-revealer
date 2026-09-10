@@ -85,6 +85,9 @@ test('canonical JSON inputs reach the injected service, legacy feeds and encrypt
   const response = await app.request('/api/v1/hotelDeals', { method: 'POST', body: futureContext });
   assert.equal(response.status, 200);
   assert.deepEqual(received, [{ ...futureContext, destinationId: 'geonames:5506956', cityName: 'Las Vegas, Nevada, United States', rooms: 1, adults: 2, childrenAges: [], currency: 'USD' }]);
+  const completion = app.logs.find(entry => entry.event === 'request_completed');
+  assert.equal(completion?.route, '/api/v1/hoteldeals');
+  assert.equal(completion?.method, 'POST');
   assert.ok(metadata);
   assert.equal(metadata.requestId, response.headers['x-request-id']);
   const invalid = await app.request('/api/v1/hotelDeals', { method: 'POST', body: { hash: 'old encrypted payload' } });
@@ -193,6 +196,13 @@ test('unknown service errors and request metadata are not reflected or logged', 
   assert.equal(failure.diagnostic.name, 'Error');
   assert.ok(failure.diagnostic.locations.some((location: unknown) => isRecord(location) && location.file === 'backend/controllers/hotelController.ts'));
   assert.equal(response.headers['referrer-policy'], 'no-referrer');
+  const completion = app.logs.find(entry => entry.event === 'request_completed');
+  assert.equal(completion?.method, 'POST');
+  assert.equal(completion?.route, '/api/v1/hoteldeals');
+  assert.equal(completion?.status, 500);
+  await app.request(`/api/${secret}`);
+  assert.equal(app.logs.at(-1)?.route, 'other');
+  assert.equal(JSON.stringify(app.logs).includes(secret), false);
 });
 
 test('non-Error failures and logging failures cannot hide or change the HTTP 500 response', async t => {
@@ -228,6 +238,8 @@ test('aborted requests emit one abort record instead of a successful completion'
   await aborted;
   assert.deepEqual(logs.map(entry => entry.event), ['request_aborted']);
   assert.equal(logs[0].status, undefined);
+  assert.equal(logs[0].route, '/api/v1/hoteldeals');
+  assert.equal(logs[0].method, 'POST');
 });
 
 test('cooldown has a controlled retryAt and Retry-After response', async (t) => {

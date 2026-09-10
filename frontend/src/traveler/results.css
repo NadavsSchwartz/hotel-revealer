@@ -30,9 +30,9 @@
 .results-page .trip-summary { font-size: 13px; gap: 8px; color: var(--muted); }
 
 .results-page .results-content { min-width: 0; }
-.results-page .results-toolbar { margin: 37px 0 13px; gap: 20px; }
+.results-page .results-toolbar { display: flex; align-items: center; justify-content: space-between; margin: 37px 0 13px; gap: 20px; }
 .results-page .results-toolbar h2 { font-size: 24px; font-weight: 650; letter-spacing: -.7px; margin: 0 0 7px; scroll-margin-top: 24px; }
-.results-page .results-toolbar p { font-size: 13px; color: var(--muted); }
+.results-page .results-toolbar p { margin: 0; font-size: 13px; color: var(--muted); }
 .results-page .results-updated { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .results-page .results-refresh { display: inline-flex; align-items: center; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .results-page .results-refresh:disabled { color: var(--muted); cursor: not-allowed; text-decoration: none; }

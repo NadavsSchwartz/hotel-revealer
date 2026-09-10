@@ -293,6 +293,96 @@ verify reboots when updates require them. Logs are bounded (Docker local logs
 and remove only explicitly reviewed obsolete image digests after preserving
 current/rollback images and persistent volumes.
 
+### Daily report from retained application logs
+
+The optional daily job writes one private Markdown report for the previous UTC
+day at 00:10 UTC. It reads the app container's retained Docker logs and limited
+container metadata; it never calls the application or provider, starts a container,
+resets state, or sends a message. It uses the host's existing Python 3 standard
+library and Docker CLI, with no host Node installation or additional packages.
+Deploy the timestamped JSON application logger before enabling reports; historical
+multiline console output is counted as unreadable, not reconstructed or evaluated.
+
+The report separates terminal hotel-API POST responses from provider events:
+
+- HTTP success is 2xx completions divided by all completions. 4xx, 5xx and aborted
+  requests are separate; health, destination, static and unrelated requests are
+  excluded. p50/p95 use completed-request durations, including errors, with the
+  completed count as sample size and nearest-rank percentiles.
+- Search service outcomes count caller-visible complete, partial and error
+  outcomes. Cache rates include only actual hit/miss checks; shared callers are
+  shown separately and do not enter that denominator.
+- Fresh search summaries provide the weighted fraction of rule-resolved offers:
+  total matched divided by total eligible offers. This is not identification
+  accuracy. An empty denominator stays unavailable.
+- Operational events are listed separately. The same failure can produce a
+  diagnostic, provider event and HTTP response; those counts are never added.
+  Detail outcomes describe hotel metadata, so they do not establish pricing
+  success. Caller-completion counters can miss upstream work continuing after a
+  caller times out, so the report does not claim an exact upstream-call total.
+
+Coverage is always **unknown or partial**: Docker retains three 10 MB files, and
+container replacement can remove earlier logs. Empty or unreadable input leaves
+metrics unavailable. Reports include the requested window, container creation
+time/status, observed timestamp range and skipped record count.
+Docker capture failure preserves an existing report and fails the job. See the
+[Docker logs reference](https://docs.docker.com/reference/cli/docker/container/logs/)
+and [local-driver retention](https://docs.docker.com/engine/logging/drivers/local/).
+
+To install from the approved checkout **on the VPS**, as an administrator:
+
+```sh
+command -v python3
+command -v docker
+sudo install -o root -g root -m 644 deploy/daily-report.py /opt/hotel-revealer/deploy/daily-report.py
+sudo install -o root -g root -m 644 deploy/hotel-revealer-daily-report.service deploy/hotel-revealer-daily-report.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start hotel-revealer-daily-report.service
+sudo systemctl show hotel-revealer-daily-report.service -p Result -p ExecMainStatus
+```
+
+Inspect the dated report under `/var/lib/hotel-revealer/reports/` after the manual
+run, including its coverage limitations, then enable the timer:
+
+```sh
+sudo systemctl enable --now hotel-revealer-daily-report.timer
+sudo systemctl list-timers hotel-revealer-daily-report.timer --no-pager
+```
+
+The job resolves exactly one container with Compose project `hotel-revealer` and service
+`app`, including stopped containers. Missing or ambiguous containers fail closed.
+Raw logs are streamed through Docker; Docker's internal log files are never read.
+Capture has a 60-second deadline, a 64 MiB total limit and a 32 KiB line limit.
+
+The directory is mode 700 and each report mode 600. Successful runs atomically
+replace that date's file and retain the newest 30 report dates; unrelated files
+are preserved. There is no separate raw-log archive or incremental counter store.
+To regenerate a retained date, run:
+
+```sh
+sudo python3 /opt/hotel-revealer/deploy/daily-report.py --date 2026-09-09
+```
+
+Choose today or an earlier UTC day. An explicit current-day run is labeled partial
+and can verify new JSON logs immediately after release. The scheduled default
+still reports yesterday; its next run atomically replaces the same date's partial
+report after the day ends. Reruns replace counts rather than accumulate them.
+To inspect an older date than the retained 30 report dates, use `--output-dir`
+with a separate private directory, subject to the same Docker-log availability.
+`Persistent=true` makes a missed timer activation run after the VPS returns;
+it does not reconstruct every missed day. Missing dated reports remain gaps, and
+the catch-up run still targets yesterday. See the
+[systemd timer reference](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html).
+
+Check job failures with `sudo journalctl -u hotel-revealer-daily-report.service`.
+There is no report email delivery; the existing health workflow remains the
+notification path. Stop scheduling with
+`sudo systemctl disable --now hotel-revealer-daily-report.timer`; this preserves
+existing reports and does not alter the running application. Host installation,
+timer execution and a real daily report require their own verification after
+deployment. Local verification uses `python3 deploy/test-daily-report.py`, which
+supplies synthetic events and a fake Docker executable.
+
 Run `npm run measure:capacity` with the pinned Node/npm toolchain to measure the
 existing local capacity scenario. It uses a synthetic provider and makes no hotel
 provider requests; results are written under ignored `output/verification/`.
