@@ -81,7 +81,7 @@ test('an unrecoverable selection offers one fresh-search recovery with factual m
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toBeVisible();
   await page.clock.fastForward(61000);
   await page.getByRole('button', { name: 'Update price', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'This offer could not be recovered', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'We couldn’t reopen this offer', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Update price|Try again/ })).toHaveCount(0);
   await expect(page.locator('.quote-price')).toHaveCount(0);
@@ -126,7 +126,7 @@ test('browser Forward withdraws a contradicted hotel while preserving independen
     await expect(page.getByRole('img', { name: /property photograph/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(refreshed.offers[0].handoffUrl));
   } finally { release(); }
-  await expect(page.getByText('We couldn’t verify the selected hotel.', { exact: false })).toBeVisible();
+  await expect(page.getByText('We couldn’t match the selected hotel to this offer.', { exact: false })).toBeVisible();
   await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$270 total');
   await expect(page.getByRole('heading', { name: 'Juniper House', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(refreshed.offers[0].handoffUrl));

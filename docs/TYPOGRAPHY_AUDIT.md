@@ -1,6 +1,25 @@
-# Typography and interface copy review — September 9, 2026
+# Typography and interface copy — September 9, 2026
 
-The “Take a closer look” closing section has been removed, together with its unused link import and section/button styles. The homepage now ends with the three-step guide followed by the existing footer. The typography and copy recommendations below are not implemented.
+## Implementation
+
+| Surface | Applied change |
+| --- | --- |
+| Home | Shorter hero copy with responsive phrase grouping; “See if the hotel fits your trip” replaces the abstract heading; repetitive supporting copy removed. |
+| Forms | Required help and errors use 13px text; the destination popup leaves its validation message visible. |
+| Results | Hotel names are more prominent; narrow cards allocate more width to them; guest ratings have an explicit label. |
+| Prices | Labels follow the displayed amount: room rate, total for your stay, last-seen variants, or neutral “Price” for a stay-only quote. |
+| Details and policies | Smaller supporting headings, readable body text, and more policy reading width on mobile. |
+| Status messages | Duplicate loading copy removed; recovery messages use plain words while retaining the distinction between a selected hotel and other possible matches. |
+
+The closing section remains removed. Matching, price calculations, expiry behavior, booking links, and policy disclosures retain their existing behavior. No dependencies were added. Local screenshots are in `output/verification/typography/implementation/`.
+
+**Verification:** Node 24.20.0 typecheck, lint, 291 tests and production build passed. All 456 browser cases have passing coverage across the initial run, serial Firefox/WebKit run, and final 20-case rerun. The initial parallel run was interrupted after broad timing failures during heavy host memory pressure; reruns retained the existing timeouts. The outdated closing-CTA navigation test now exercises the retained search anchor. Twenty-two final captures cover desktop/mobile and light/dark themes; extra checks confirm text-spacing reflow, enlarged hero text and unobscured destination validation. Hosted and physical-device verification remain outside this local change.
+
+[Desktop preview](../output/verification/typography/implementation/home-light-1440.png) · [Mobile preview](../output/verification/typography/implementation/home-light-390.png) · [Narrow results](../output/verification/typography/implementation/results-320.png)
+
+## Original audit — before implementation
+
+The findings below describe revision `3fe7e61`, before the implementation above. Source line references, measurements and proposed copy in this historical section are not descriptions of the current files; the implementation summary takes precedence.
 
 The main weaknesses are line breaks that separate meaningful phrases, inconsistent emphasis between related text, and small guidance at the exact point where a traveler needs to make a decision. Manrope itself is a reasonable fit; replacing the font would leave most of these problems intact.
 

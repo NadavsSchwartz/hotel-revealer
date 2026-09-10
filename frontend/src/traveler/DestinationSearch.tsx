@@ -61,6 +61,7 @@ const DestinationSearch = forwardRef<DestinationSearchHandle, DestinationSearchP
     const positionPopup = (event?: Event) => {
       if (event?.target === popup.current || !input.current || !popup.current) return;
       const anchor = input.current.getBoundingClientRect();
+      const anchorBottom = error && control.current ? control.current.getBoundingClientRect().bottom : anchor.bottom;
       const viewport = window.visualViewport;
       const leftEdge = (viewport?.offsetLeft || 0) + 12;
       const topEdge = (viewport?.offsetTop || 0) + 12;
@@ -70,7 +71,7 @@ const DestinationSearch = forwardRef<DestinationSearchHandle, DestinationSearchP
       if (anchor.bottom < topEdge || anchor.top > bottomEdge) { setPosition({ visibility: 'hidden' }); return; }
       const width = Math.min(Math.max(anchor.width, 270), rightEdge - leftEdge);
       popup.current.style.width = `${width}px`;
-      const below = Math.max(0, bottomEdge - anchor.bottom - 8);
+      const below = Math.max(0, bottomEdge - anchorBottom - 8);
       const above = Math.max(0, anchor.top - topEdge - 8);
       const height = Math.min(popup.current.scrollHeight + 2, 314);
       const upwards = below < height && above > below;
@@ -78,7 +79,7 @@ const DestinationSearch = forwardRef<DestinationSearchHandle, DestinationSearchP
       setPosition({
         width,
         left: Math.max(leftEdge, Math.min(anchor.left, rightEdge - width)),
-        top: upwards ? anchor.top - Math.min(height, maxHeight) - 8 : anchor.bottom + 8,
+        top: upwards ? anchor.top - Math.min(height, maxHeight) - 8 : anchorBottom + 8,
         maxHeight,
       });
     };
@@ -98,7 +99,7 @@ const DestinationSearch = forwardRef<DestinationSearchHandle, DestinationSearchP
       window.visualViewport?.removeEventListener('scroll', positionPopup);
       document.removeEventListener('pointerdown', dismissOutside);
     };
-  }, [showPopup, results, status]);
+  }, [showPopup, results, status, error]);
 
   useLayoutEffect(() => {
     if (!showOptions || !popup.current) return;

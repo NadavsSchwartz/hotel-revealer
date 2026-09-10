@@ -43,8 +43,7 @@ for (const destination of ['home', 'privacy']) {
 }
 
 test('hash navigation focuses the requested Home and Terms content', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Search hotels', exact: true }).click();
+  await page.goto('/#unboxed-search');
   await expect(page).toHaveURL(/\/#unboxed-search$/);
   await expect(page.locator('#search-title')).toBeFocused();
   await expect(page.locator('#unboxed-search')).toBeInViewport();
@@ -54,8 +53,7 @@ test('hash navigation focuses the requested Home and Terms content', async ({ pa
   await page.goBack();
   await expect(page.locator('#search-title')).toBeFocused();
   await page.getByRole('link', { name: 'Hotel Revealer home', exact: true }).click();
-  await page.getByRole('link', { name: 'Search hotels', exact: true }).click();
-  await expect(page.locator('#search-title')).toBeFocused();
+  await expect(page).toHaveURL(/\/$/);
   await page.getByRole('link', { name: 'Back to home', exact: true }).click();
   await expect(page.locator('#home-title')).toBeFocused();
   await expect(page.getByRole('link', { name: 'Hotel Revealer home', exact: true })).toBeInViewport();

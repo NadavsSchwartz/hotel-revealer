@@ -25,7 +25,8 @@
 .room-introduction, .room-reception { position: relative; width: min(1200px, calc(100% - 96px)); margin-inline: auto; }
 .room-introduction { z-index: 1; padding-block: 134px 32px; }
 .room-introduction h1 { max-width: 680px; font-size: clamp(60px, 6.7vw, 90px); font-weight: 500; line-height: 1.02; letter-spacing: -.055em; }
-.room-home .room-description { max-width: 440px; margin-top: 24px; color: #e5e9dd; font-size: 18px; line-height: 1.65; }
+.room-home .room-description { max-width: 440px; margin-top: 24px; color: #e5e9dd; font-size: 18px; line-height: 1.65; text-wrap: balance; }
+.room-phrase { display: inline-block; max-width: 100%; text-wrap: wrap; }
 .room-reception { z-index: 2; }
 .room-reception h2 { margin-bottom: 12px; color: #f8f5ea; font-size: 14px; font-weight: 500; line-height: 1.4; }
 .room-reception :focus-visible { outline-color: var(--blue); }
@@ -34,8 +35,7 @@
 /* Actual saved property details show what the product makes available. */
 .room-example { display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 100px; padding-block: 104px; }
 .room-kicker { color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
-.room-example h2 { margin-top: 20px; font-size: clamp(36px, 3.8vw, 52px); font-weight: 500; line-height: 1.12; letter-spacing: -.045em; }
-.room-home .room-example-description { margin-top: 24px; color: var(--muted); font-size: 17px; line-height: 1.75; }
+.room-example h2 { max-width: 18ch; text-wrap: balance; margin-top: 20px; font-size: clamp(36px, 3.8vw, 52px); font-weight: 500; line-height: 1.12; letter-spacing: -.045em; }
 .room-preview-benefits { display: grid; gap: 24px; margin-top: 32px; }
 .room-preview-benefits h3 { font-size: 16px; font-weight: 650; line-height: 1.5; }
 .room-preview-benefits p { margin-top: 6px; color: var(--muted); font-size: 15px; line-height: 1.7; }

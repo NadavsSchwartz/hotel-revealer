@@ -1454,12 +1454,6 @@ img {
   .detail-main .evidence-columns {
     grid-template-columns: 1fr 1fr;
   }
-  .policy-page h1 {
-    font-size: 43px;
-  }
-  .policy-page p {
-    font-size: 14px;
-  }
 }
 @media (max-width: 480px) {
   .site-header {
@@ -1642,5 +1636,5 @@ img {
 }
 
 @media (max-width: 760px) {
-  .policy-page { width: calc(100% - 64px); margin-block: 24px 32px; padding: 24px 20px; }
+  .policy-page { width: calc(100% - 32px); margin-block: 24px 32px; padding: 24px 16px; }
 }

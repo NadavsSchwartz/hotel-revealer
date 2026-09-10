@@ -21,7 +21,7 @@ test('mobile results show a hotel and its price without the full search form tak
   await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
   await expect(city).toBeFocused();
   await city.fill('Unsubmitted edit');
-  await page.getByRole('button', { name: 'Close editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide form', exact: true }).click();
   await expect(city).toBeHidden();
   await page.getByRole('button', { name: 'Edit trip', exact: true }).click();
   await expect(city).toHaveValue('Unsubmitted edit');

@@ -57,7 +57,7 @@
 .results-page .offer-identity { grid-area: identity; min-width: 0; }
 .results-page :is(.offer-preview, .offer-preview-empty) { grid-area: preview; min-width: 0; }
 .results-page .offer-index { display: block; margin-bottom: 9px; font-size: 12px; letter-spacing: 1.2px; color: var(--blue); font-weight: 750; }
-.results-page .offer-identity h3 { margin: 0 0 7px; font-family: Manrope, sans-serif; font-size: 25px; font-weight: 650; letter-spacing: -.75px; line-height: 1.35; }
+.results-page .offer-identity h3 { margin: 0 0 7px; font-family: Manrope, sans-serif; font-size: 20px; font-weight: 500; letter-spacing: -.4px; line-height: 1.35; }
 .results-page .offer-meta { margin-bottom: 0; font-size: 13px; color: var(--muted); }
 .results-page .preview-label { margin: 0 0 12px; font-size: 12px; font-weight: 750; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
 .results-page .candidate-previews { display: grid; gap: 16px; list-style: none; margin: 0; padding: 0; }
@@ -69,8 +69,8 @@
 .results-page .candidate-photo-missing { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; font-size: 12px; color: var(--blue); }
 .results-page .candidate-photo-missing svg { width: 38px; height: 38px; stroke: #7e896e; stroke-width: 1.2; }
 .results-page .candidate-preview-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-.results-page .candidate-preview-copy > strong { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.6px; line-height: 1.35; margin: 7px 0 6px; overflow-wrap: anywhere; }
-.results-page .candidate-preview-meta { font-size: 13px; line-height: 1.6; color: var(--muted); }
+.results-page .candidate-preview-copy > strong { display: block; font-size: 24px; font-weight: 600; letter-spacing: -.6px; line-height: 1.35; margin: 7px 0 6px; overflow-wrap: anywhere; }
+.results-page .candidate-preview-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 .results-page .candidate-preview:hover .candidate-preview-copy > strong { text-decoration: underline; text-underline-offset: 4px; }
 .results-page .tier { background: transparent; border: 0; padding: 0; color: #756244; font-size: 12px; font-weight: 750; letter-spacing: .2px; }
 .results-page .tier::before { content: ''; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; margin-right: 6px; align-self: center; }
@@ -81,7 +81,7 @@
 .results-page .quote-compact { padding: 0; border: 0; }
 .results-page .quote .eyebrow { font-size: 12px; letter-spacing: 1px; color: var(--muted); }
 .results-page .quote-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 37px; font-weight: 650; letter-spacing: -1.5px; margin: 11px 0 5px; line-height: 1.18; overflow-wrap: anywhere; }
-.results-page .quote-price span { flex-shrink: 0; font-size: 13px; font-weight: 450; letter-spacing: 0; color: var(--muted); white-space: nowrap; }
+.results-page .quote-price span { flex-shrink: 0; font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--muted); white-space: nowrap; }
 .results-page .quote-amount { max-width: 100%; min-width: 0; }
 .results-page .quote-context { margin: 0 0 5px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .results-page .quote-stay { font-size: 14px; margin-bottom: 5px; overflow-wrap: anywhere; }
@@ -93,7 +93,7 @@
 .results-page .offer-booking .provider-handoff .button-link:hover { background: transparent; color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
 .results-page .offer-booking .provider-handoff .action-icon { width: 16px; height: 16px; }
 .results-page .offer-booking .provider-handoff .ui-button { width: 100%; min-height: 44px; height: auto; border-radius: var(--radius-control); padding: 8px 12px; font-size: 13px; white-space: normal; }
-.results-page .offer-booking .provider-handoff .booking-note { margin-top: auto; padding-top: 8px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.results-page .offer-booking .provider-handoff .booking-note { margin-top: auto; padding-top: 8px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 .results-page .offer-action { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px 0 0; margin-top: 24px; border-top: 1px solid var(--line); background: transparent; }
 .results-page .offer-action p { font-size: 13px; color: var(--muted); }
 .results-page .offer-action .offer-candidate-count { margin: 0; font-weight: 450; }
@@ -124,7 +124,7 @@
 .results-page .results-footnote { margin-top: 15px; padding-top: 20px; border-color: var(--line); }
 .results-page .results-footnote p { color: var(--muted); font-size: 12px; line-height: 1.85; margin: 0 0 6px; }
 .results-page .results-updating { display: flex; align-items: center; gap: 16px; padding: 19px 0; margin-top: 12px; border-bottom: 1px solid var(--line); }
-.results-page .results-updating strong { font-size: 13px; font-weight: 650; }
+.results-page .results-updating strong { font-size: 15px; font-weight: 650; }
 .results-page .results-updating p { margin: 3px 0 0; font-size: 14px; color: var(--muted); }
 .results-page .coverage-notice, .results-page .stale-notice { padding: 18px 20px; background: #f0ebdf; border: 1px solid #ded3bc; border-radius: 12px; }
 .results-page .coverage-notice p, .results-page .stale-notice p { color: #66583f; font-size: 14px; }
@@ -142,12 +142,12 @@
   .results-page .offer-overview { column-gap: 30px; grid-template-columns: minmax(0, 1fr) 249px; }
   .results-page .offer-booking { padding-left: 22px; }
   .results-page .candidate-preview { grid-template-columns: 142px minmax(0, 1fr); gap: 18px; }
-  .results-page .candidate-preview-copy > strong { font-size: 19px; }
+  .results-page .candidate-preview-copy > strong { font-size: 22px; }
 }
 @media (max-width: 850px) {
   .results-page .offer-overview { grid-template-columns: minmax(0, 1fr) 225px; column-gap: 25px; }
   .results-page .candidate-preview { grid-template-columns: 110px minmax(0, 1fr); gap: 15px; align-items: start; }
-  .results-page .candidate-preview-copy > strong { font-size: 18px; }
+  .results-page .candidate-preview-copy > strong { font-size: 22px; }
   .results-page .candidate-preview-photo { aspect-ratio: 1; }
 }
 @media (max-width: 760px) {
@@ -170,13 +170,13 @@
   .results-page .offer-list { gap: 18px; }
   .results-page .offer-card { padding: 18px 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; }
   .results-page .offer-overview { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'identity' 'preview' 'booking'; grid-template-rows: auto; gap: 16px; }
-  .results-page .offer-booking > .quote > .eyebrow { font-size: 11px; line-height: 1.5; letter-spacing: .5px; }
+  .results-page .offer-booking > .quote > .eyebrow { font-size: 12px; line-height: 1.5; letter-spacing: .5px; }
   .results-page .offer-index { font-size: 12px; letter-spacing: .5px; }
-  .results-page .offer-identity h3 { font-size: 20px; }
+  .results-page .offer-identity h3 { font-size: 18px; }
   .results-page .candidate-previews { gap: 18px; }
   .results-page .candidate-preview { grid-template-columns: minmax(110px, 34%) minmax(0, 1fr); gap: 18px; align-items: center; }
   .results-page .candidate-preview-photo { aspect-ratio: 4 / 3; }
-  .results-page .candidate-preview-copy > strong { font-size: 21px; }
+  .results-page .candidate-preview-copy > strong { font-size: 22px; }
   .results-page .offer-booking { padding: 0; border: 0; }
   .results-page .quote-price { font-size: 32px; margin: 9px 0 5px; }
   .results-page .offer-booking .provider-handoff { padding: 0; }
@@ -192,9 +192,10 @@
   .results-page .results-pagination .ui-button { min-width: 92px; gap: 7px; padding: 8px 10px; }
 }
 @media (max-width: 420px) {
-  .results-page .candidate-preview { grid-template-columns: 105px minmax(0, 1fr); align-items: start; gap: 14px; }
+  .results-page .candidate-preview { grid-template-columns: 72px minmax(0, 1fr); align-items: start; gap: 12px; }
   .results-page .candidate-preview-photo { aspect-ratio: 1; }
-  .results-page .candidate-preview-copy > strong { font-size: 18px; margin-top: 6px; }
+  .results-page .candidate-preview-copy > strong { font-size: 21px; margin-top: 0; }
+  .results-page .candidate-photo-missing > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .results-page .tier { font-size: 12px; }
   .results-page .quote-price { font-size: clamp(24px, 8vw, 34px); }
   .results-page .offer-action { flex-direction: column; align-items: stretch; gap: 7px; margin-top: 19px; }

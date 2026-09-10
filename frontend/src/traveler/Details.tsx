@@ -148,7 +148,7 @@ export default function Details() {
           <header className="detail-heading">
             <p className="eyebrow">{candidate ? 'Likely hotel' : 'Express offer'}</p>
             <h1 tabIndex={-1}>{candidate?.name || 'Your Express offer'}</h1>
-            {candidate && <p className="detail-location">The hotel name is inferred from the deal information, and is not guaranteed.</p>}
+            {candidate && <p className="detail-location">The deal details suggest this hotel, but its name is not confirmed.</p>}
             <p className="detail-location">
               {candidate?.neighborhoodName && `${candidate.neighborhoodName} · `}
               {context.cityName}
@@ -178,7 +178,7 @@ export default function Details() {
             />
           )}
           {data && hotelId && !candidate && <p className="detail-coverage-notice" role="status">
-            We couldn’t verify the selected hotel. You can still check the original Express offer below.
+            We couldn’t match the selected hotel to this offer. You can still check the original Express offer below.
           </p>}
           {(candidate || offer) && <div className={`detail-layout${candidate ? '' : ' detail-layout-unverified'}`}>
             {candidate && (
@@ -218,7 +218,7 @@ export default function Details() {
                     <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Update price</button>
                   </div>}
                   {!bindingRejected && !priceUpdateFailed && data?.quoteStatus === 'unavailable' && !priceStale && <div className="detail-total-unavailable" role="status">
-                    <p>A complete total is unavailable. Check the current price on Priceline or try again.</p>
+                    <p>We couldn’t get the total price. Check Priceline or try again.</p>
                     <button type="button" className="ui-button" onClick={retry} disabled={loading || coolingDown}>Update price</button>
                   </div>}
                   <TripSummary context={context} />
