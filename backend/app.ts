@@ -45,6 +45,8 @@ export function createApp({ logger = console, service = createProviderService({ 
   app.use((req, res, next) => {
     req.requestId = randomUUID();
     const startedAt = Date.now();
+    const method = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(req.method) ? req.method : 'OTHER';
+    const route = requestRoute(req);
     res.set({
       'X-Request-Id': req.requestId,
       'X-Content-Type-Options': 'nosniff',
@@ -57,14 +59,15 @@ export function createApp({ logger = console, service = createProviderService({ 
       // Bodies, URLs, raw errors and upstream credentials are never logged.
       try {
         logger?.info?.({ event: 'request_completed', requestId: req.requestId, status: res.statusCode,
+          method, route,
           ...(res.locals.errorCode ? { code: res.locals.errorCode } : {}), durationMs: Date.now() - startedAt });
       } catch { /* Logging must not affect the response. */ }
     });
     res.once('close', () => {
       if (res.writableFinished) return;
       try {
-        logger?.info?.({ event: 'request_aborted', requestId: req.requestId, method: req.method,
-          route: requestRoute(req), durationMs: Date.now() - startedAt });
+        logger?.info?.({ event: 'request_aborted', requestId: req.requestId, method,
+          route, durationMs: Date.now() - startedAt });
       } catch { /* Logging must not affect the response. */ }
     });
     next();

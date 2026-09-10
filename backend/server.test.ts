@@ -32,4 +32,8 @@ test('an occupied port fails startup without a success event or raw error stack'
   assert.match(stderr, /server_start_failed/);
   assert.match(stderr, /EADDRINUSE/);
   assert.doesNotMatch(stderr, /\n\s+at |node:events|Unhandled 'error'|\/Users\//);
+  const record = JSON.parse(stderr.trim());
+  assert.equal(record.event, 'server_start_failed');
+  assert.equal(record.level, 'error');
+  assert.equal(new Date(record.timestamp).toISOString(), record.timestamp);
 });
