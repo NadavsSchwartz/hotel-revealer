@@ -84,7 +84,7 @@ test('reloading an original offer across a real service restart recovers its pri
     await expect(page).toHaveURL(originalUrl);
     await expect(page.getByRole('heading', { name: 'Your Express offer', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Example Hotel', exact: true })).toHaveCount(0);
-    await expect(page.getByText('We couldn’t verify the selected hotel.', { exact: false })).toBeVisible();
+    await expect(page.getByText('We couldn’t match the selected hotel to this offer.', { exact: false })).toBeVisible();
     await expect(page.locator('.detail-quote-panel .quote-price')).toHaveText('$240 total');
     await expect(page.getByRole('link', { name: /View deal on Priceline/ })).toHaveAttribute('href', present(handoff));
     expect(listingCalls).toBe(1);

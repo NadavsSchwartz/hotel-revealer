@@ -55,7 +55,7 @@ function CandidatePhoto({ candidate, eager }: { candidate: Candidate; eager: boo
           <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <path d="M7 33V11l13-5 13 5v22M3 33h34M15 33v-8h10v8M13 14h3m8 0h3m-14 5h3m8 0h3" />
           </svg>
-          Photo unavailable
+          <span>Photo unavailable</span>
         </span>
       )}
     </span>
@@ -307,7 +307,7 @@ export default function Results() {
             {valid ? <><span className="results-heading-prefix">Hotel deals in </span>{context.cityName.split(',')[0]}</> : 'Check your trip details'}
           </h1>
           {valid && <button type="button" className="ui-button edit-trip-toggle" aria-expanded={editing} aria-controls="results-search"
-            onClick={editing ? () => setEditing(false) : editTrip}>{editing ? 'Close editor' : 'Edit trip'}</button>}
+            onClick={editing ? () => setEditing(false) : editTrip}>{editing ? 'Hide form' : 'Edit trip'}</button>}
         </div>
         {valid && <TripSummary context={context} />}
       </header>
@@ -327,7 +327,7 @@ export default function Results() {
       {valid && !loading && visibleError && (
         <>
           <ErrorNotice error={visibleError} onRetry={refresh} onEdit={editTrip} />
-          {data && <p className="results-cached-note">Your last retrieved results are shown below.</p>}
+          {data && <p className="results-cached-note">Your previous results are shown below.</p>}
         </>
       )}
       {valid && data && (
@@ -385,12 +385,12 @@ export default function Results() {
                         <CandidatePhoto candidate={candidate} eager={index === 0} />
                         <span className="candidate-preview-copy">
                           <strong>{candidate.name}</strong>
-                          <span className="candidate-preview-meta"><Stars value={candidate.stars} />{candidate.guestRating != null && ` · ${candidate.guestRating}/10 guests`}</span>
+                          <span className="candidate-preview-meta"><Stars value={candidate.stars} />{candidate.guestRating != null && <span>Guest rating: {candidate.guestRating}/10</span>}</span>
                         </span>
                       </Link>
                     </div>
                     <div className="offer-booking">
-                      <Quote quote={offer.quote} compact trip={data.context} title={stale ? 'Last seen room rate' : 'Room rate'} />
+                      <Quote quote={offer.quote} compact trip={data.context} stale={stale} />
                       <Link className="offer-detail-link button-link" {...candidateLink(offer, candidate, `details-${encodeURIComponent(offer.offerId)}`)}>
                         View hotel details
                         <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>

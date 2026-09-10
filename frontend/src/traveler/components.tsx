@@ -21,7 +21,7 @@ export function TripSummary({ context }: { context: TripDraft }) {
 
 interface QuoteProps {
   quote: QuoteValue | null;
-  title?: string;
+  stale?: boolean;
   compact?: boolean;
   trip?: TripDraft | null;
   expired?: boolean;
@@ -32,7 +32,7 @@ interface QuoteProps {
 
 export function Quote({
   quote,
-  title = 'Original Express quote',
+  stale = false,
   compact = false,
   trip = null,
   expired = false,
@@ -44,6 +44,12 @@ export function Quote({
   const nightly = format(quote?.nightlyCents);
   const stay = format(quote?.stayCents);
   const total = quote?.totalTaxesFees === 'included' ? format(quote.totalCents) : null;
+  let title = 'Original Express quote';
+  if (compact) {
+    if (total) title = stale ? 'Last seen total' : 'Total for your stay';
+    else if (nightly) title = stale ? 'Last seen room rate' : 'Room rate';
+    else title = 'Price';
+  }
   const discount = quote?.advertisedDiscount?.source === 'Priceline' &&
     quote.advertisedDiscount.percent > 0 && quote.advertisedDiscount.percent < 100
     ? quote.advertisedDiscount.percent : null;
@@ -168,20 +174,20 @@ const errorCopy: Record<string, [string, string]> = {
     'We could not finish within the search time limit. Your trip details are preserved. You can try again.',
   ],
   PROVIDER_UNAVAILABLE: [
-    'The hotel provider is unavailable',
-    'We could not retrieve reliable hotel information. Please try again later.',
+    'We couldn’t load hotel information',
+    'Please try again later.',
   ],
   PROVIDER_RESPONSE_INVALID: [
-    'We could not verify this response',
+    'We couldn’t read the hotel information',
     'The hotel information was incomplete or inconsistent. Please try again.',
   ],
   INVALID_SELECTION: [
-    'This offer could not be recovered',
-    'Return to your results to choose an offer. Your other results are preserved.',
+    'We couldn’t reopen this offer',
+    'Return to your results and choose an offer.',
   ],
   SELECTION_UNAVAILABLE: [
-    'This offer could not be recovered',
-    'Return to your results to choose an offer. Your other results are preserved.',
+    'We couldn’t reopen this offer',
+    'Return to your results and choose an offer.',
   ],
   NETWORK_ERROR: [
     'We could not connect',
