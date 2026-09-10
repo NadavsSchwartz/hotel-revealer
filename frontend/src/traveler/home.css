@@ -56,6 +56,4 @@ html:root .travelers-panel-footer .ui-button { border-radius: var(--radius-contr
   .direction-footer a { min-height: 44px; }
 }
 
-html:root .travelers-panel-footer .ui-button{background:var(--blue);border-color:var(--blue)}
-html:root .traveler-counter button{color:var(--blue);border-color:var(--line)}
 html:root .travelers-panel button:focus-visible, html:root .travelers-trigger:focus-visible { outline-color: var(--blue); }

@@ -236,7 +236,7 @@ only when actually supplied, and no room, bed or cancellation policy is inferred
   `amenities` (codes or null), `amenitiesComplete`, and `retailQuote`.
 - `matchListings` returns `{offers,unassessedHotels,invalidRows}`. Matching and
   public resolution perform no I/O; ambiguity is not settled by ranking.
-- Provider/API owns `backend/provider/`, `backend/app.js`, `backend/server.js`,
+- Provider/API owns `backend/provider/`, `backend/app.ts`, `backend/server.ts`,
   routes/controllers/middleware. Factory `createApp({service,logger}={})` permits
   test injection. Service methods `search(input)` and `detail(input)` return wire
   responses. The service factory without an adapter refuses access with
@@ -259,7 +259,7 @@ only when actually supplied, and no room, bed or cancellation policy is inferred
 
 ## Live adapter and operating contract
 
-- `backend/provider/priceline.js` sends ordinary JSON POST requests to the public
+- `backend/provider/priceline.ts` sends ordinary JSON POST requests to the public
   `/pws/v0/pcln-graph/` endpoint with content/accept headers, no credentials, and
   redirects rejected. It uses no cookies, identity spoofing, proxy rotation,
   challenge solving or automatic retries. Public website compatibility is not a
