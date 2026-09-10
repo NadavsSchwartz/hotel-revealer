@@ -3,6 +3,29 @@
 Updated **2026-09-10 UTC**. [Hotel Revealer](https://hotelrevealer.tech) runs on
 Hostinger. The September 9 sections below retain the original launch evidence.
 
+## Homepage and typography release — September 10
+
+At 13:54 UTC, the restricted release command deployed the homepage removal and
+typography/copy changes from `3fe7e61` and `98aaeb1`, integrated with the reporting
+release. [PR #85](https://github.com/NadavsSchwartz/hotel-revealer/pull/85) merged as
+`b0f1193ece65563f110d0f8d423dd38d1e89b437`; its tree matches tested source
+`fc9d50ed46e1eede7b8f86946c1bffe7935cb430`.
+
+Running image:
+`ghcr.io/nadavsschwartz/hotel-revealer@sha256:eae26e5d19409c9ab20608db0b1fe2f29dfeb42657838eb828bcc0cdb8edd7a5`
+
+[Release CI 34484248641](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34484248641)
+passed 293 native tests, all 456 browser cases, 12 report tests and the existing
+deployment/container checks. Container `65a44d18ffb6` reports the tested revision
+and healthy status; the public health check passed. The previous `310e222` image
+below is the rollback target.
+
+A fresh production browser tab showed the updated home copy, retained main search
+and no “Take a closer look” section. Local review covered 22 captures across
+desktop/mobile and both themes, with no horizontal overflow or browser errors.
+Caddy, Compose and the report script hashes were unchanged; the daily timer remains
+enabled and active. Evidence is in ignored `output/verification/homepage-release/`.
+
 ## Reporting release — September 10
 
 [PR #84](https://github.com/NadavsSchwartz/hotel-revealer/pull/84) merged as

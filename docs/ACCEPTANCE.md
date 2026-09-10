@@ -5,6 +5,22 @@ claim. The current modernization results below supersede the earlier 278-native 
 420-browser summary. Historical sections retain the results and limitations of
 their original revisions; they are not repeated verification of the current tree.
 
+## Homepage and typography release — 2026-09-10
+
+The saved homepage removal and typography/copy changes are now integrated with
+main and deployed through [PR #85](https://github.com/NadavsSchwartz/hotel-revealer/pull/85).
+The Results restoration hook, strict scroll/focus/request-count regression and
+consolidated toolbar styles remain intact. Independent review found no integration
+defects; backend and reporting code are unchanged.
+
+The pinned toolchain passed `npm run check` with 293 native tests. All 57 focused
+browser checks passed locally; both PR and release CI passed all 456 browser cases
+and the existing deployment checks. Rendered review covered 22 desktop/mobile,
+light/dark captures with no overflow or browser errors. A fresh production tab
+confirmed the updated copy and absence of the closing search section. The main
+search remains available. Exact image and run links are in
+[live deployment evidence](LIVE_DEPLOYMENT.md#homepage-and-typography-release--september-10).
+
 ## Targeted cleanup and reporting — 2026-09-10
 
 [PR #84](https://github.com/NadavsSchwartz/hotel-revealer/pull/84) adds JSON logging,

@@ -1,5 +1,8 @@
 # Typography and interface copy — September 9, 2026
 
+Shipped on September 10 with the current main branch; see the
+[integration and production checks](LIVE_DEPLOYMENT.md#homepage-and-typography-release--september-10).
+
 ## Implementation
 
 | Surface | Applied change |
@@ -13,7 +16,7 @@
 
 The closing section remains removed. Matching, price calculations, expiry behavior, booking links, and policy disclosures retain their existing behavior. No dependencies were added. Local screenshots are in `output/verification/typography/implementation/`.
 
-**Verification:** Node 24.20.0 typecheck, lint, 291 tests and production build passed. All 456 browser cases have passing coverage across the initial run, serial Firefox/WebKit run, and final 20-case rerun. The initial parallel run was interrupted after broad timing failures during heavy host memory pressure; reruns retained the existing timeouts. The outdated closing-CTA navigation test now exercises the retained search anchor. Twenty-two final captures cover desktop/mobile and light/dark themes; extra checks confirm text-spacing reflow, enlarged hero text and unobscured destination validation. Hosted and physical-device verification remain outside this local change.
+**Original local verification (September 9):** Node 24.20.0 typecheck, lint, 291 tests and production build passed. All 456 browser cases have passing coverage across the initial run, serial Firefox/WebKit run, and final 20-case rerun. The initial parallel run was interrupted after broad timing failures during heavy host memory pressure; reruns retained the existing timeouts. The outdated closing-CTA navigation test now exercises the retained search anchor. Twenty-two final captures cover desktop/mobile and light/dark themes; extra checks confirm text-spacing reflow, enlarged hero text and unobscured destination validation. These checks did not include hosted or physical-device verification.
 
 ## Original audit — before implementation
 
