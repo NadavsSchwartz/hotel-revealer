@@ -134,13 +134,11 @@ def duration(value):
 
 
 def summarize(lines, start, end):
-    result = {"events": 0, "invalid": 0, "outside": 0, "duplicates": 0,
+    result = {"events": 0, "invalid": 0,
               "first": None, "last": None, "http": {route: Counter() for route in ROUTES},
               "durations": {route: [] for route in ROUTES}, "search": Counter(),
               "cache": {kind: Counter() for kind in ("search", "detail")},
               "fresh": Counter(), "diagnostics": Counter()}
-    terminals = set()
-    callers = set()
     for line in lines:
         if not line.strip():
             continue
@@ -153,7 +151,6 @@ def summarize(lines, start, end):
             result["invalid"] += 1
             continue
         if not start <= timestamp < end:
-            result["outside"] += 1
             continue
         result["events"] += 1
         result["first"] = min(timestamp, result["first"] or timestamp)
@@ -166,18 +163,13 @@ def summarize(lines, start, end):
             route = event["route"]
             if route not in ROUTES or event["method"] != "POST":
                 continue
-            request_id = event.get("requestId")
-            if not isinstance(request_id, str) or not 1 <= len(request_id) <= 128 or not duration(event.get("durationMs")):
+            if not duration(event.get("durationMs")):
                 result["invalid"] += 1
                 continue
             status = event.get("status")
             if name == "request_completed" and (not count(status) or not 100 <= status <= 599):
                 result["invalid"] += 1
                 continue
-            if request_id in terminals:
-                result["duplicates"] += 1
-                continue
-            terminals.add(request_id)
             stats = result["http"][route]
             if name == "request_aborted":
                 stats["aborted"] += 1
@@ -190,13 +182,6 @@ def summarize(lines, start, end):
             if kind not in ("search", "detail") or not isinstance(event.get("shared"), bool):
                 result["invalid"] += 1
                 continue
-            request_id = event.get("requestId")
-            if isinstance(request_id, str):
-                identity = (kind, request_id)
-                if identity in callers:
-                    result["duplicates"] += 1
-                    continue
-                callers.add(identity)
             if kind == "search":
                 outcome = event.get("outcome")
                 if outcome in ("complete", "partial"):
@@ -240,11 +225,11 @@ def render(summary, container, start, end, now=None):
     in_progress = end > (now or datetime.now(UTC))
     partial = in_progress or container["created"] > start or summary["invalid"] > 0
     lines = [f"# Hotel Revealer — {start.date()} UTC", "",
-             "Observed retained application logs; this is not a complete traffic or uptime measurement.", "",
+             "Only retained logs are reported. Docker rotation or removed containers can omit activity; unavailable metrics show n/a.", "",
              f"- Window: {stamp(start)} inclusive to {stamp(end)} exclusive.",
-             f"- Coverage: {'partial' if partial else 'unknown'}; Docker rotation and removed containers can omit activity.",
+             f"- Coverage: {'partial' if partial else 'unknown'}.",
              f"- Container: `{container['id'][:12]}`; created {stamp(container['created'])}; capture-time status: {container['status']}.",
-             f"- Valid timestamped events: {summary['events']}; skipped malformed/legacy events or lines: {summary['invalid']}; duplicate caller/terminal events: {summary['duplicates']}."]
+             f"- Valid timestamped events: {summary['events']}; skipped malformed/legacy events or lines: {summary['invalid']}."]
     if in_progress:
         lines.append("- This UTC day is still in progress. This partial report can be replaced by the scheduled report after the day ends.")
     if container["created"] > start:
@@ -252,7 +237,7 @@ def render(summary, container, start, end, now=None):
     if summary["first"]:
         lines.append(f"- Observed event range: {stamp(summary['first'])} to {stamp(summary['last'])}.")
     else:
-        lines.append("- No usable timestamped events in this window. Activity and reliability are unknown; this does not mean zero traffic or zero failures.")
+        lines.append("- No usable timestamped events in this window.")
     lines.extend(["", "## Hotel API responses", "",
                   "Counts use terminal POST events only. Diagnostics and provider events are not added to HTTP failures. Dates follow completion/abort time.", "",
                   "| Route | Completed | 2xx / completed | 4xx | 5xx | Other status | Aborted | p50 | p95 |",
@@ -286,8 +271,8 @@ def render(summary, container, start, end, now=None):
     observed = summary["diagnostics"]
     lines.extend(f"- {name}: {observed[name]}" for name in DIAGNOSTICS if observed[name])
     if not observed:
-        lines.append("No operational events observed in retained logs; absence is not proof that none occurred.")
-    lines.extend(["", "Server-start events are observed starts, not an uptime calculation. Provider-search-failed events count unexpected underlying failures; they overlap caller/HTTP errors and are not added to them.", ""])
+        lines.append("No operational events observed.")
+    lines.extend(["", "Provider-search-failed events count unexpected underlying failures; they overlap caller/HTTP errors and are not added to them.", ""])
     return "\n".join(lines)
 
 

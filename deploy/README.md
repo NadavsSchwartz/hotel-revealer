@@ -321,13 +321,10 @@ The report separates terminal hotel-API POST responses from provider events:
   success. Caller-completion counters can miss upstream work continuing after a
   caller times out, so the report does not claim an exact upstream-call total.
 
-Every report is labeled **unknown or partial coverage**. App logs retain at most
-three 10 MB files; rotation can remove earlier activity, and a release replaces
-the container. A newly created container cannot supply the old container's logs.
-An ordinary restart of the same container can retain logs, but that still does
-not prove a full reporting window. Empty, legacy or missing records never become
-zero-traffic or zero-failure claims. Reports include the requested window,
-container creation time/status, observed timestamp range and skipped record count.
+Coverage is always **unknown or partial**: Docker retains three 10 MB files, and
+container replacement can remove earlier logs. Empty or unreadable input leaves
+metrics unavailable. Reports include the requested window, container creation
+time/status, observed timestamp range and skipped record count.
 Docker capture failure preserves an existing report and fails the job. See the
 [Docker logs reference](https://docs.docker.com/reference/cli/docker/container/logs/)
 and [local-driver retention](https://docs.docker.com/engine/logging/drivers/local/).
@@ -352,8 +349,7 @@ sudo systemctl enable --now hotel-revealer-daily-report.timer
 sudo systemctl list-timers hotel-revealer-daily-report.timer --no-pager
 ```
 
-The job
-resolves exactly one container with Compose project `hotel-revealer` and service
+The job resolves exactly one container with Compose project `hotel-revealer` and service
 `app`, including stopped containers. Missing or ambiguous containers fail closed.
 Raw logs are streamed through Docker; Docker's internal log files are never read.
 Capture has a 60-second deadline, a 64 MiB total limit and a 32 KiB line limit.
@@ -375,8 +371,7 @@ To inspect an older date than the retained 30 report dates, use `--output-dir`
 with a separate private directory, subject to the same Docker-log availability.
 `Persistent=true` makes a missed timer activation run after the VPS returns;
 it does not reconstruct every missed day. Missing dated reports remain gaps, and
-the catch-up run still targets yesterday. No uptime percentage is derived from
-report existence or observed server-start events. See the
+the catch-up run still targets yesterday. See the
 [systemd timer reference](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html).
 
 Check job failures with `sudo journalctl -u hotel-revealer-daily-report.service`.

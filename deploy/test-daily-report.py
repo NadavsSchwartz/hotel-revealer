@@ -61,14 +61,12 @@ else:
 class SummaryTests(unittest.TestCase):
     def test_http_denominators_ignore_overlapping_diagnostics_and_other_routes(self):
         events = [completed("one", 200, 10), completed("two", 404, 20), completed("three", 503, 30),
-                  completed("three", 503, 30),
                   event("request_failed", requestId="three", code="PROVIDER_BUSY"),
                   event("provider_request", kind="search", requestId="three", outcome="PROVIDER_BUSY", shared=False),
                   event("request_aborted", requestId="four", route="/api/v1/hoteldeals", method="POST", durationMs=50),
                   completed("health", route="/health"), completed("get", method="GET")]
         result = summarize(events)
         self.assertEqual(result["http"]["/api/v1/hoteldeals"], {"completed": 3, "2xx": 1, "4xx": 1, "5xx": 1, "aborted": 1})
-        self.assertEqual(result["duplicates"], 1)
         body = report.render(result, CONTAINER, START, END)
         self.assertIn("33.3% (1/3)", body)
         self.assertIn("| 20 ms | 30 ms |", body)
@@ -80,12 +78,10 @@ class SummaryTests(unittest.TestCase):
                   completed("end", timestamp="2020-01-03T00:00:00Z")]
         result = summarize(events)
         self.assertEqual(result["http"]["/api/v1/hoteldeals"]["completed"], 1)
-        self.assertEqual(result["outside"], 2)
 
     def test_cache_shared_and_fresh_result_denominators_are_independent(self):
         events = [event("provider_request", kind="search", requestId="hit", outcome="complete", shared=False, searchCache="hit"),
                   event("provider_request", kind="search", requestId="miss", outcome="partial", shared=False, searchCache="miss"),
-                  event("provider_request", kind="search", requestId="shared", outcome="partial", shared=True, searchCache="not_checked"),
                   event("provider_request", kind="search", requestId="shared", outcome="partial", shared=True, searchCache="not_checked"),
                   event("provider_request", kind="search", requestId="rejected", outcome="PROVIDER_DISABLED", shared=False, searchCache="not_checked"),
                   event("provider_request", kind="detail", requestId="detail", outcome="unavailable", shared=False, detailCache="miss", upstreamCalls=500),
@@ -114,7 +110,7 @@ class SummaryTests(unittest.TestCase):
             result = report.summarize(lines, START, END)
             body = report.render(result, CONTAINER, START, END)
             self.assertIn("No observations", body)
-            self.assertIn("not a complete traffic or uptime measurement", body)
+            self.assertIn("Docker rotation or removed containers can omit activity; unavailable metrics show n/a", body)
             self.assertNotIn("100.0%", body)
             self.assertIn("Coverage: partial" if lines else "Coverage: unknown", body)
         self.assertEqual(summarize([completed("bad", milliseconds=float("nan"))])["invalid"], 1)
