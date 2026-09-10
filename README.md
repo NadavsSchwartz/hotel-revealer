@@ -1,48 +1,35 @@
 # Hotel Revealer
 
-Explore the likely hotel behind a Priceline Express Deal before you book.
+Matches Priceline Express Deals to named hotels using star ratings, neighborhoods,
+amenities, guest ratings, review counts, and rates.
 
-[Visit Hotel Revealer](https://hotelrevealer.tech) · [Source][source] · [Technical documentation][docs] · [Verified build][verified-build]
+The hotel name is inferred by deterministic rules, not confirmed. Only deals with
+one consistent match appear in results. Prices and availability come from
+Priceline's unofficial website API and can change or become unavailable.
 
-Priceline Express Deals hide the hotel name until booking. Hotel Revealer compares
-the offer's available clues with named hotel listings, shows one inferred hotel
-when the matching rules resolve it, and lets you inspect the property before
-continuing to the original offer on Priceline.
+[Live site](https://hotelrevealer.tech) · [Docs](docs/README.md)
 
-**Hotel identity is inferred, not verified.** Unresolved deals stay unidentified;
-the original offer, the inferred hotel, and the current price are separate facts.
+![Hotel Revealer search interface](docs/media/homepage.jpg)
 
-![Hotel Revealer search interface with destination, dates, travelers, currency, and theme controls](docs/media/homepage.jpg)
+## Features
 
-## What you can do
+- Destination autocomplete and search by dates, rooms, adults, and children's ages.
+- Prices in USD, EUR, GBP, CAD, and AUD.
+- Sorting by room rate, guest rating, stars, or advertised room-rate discount.
+- Hotel photos, amenities, address, ratings, and links to maps and reviews.
+- Original-offer totals, quote refresh, and a Priceline handoff with the selected trip.
 
-1. **Plan a stay.** Find a destination by city or country, choose dates, and set
-   rooms, adults, and children's ages. Request provider prices in USD, EUR, GBP,
-   CAD, or AUD.
-2. **Compare resolved deals.** Browse offers with one inferred hotel and sort by
-   room rate, guest rating, star rating, or advertised discount. Offers without a
-   single inferred hotel are excluded from the result list.
-3. **Look into the property.** Inspect available photos, amenities, address, guest
-   ratings, and review counts, with links to maps and external reviews.
-4. **Check the original offer.** Request its total price, refresh an expired quote,
-   and continue to Priceline with the selected offer and trip details. Booking and
-   payment happen on Priceline.
-
-The interface supports light and dark themes, responsive layouts, and returning
-from hotel details to the previous result list and scroll position. Currency
-changes request new provider prices rather than applying a browser-side conversion.
-
-## How it is built
+## Architecture
 
 | Layer | Implementation |
 | --- | --- |
 | Interface | React 19, Redux, React Router, TypeScript, Vite, CSS |
-| Server | Node.js 24, Express 5, TypeScript with native type stripping |
-| Contracts | Shared TypeScript types plus runtime validation at request and provider boundaries |
-| Destination lookup | Vendored GeoNames catalog, searched locally on the server |
-| State | Bounded in-memory caches; small disk snapshots for provider control state and selection recovery |
-| Verification | TypeScript, ESLint, Node's test runner, Playwright, axe accessibility checks |
-| Deployment | One application container behind Caddy HTTPS; Docker Compose and GitHub Actions |
+| Server | Node.js 24, Express 5, native TypeScript stripping |
+| Validation | Shared TypeScript contracts and runtime checks on external data |
+| Destination lookup | Local GeoNames catalog |
+| State | Bounded memory caches and local state files |
+| Tests | Node's test runner, Playwright, axe |
+| Deployment | One application container, Caddy, Docker Compose, GitHub Actions |
 
 ```mermaid
 flowchart TD
@@ -56,31 +43,19 @@ flowchart TD
   Match --> Browser
 ```
 
-One Express process serves both the production frontend and the API. Destination
-autocomplete does not contact Priceline. The rebuilt application does not require
-MongoDB, a Google Maps API key, or a background job service.
+Express serves the frontend and API. Destination lookup runs locally.
+No database or Google Maps API key is required.
 
-### Engineering decisions
+### Constraints
 
-- **Preserve uncertainty.** Deterministic matching retains the original comparison
-  rules while bounding work by neighborhood and star-rating groups. Conflicting,
-  missing, ambiguous, or incomplete evidence remains unresolved. Differential
-  tests compare behavior with the preserved original matcher; they do not measure
-  real-world identification accuracy. See the [matching study][matching].
-- **Bound upstream work.** The provider service shares concurrent requests,
-  caches eligible responses, and limits queued work. Calls run one at a time with
-  deadlines and persisted cooldown/block state. These controls constrain load;
-  they are not provider-approved quotas. See the [provider contract][provider].
-- **Recover a selection without reviving stale claims.** A short-lived recovery
-  snapshot stores the trip/offer hash, optional provider city ID, and expiry.
-  After a restart it can recover a fresh original-offer quote and handoff without
-  restoring a saved price or an inferred hotel identity. See the
-  [selection store][selection-store].
+- Run one application process. Caches and upstream scheduling are not shared across replicas.
+- Upstream calls are queued, rate-limited, and cached. Provider access restrictions still apply.
+- Search pagination is bounded; results are not exhaustive inventory.
+- Confirm the final room, total price, and booking terms on Priceline.
 
 ## Run locally
 
-Use **Node.js 24.20.0** and **npm 11.19.0**, as pinned by `.nvmrc` and
-`package.json`. Install from the root workspace lockfile.
+Requires **Node.js 24.20.0** and **npm 11.19.0**. Use the root workspace lockfile.
 
 ```sh
 git clone https://github.com/NadavsSchwartz/hotel-revealer.git
@@ -93,13 +68,10 @@ npm run dev
 ```
 
 Open [localhost:5173](http://127.0.0.1:5173). Vite proxies `/api` to Express on
-port 5000; both processes watch source changes. If that port is occupied, run
-`PORT=5001 npm run dev` instead.
+port 5000. Both processes watch source changes. If port 5000 is occupied, use
+`PORT=5001 npm run dev`.
 
-The default adapter uses Priceline's public website API; recorded integration
-checks did not require provider credentials. Live access depends on upstream
-availability and compatibility. Optional root `.env` settings are documented in
-[`.env.example`][env].
+Priceline is the default provider. Optional settings are in [.env.example](.env.example).
 
 For offline interface work:
 
@@ -107,10 +79,10 @@ For offline interface work:
 HOTEL_PROVIDER=disabled npm run dev
 ```
 
-Destination lookup and the interface remain available. Hotel requests return a
-provider-not-configured response; this mode does not supply demo search results.
+Destination lookup works offline. Hotel requests return a provider-not-configured
+response; there are no demo search results.
 
-To serve the production build locally:
+To serve the production build:
 
 ```sh
 npm run build
@@ -118,9 +90,9 @@ NODE_ENV=production npm start
 ```
 
 Open [localhost:5000](http://127.0.0.1:5000). `/health` reports application and
-recorded provider state without issuing a new upstream search.
+recorded provider state without making an upstream request.
 
-## Verify changes
+## Verify
 
 ```sh
 HOTEL_PROVIDER=disabled npm run check
@@ -128,63 +100,29 @@ npx --no-install playwright install chromium firefox webkit
 HOTEL_PROVIDER=disabled npm run test:browser
 ```
 
-`check` runs strict type checking, lint, native tests, and a production build.
-Browser tests run against that build with intercepted API fixtures across
-Chromium, mobile Chromium emulation, Firefox, and WebKit. Tests cover search,
-navigation, pricing expiry, selection recovery, provider failure states, and
-accessibility checks without depending on live inventory.
+`check` runs strict type checking, lint, native tests, and the production build.
+Browser tests use that build with synthetic API responses across Chromium, mobile
+Chromium, Firefox, and WebKit. They cover search, navigation, quote expiry,
+recovery, provider errors, and automated accessibility checks.
 
-The [verified CI run][verified-build] for
-[`58f9c1f`](https://github.com/NadavsSchwartz/hotel-revealer/commit/58f9c1fe4bfb42fa58a908493990830c3f36a536)
-passed the checks, browser suite, deployment-script validation, and production
-container smoke test, then published the tested image. This is evidence for that
-revision. The [acceptance record][acceptance] contains detailed local checkpoints
-and remaining validation gaps. The [live deployment record](docs/LIVE_DEPLOYMENT.md)
-separately documents the released image, hosted journey, reboot, and rollback checks.
+[CI at `f5f6358`](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34415402534):
+291 native tests, 452 browser tests, and production container checks passed.
 
-## Scope and limitations
+## Docs and contributing
 
-- **No guaranteed identity or savings.** Matching agreement is evidence for an
-  inference, including when only one hotel fits. It is not verified hotel identity.
-  Advertised discounts describe the room rate, not guaranteed total savings.
-- **Prices and availability can change.** Quotes expire. Confirm the final hotel
-  disclosure, room, total, cancellation policy, and booking terms on Priceline.
-- **Provider access can fail.** The integration uses a public website API, not an
-  official partner API. Successful requests do not establish permission for
-  automated use or future compatibility; see [live access and constraints][live-access].
-- **Coverage is bounded.** A worldwide destination catalog does not imply hotel
-  inventory for every location. Search pagination is limited, and partial results
-  are not treated as exhaustive inventory.
-- **Operational proof has limits.** The application is designed for one process.
-  Automated checks and a reachable site do not establish production capacity,
-  identification accuracy, physical-device support, or manual accessibility.
+- [Documentation index](docs/README.md)
+- [Implementation](docs/IMPLEMENTATION.md) — API contracts, pricing, and recovery.
+- [Matching rules](scripts/matching-study/README.md) — original predicates and differential tests.
+- [Provider boundary](backend/provider/README.md) — queues, caching, deadlines, and persisted state.
+- [Live access](docs/LIVE_ACCESS.md) — integration behavior and provider restrictions.
+- [Deployment](deploy/README.md) · [Live deployment record](docs/LIVE_DEPLOYMENT.md) · [Verification history](docs/ACCEPTANCE.md)
+- [Data sources and attribution](docs/DATA_SOURCES.md)
 
-## Documentation and contributions
-
-- [Documentation index][docs] — API behavior, data provenance, dependencies, and verification records.
-- [Implementation contract][implementation] — matching, pricing, response validation, and recovery.
-- [Data sources and attribution][data] — destination data, refresh procedure, and media credits.
-- [Deployment guide][deployment] — container packaging, VPS configuration, health checks, and rollback.
-
-For bugs, include reproduction steps, browser/device, and the visible error; omit
-credentials and personal booking information. Keep pull requests focused and run
-the relevant checks. Target `main` for application changes.
+Keep PRs focused, target `main`, and run the relevant checks. Bug reports should
+include reproduction steps, browser/device, and the visible error. Leave out
+credentials and personal booking information.
 
 ## License
 
-The app is available as open source under the terms of the
-[MIT License](https://opensource.org/licenses/MIT). Third-party data, fonts, and
-media retain their own licenses; see [data sources and attribution][data].
-
-[source]: https://github.com/NadavsSchwartz/hotel-revealer/tree/main
-[docs]: docs/README.md
-[matching]: scripts/matching-study/README.md
-[provider]: backend/provider/README.md
-[selection-store]: backend/provider/selection-store.ts
-[env]: .env.example
-[acceptance]: docs/ACCEPTANCE.md
-[live-access]: docs/LIVE_ACCESS.md
-[implementation]: docs/IMPLEMENTATION.md
-[data]: docs/DATA_SOURCES.md
-[deployment]: deploy/README.md
-[verified-build]: https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34405371862
+[MIT](https://opensource.org/licenses/MIT). Third-party data, fonts, and media
+retain their own licenses; see [attribution](docs/DATA_SOURCES.md).
