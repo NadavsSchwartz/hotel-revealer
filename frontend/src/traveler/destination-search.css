@@ -44,7 +44,7 @@
   padding: 17px;
   max-width: none;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
 }
 .destination-panel.destination-status-panel > span:not(.destination-spinner) { min-width: 0; }

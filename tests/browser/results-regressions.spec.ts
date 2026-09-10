@@ -230,7 +230,7 @@ test('old search response formats require an explicit refresh before displaying 
   let calls = 0;
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: ++calls === 1 ? old : searchResponse() }));
   await page.goto(searchPath);
-  await expect(page.getByRole('heading', { name: 'We could not verify this response', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'We couldn’t read the hotel information', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /View likely hotel:/ })).toHaveCount(0);
   expect(calls).toBe(1);
   await page.getByRole('button', { name: 'Try again', exact: true }).click();

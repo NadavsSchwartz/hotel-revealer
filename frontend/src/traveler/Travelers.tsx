@@ -210,7 +210,7 @@ const Travelers = forwardRef<TravelersHandle, TravelersProps>(function Travelers
         </div>
       )}
       {occupancyErrors.map((field) => <p key={field} className="field-error" id={`travelers-${field}-error`}>{errors[field]}</p>)}
-      <div className="travelers-panel-footer"><span>Changes are saved as you go.</span><button type="button" className="ui-button ui-button-primary" onClick={() => close(true)}>Done</button></div>
+      <div className="travelers-panel-footer"><span>Changes apply as you go.</span><button type="button" className="ui-button ui-button-primary" onClick={() => close(true)}>Done</button></div>
     </div>
   );
 

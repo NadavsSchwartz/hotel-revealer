@@ -4,7 +4,7 @@ import { queryParams, context, detailResponse, searchPath, searchResponse } from
 
 for (const [code, heading] of [
   ['PROVIDER_COOLDOWN', 'The provider needs a short pause'],
-  ['PROVIDER_UNAVAILABLE', 'The hotel provider is unavailable'],
+  ['PROVIDER_UNAVAILABLE', 'We couldn’t load hotel information'],
   ['PROVIDER_BUSY', 'The provider is busy'],
 ]) {
   test(`${code} search wait retains its reason and allows retry only after expiry`, async ({ page }) => {

@@ -13,7 +13,7 @@ export default function SearchProgress({ variant = 'search' }: { variant?: 'sear
       <BrandIcon className={`search-mark${compact ? ' search-mark-compact' : ''}`} />
       <div>
         <Heading>{title}</Heading>
-        <p>{compact ? 'Your current results remain available.' : preparing ? 'Getting your search ready.' : 'We’ll show the results as soon as they’re ready.'}</p>
+        {compact && <p>You can keep browsing your results.</p>}
       </div>
     </Container>
   );
