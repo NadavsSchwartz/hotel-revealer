@@ -1,14 +1,54 @@
 # Live deployment evidence
 
-Recorded **2026-09-09 UTC**. [Hotel Revealer](https://hotelrevealer.tech) is live on
-Hostinger. These are observed launch results, not a guarantee of future provider
-compatibility, matching accuracy, or uptime.
+Updated **2026-09-10 UTC**. [Hotel Revealer](https://hotelrevealer.tech) runs on
+Hostinger. The September 9 sections below retain the original launch evidence.
 
-## Release identity
+## Reporting release — September 10
+
+[PR #84](https://github.com/NadavsSchwartz/hotel-revealer/pull/84) merged as
+`5a1ed254d425cdef07ff9d0eb2e53c4ecf34eb08`. Its tree matches tested source
+`e37ca8ad78c9701c447195f8afd706a879b384f8`.
+[Release CI 34430653571](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34430653571)
+passed 293 native tests, 452 browser executions, 12 report tests, and the existing
+deployment and container checks. It published the exact tested image:
+
+`ghcr.io/nadavsschwartz/hotel-revealer@sha256:310e222bbc1db989a8172e0da7e5ca364c74b7b594b42486f7f8e1ab797d2669`
+
+The restricted release command deployed it healthy at 02:56 UTC. Container
+`4a3719fea9d1` reports revision `e37ca8a`; public `/health` returned 200 with the
+provider available. The previous `848c09c` image below is the rollback target.
+Caddy and Compose file hashes were unchanged. The existing health workflow remains
+enabled. The obsolete Netlify preview checks still fail; they are separate from
+this VPS release and were outside the cleanup scope.
+
+Only the report script and its service/timer were installed. The host already had
+Python 3.14.4, Docker 29.8.0 and systemd 259. Installed files match the committed
+hashes; no packages, credentials or Caddy settings changed.
+
+- The manual September 10 report observed one server start. Two deliberate
+  empty-body API probes returned 400 and appeared once each under Search and
+  Details, with no provider calls. Consecutive report hashes matched.
+- The September 9 report contains no events from the replacement container. It
+  shows partial coverage and unavailable metrics, including the deployment gap.
+- The actual timer triggered the service at **03:00:11 UTC** using a temporary
+  one-minute activation. The journal records a successful report write and exit
+  status 0. The temporary drop-in was removed; the enabled timer has only its
+  daily **00:10 UTC** calendar schedule. Its next regular run is September 11;
+  that calendar run has not yet been observed.
+- Reports are root-owned under `/var/lib/hotel-revealer/reports/`, with directory
+  mode 0700 and file mode 0600. The script retains 30 dates. Retrieval-failure
+  preservation and retention were verified by the report tests, not by deleting
+  live logs or forcing Docker failures on the host.
+
+Local evidence is in ignored `output/verification/targeted-cleanup/`. The
+[shortlist check](SHORTLIST_CHECK.md) was collected before this release, against
+the preceding `58f9c1f` application image.
+
+## Launch release identity — September 9
 
 | Artifact | Verified identity and status |
 | --- | --- |
-| Running application | `ghcr.io/nadavsschwartz/hotel-revealer@sha256:848c09c6300e1a12b46ce1bc22c964e6b578d082fc7f79d9e00085262b33ab58`; image revision `58f9c1fe4bfb42fa58a908493990830c3f36a536`; normal release through the restricted deployment key completed healthy |
+| Application at launch | `ghcr.io/nadavsschwartz/hotel-revealer@sha256:848c09c6300e1a12b46ce1bc22c964e6b578d082fc7f79d9e00085262b33ab58`; image revision `58f9c1fe4bfb42fa58a908493990830c3f36a536`; normal release through the restricted deployment key completed healthy |
 | Previous rollback target | `ghcr.io/nadavsschwartz/hotel-revealer@sha256:1f43748c2141805669f49d8a9fc142e54edc843ce4b99fb37ad42e191fe9f61d`; image revision `57ca536fbb44a68f21f841768443d1fef59b0120`; restored successfully during the failed-start drill |
 | Released-image CI | [Run 34405371862](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34405371862) passed 291 native tests, 452 browser executions, 12 release simulations, and actual Docker image/Caddy configuration validation |
 | Monitoring on main | [PR #79](https://github.com/NadavsSchwartz/hotel-revealer/pull/79), merged as `a693f3311835747e53a344d52899319d3186f16c`, added only the health workflow and checker; existing main application files were unchanged |

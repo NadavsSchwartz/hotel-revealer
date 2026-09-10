@@ -1,9 +1,41 @@
 # Acceptance evidence
 
-Updated **2026-09-09 UTC**. This records observed evidence, not a blanket readiness
+Updated **2026-09-10 UTC**. This records observed evidence, not a blanket readiness
 claim. The current modernization results below supersede the earlier 278-native /
 420-browser summary. Historical sections retain the results and limitations of
 their original revisions; they are not repeated verification of the current tree.
+
+## Targeted cleanup and reporting — 2026-09-10
+
+[PR #84](https://github.com/NadavsSchwartz/hotel-revealer/pull/84) adds JSON logging,
+private daily reports, two detail-response helpers, an in-file results restoration
+hook, and the scoped CSS/documentation cleanup. Matching rules, API contracts,
+request limits and cache lifetimes are unchanged. Independent skeptical reviews
+covered the implementation, report denominators, shortlist evidence and release.
+
+The stronger return-from-details assertion exposed a pre-existing Firefox bug:
+leaving results could save the shorter details page's clamped scroll position.
+The scroll listener now tears down in a layout effect. The baseline failed the
+new assertion; the fix passed in all four browser configurations with unchanged
+focus and exact-request-count assertions. Twelve before/after screenshot pairs
+and four computed-style maps were identical at desktop/mobile sizes in both themes.
+
+Node 24.20.0 / npm 11.19.0 `npm run check` passed typechecking, lint, 293 native
+tests and the production build. Both [PR CI](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34430492175)
+and [release CI](https://github.com/NadavsSchwartz/hotel-revealer/actions/runs/34430653571)
+passed all 452 browser cases, 12 reporting tests and the existing deployment checks.
+The updated documented test commands also passed. Local evidence is retained in
+ignored `output/verification/targeted-cleanup/`.
+
+The [shortlist check](SHORTLIST_CHECK.md) selected 15 of 20 planned offers:
+11 inside the guaranteed shortlist, none outside and four uncheckable. London's
+search reached its deadline without matched offers, leaving five unfilled slots.
+This measures shortlist agreement, not confirmed hotel identification.
+
+The tested image is live. Manual and timer-triggered reports passed on the VPS,
+including missing-data handling and private permissions. The temporary timer test
+was removed; the next regular 00:10 UTC run remains pending. See the exact image,
+timestamps and boundaries in [live deployment evidence](LIVE_DEPLOYMENT.md#reporting-release--september-10).
 
 ## Hosted deployment — 2026-09-09
 
