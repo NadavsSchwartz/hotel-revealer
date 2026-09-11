@@ -15,6 +15,7 @@ import { MAX_MATCH_COMPARISONS } from '../domain/matching.ts';
 import { isRecord } from '../domain/validation.ts';
 import type { ProviderStateStore } from './state.ts';
 import { addCalendarDays } from '../../shared/travel.ts';
+import { checkHealth } from '../../scripts/check-health.mts';
 
 type SetupOptions = { clock?: ManualClock; adapter?: Partial<ProviderAdapter>; stateStore?: NonNullable<Parameters<typeof createProviderService>[0]>['stateStore']; logger?: ProviderLogger };
 type Call = ['search', ProviderParameters['listingsPage']] | ['detail', ProviderParameters['hotelDetails']];
@@ -1285,7 +1286,7 @@ test('fresh search outcome counts preserve strict price types and ignore cache h
   } });
   assert.deepEqual((await service.status()).search, {
     status: 'unknown', eligibleOffers: null, matched: null, unresolved: null,
-    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0,
+    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0, consecutiveInvalidResponses: 0,
   });
   const [first, follower] = await Promise.all([service.search(futureContext), service.search(futureContext)]);
   assert.deepEqual(first, follower);
@@ -1325,6 +1326,50 @@ test('unexpected underlying search failures count once and a successful empty se
   assert.deepEqual((await pending).offers, []);
   assert.equal((await service.status()).search.consecutiveUnexpectedFailures, 0);
   assert.equal((await service.status()).search.eligibleOffers, 0);
+});
+
+test('repeated invalid search responses alert once per shared search and fresh recovery clears the warning', async () => {
+  for (const laterPage of [false, true]) {
+    let broken = false;
+    const { service, clock } = setup({ adapter: { async listingsPage({ cursor }) {
+      if (broken && (!laterPage || cursor)) return { listings: null, nextCursor: null };
+      return { listings: listingRows(), nextCursor: broken ? 'next' : null };
+    } } });
+    const monitor = async () => checkHealth('hotel.example.com', {
+      fetchImpl: async () => Response.json({ status: 'ok', provider: await service.status() }),
+    });
+    await service.search(futureContext);
+    broken = true;
+    const otherTrip = { ...futureContext, adults: 3 };
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const pending = Promise.allSettled([service.search(otherTrip), service.search(otherTrip)]);
+      await clock.advance(2000);
+      for (const result of await pending) {
+        if (laterPage) {
+          assert.equal(result.status, 'fulfilled');
+          if (result.status === 'fulfilled') assert.equal(result.value.coverage.status, 'partial');
+        } else {
+          assert.equal(result.status, 'rejected');
+          if (result.status === 'rejected') assert.equal(result.reason.code, 'PROVIDER_RESPONSE_INVALID');
+        }
+      }
+      const status = await service.status();
+      assert.equal(status.available, true);
+      assert.equal(status.search.consecutiveInvalidResponses, attempt);
+      if (attempt < 3) await monitor();
+      else await assert.rejects(monitor(), /unsupported provider responses/);
+    }
+    // Serving a previously cached trip must not clear a broken-provider warning.
+    await service.search(futureContext);
+    await assert.rejects(monitor(), /unsupported provider responses/);
+    broken = false;
+    const recovered = service.search(otherTrip);
+    await clock.advance(1000);
+    assert.equal((await recovered).coverage.status, 'complete');
+    assert.equal((await service.status()).search.consecutiveInvalidResponses, 0);
+    await monitor();
+    await service.close();
+  }
 });
 
 

@@ -50,6 +50,9 @@ export async function checkHealth(host: unknown, { fetchImpl = fetch, timeoutMs 
     const provider = 'provider' in health && health.provider && typeof health.provider === 'object' ? health.provider : {};
     if (!('available' in provider) || provider.available !== true) throw new HealthcheckError('Live provider is unavailable.');
     const search = 'search' in provider && provider.search && typeof provider.search === 'object' ? provider.search : {};
+    if ('consecutiveInvalidResponses' in search && Number(search.consecutiveInvalidResponses) >= 3) {
+      throw new HealthcheckError('Repeated searches received unsupported provider responses.');
+    }
     if ('consecutiveUnexpectedFailures' in search && Number(search.consecutiveUnexpectedFailures) >= 3) {
       throw new HealthcheckError('Three consecutive unexpected searches failed.');
     }
