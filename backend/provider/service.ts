@@ -18,7 +18,7 @@ export interface ProviderServiceOptions { adapter?: ProviderAdapter | null; cloc
 export type ProviderService = ReturnType<typeof createProviderService>;
 interface IssuedOffer { offer: Offer; offerExpiresAt: string }
 interface Metrics { searchCache: string; detailCache: string; shared: boolean; upstreamCalls: number; pagesFetched: number; queueDepth: number; failureCode?: string }
-interface SearchSummary { status: 'unknown' | 'observed'; eligibleOffers: number | null; matched: number | null; unresolved: Record<UnresolvedReason, number> | null; lastSuccessfulFreshSearch: string | null; consecutiveUnexpectedFailures: number }
+interface SearchSummary { status: 'unknown' | 'observed'; eligibleOffers: number | null; matched: number | null; unresolved: Record<UnresolvedReason, number> | null; lastSuccessfulFreshSearch: string | null; consecutiveUnexpectedFailures: number; consecutiveInvalidResponses: number }
 const record = (value: unknown): Record<string, unknown> => isRecord(value) ? value : {};
 
 const SEARCH_TTL = 5 * 60_000;
@@ -100,7 +100,7 @@ export function createProviderService({ adapter = null, clock = realClock, state
   let draining = false;
   let searchSummary: SearchSummary = {
     status: 'unknown', eligibleOffers: null, matched: null, unresolved: null,
-    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0,
+    lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0, consecutiveInvalidResponses: 0,
   };
 
   function log(level: 'info' | 'error', entry: unknown) {
@@ -313,12 +313,20 @@ export function createProviderService({ adapter = null, clock = realClock, state
         searchSummary = {
           status: 'observed', eligibleOffers: result.offers.length, matched, unresolved,
           lastSuccessfulFreshSearch: iso(clock.now()), consecutiveUnexpectedFailures: 0,
+          // A partial response or cache hit cannot establish provider recovery.
+          consecutiveInvalidResponses: metrics.failureCode === 'PROVIDER_RESPONSE_INVALID'
+            ? Math.min(Number.MAX_SAFE_INTEGER, searchSummary.consecutiveInvalidResponses + 1)
+            : result.coverage.status === 'complete' ? 0 : searchSummary.consecutiveInvalidResponses,
         };
         log('info', { event: 'provider_search_summary', ...searchSummary });
       }
       return result;
     } catch (error) {
-      if (!(error instanceof ServiceError) || error.code === 'INTERNAL_ERROR') {
+      if (error instanceof ServiceError && error.code === 'PROVIDER_RESPONSE_INVALID') {
+        searchSummary = { ...searchSummary, status: 'observed',
+          consecutiveInvalidResponses: Math.min(Number.MAX_SAFE_INTEGER, searchSummary.consecutiveInvalidResponses + 1) };
+        log('error', { event: 'provider_search_failed', ...searchSummary, diagnostic: diagnostic(error) });
+      } else if (!(error instanceof ServiceError) || error.code === 'INTERNAL_ERROR') {
         searchSummary = { ...searchSummary, status: 'observed',
           consecutiveUnexpectedFailures: Math.min(Number.MAX_SAFE_INTEGER, searchSummary.consecutiveUnexpectedFailures + 1) };
         log('error', { event: 'provider_search_failed', ...searchSummary, diagnostic: diagnostic(error) });

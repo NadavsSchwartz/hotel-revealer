@@ -44,7 +44,7 @@ function controlledService({ admit = false } = {}) {
     // @ts-expect-error Both HTTP operations share the same controlled timing fixture.
     detail: hold,
     status: async () => ({ available: true, search: { status: 'unknown', eligibleOffers: null, matched: null,
-      unresolved: null, lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0 } }),
+      unresolved: null, lastSuccessfulFreshSearch: null, consecutiveUnexpectedFailures: 0, consecutiveInvalidResponses: 0 } }),
   };
   return { calls, service,
     waitForCalls(count: number) { return calls.length >= count ? Promise.resolve() : new Promise<void>(resolve => waiters.push({ count, resolve })); },

@@ -22,7 +22,7 @@ function populatedDetail(now: number) {
 
 async function mockPhoto(page: Page) {
   await page.route('https://images.priceline.com/**', route => route.fulfill({
-    path: fileURLToPath(new URL('../../frontend/static/media/stay-hero.webp', import.meta.url)),
+    path: fileURLToPath(new URL('../../frontend/static/media/room-doorway.webp', import.meta.url)),
   }));
 }
 
