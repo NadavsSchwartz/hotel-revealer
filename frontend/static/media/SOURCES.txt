@@ -33,4 +33,6 @@ Source and exact prompt: sketches/room/assets/room-doorway.png and doorway-promp
 Production derivatives use existing Sharp 0.35.2 tooling, without a runtime dependency:
 1280px AVIF quality 48/effort 6; 1280px WebP quality 76/effort 6;
 720px mobile WebP quality 74/effort 6. No fabricated hotel name or offer is depicted.
-The previous terrace and pool assets remain available for historical references.
+Previous terrace and pool production derivatives were removed from this directory.
+Their source images remain in sketches/afterlight/assets/; previous derivatives
+remain in Git history. Browser image fixtures use the active room-doorway.webp.

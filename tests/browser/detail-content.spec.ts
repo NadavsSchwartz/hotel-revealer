@@ -5,7 +5,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { fileURLToPath } from 'node:url';
 import { queryParams, detailResponse } from './fixtures.ts';
 
-const picture = fileURLToPath(new URL('../../frontend/static/media/stay-hero.webp', import.meta.url));
+const picture = fileURLToPath(new URL('../../frontend/static/media/room-doorway.webp', import.meta.url));
 const imageUrl = (name: string | number) => `https://images.priceline.com/detail-content/${name}.webp`;
 const detailPath = (data: DetailResponse) => `/deal?${queryParams({ ...data.context, offerId: data.offer.offerId, hotelId: present(data.candidate).hotelId })}`;
 function populated() {

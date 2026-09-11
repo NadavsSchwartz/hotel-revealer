@@ -609,7 +609,7 @@ test('a likely hotel keeps property photos and available facts without ranked co
   candidate.thumbnailUrl = 'https://mobileimg.priceline.com/browser-fixture/juniper.webp';
   const photos = ['one', 'two', 'three'].map(name => `https://mobileimg.priceline.com/browser-fixture/${name}.webp`);
   await page.route('https://mobileimg.priceline.com/browser-fixture/**', route => route.fulfill({
-    path: fileURLToPath(new URL('../../frontend/static/media/stay-hero.webp', import.meta.url)),
+    path: fileURLToPath(new URL('../../frontend/static/media/room-doorway.webp', import.meta.url)),
   }));
   await page.route('**/api/v1/hotelDeals', route => route.fulfill({ json: data }));
   await page.route('**/api/v1/deal', route => route.fulfill({ json: {
