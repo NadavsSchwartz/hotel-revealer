@@ -42,7 +42,6 @@ Implementation complete locally on September 12, 2026. Not yet pushed or deploye
 
 - Browser/session identity, categorized referrals and screen sizes, page views,
   validated search/detail outcomes, and original-offer clicks.
-- DNT/GPC and unavailable storage suppress events.
 - DNT/GPC and unavailable storage suppress events. Internal-test and suspected
   automated traffic remain separate from ordinary browser totals.
 - Bounded first-party ingestion and a persistent daily stream, independent of
@@ -72,8 +71,9 @@ usage records have been added by this task. Git push needs an explicit request
 under this repository's working agreement. After authorization, publish the
 reviewed branch, run CI (including the offline Docker smoke/persistence checks),
 deploy the exact tested image, and install the updated `daily-report.py` without
-overwriting the host-specific Caddyfile. Verify an internal browser visit and a
-partial report on the actual host. Docker is unavailable on this Mac; new image
+overwriting the host-specific Caddyfile. Verify a synthetic/internal test event
+and an ordinary browser event in a partial report on the actual host. Docker is
+unavailable on this Mac; new image
 runtime checks, CI and hosted verification remain outstanding. Existing physical
 device and assistive-technology release evidence remains separate.
 
