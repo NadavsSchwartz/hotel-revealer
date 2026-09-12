@@ -107,7 +107,7 @@ test('usage quotas bound global work and client memory, refill and stay independ
   now = 60_000;
   assert.equal(allow('c'), true);
   const app = await serve(t, { usageNow: () => now, usageStore: { append: async () => true } });
-  for (let index = 0; index < 60; index++) assert.equal((await app.request()).status, 204);
+  for (let index = 0; index < 300; index++) assert.equal((await app.request()).status, 204);
   const limited = await app.request();
   assert.equal(limited.status, 429);
   assert.equal(limited.headers['retry-after'], '60');

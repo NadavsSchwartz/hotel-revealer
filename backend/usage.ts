@@ -157,7 +157,7 @@ export function createUsageStore({ directory = path.resolve(path.dirname(process
 }
 
 /** Quotas are independent of paid hotel operations, and expire without retaining client history. */
-export function createUsageLimiter({ now = Date.now, clientBurst = 60, globalBurst = 300, maxClients = 1000 }: {
+export function createUsageLimiter({ now = Date.now, clientBurst = 300, globalBurst = 5_000, maxClients = 1000 }: {
   now?: () => number; clientBurst?: number; globalBurst?: number; maxClients?: number;
 } = {}) {
   const clients = new Map<string, { tokens: number; timestamp: number }>();
