@@ -5,6 +5,7 @@ import { createProviderService } from './provider/service.ts';
 import { createPricelineAdapter } from './provider/priceline.ts';
 import { createSelectionStore } from './provider/selection-store.ts';
 import { jsonLogger as logger } from './logging.ts';
+import { createUsageStore } from './usage.ts';
 
 const providerMode = process.env.HOTEL_PROVIDER || 'priceline';
 if (!['priceline', 'disabled'].includes(providerMode)) throw new Error('HOTEL_PROVIDER must be priceline or disabled');
@@ -14,7 +15,9 @@ const selectionStore = providerMode === 'priceline' ? createSelectionStore({
 }) : null;
 await selectionStore?.ready();
 const service = createProviderService({ adapter: providerMode === 'priceline' ? createPricelineAdapter() : null, selectionStore, logger });
-const app = createApp({ service, logger, clientIdentity: process.env.HOTEL_CLIENT_IDENTITY || 'socket',
+const usageStore = createUsageStore({ directory: process.env.USAGE_DATA_DIR ? path.resolve(process.env.USAGE_DATA_DIR) : undefined, logger });
+await usageStore.ready();
+const app = createApp({ service, logger, usageStore, clientIdentity: process.env.HOTEL_CLIENT_IDENTITY || 'socket',
   frontendDirectory: process.env.FRONTEND_DIST_DIR ? path.resolve(process.env.FRONTEND_DIST_DIR) : undefined });
 const port = Number(process.env.PORT || 5000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
@@ -24,7 +27,8 @@ const server = app.listen(port, (error?: NodeJS.ErrnoException) => {
     process.exitCode = 1;
     logger.error({ event: 'server_start_failed',
       code: error.code && ['EADDRINUSE', 'EACCES', 'EADDRNOTAVAIL'].includes(error.code) ? error.code : 'LISTEN_FAILED' });
-    Promise.resolve().then(() => service.close()).catch(() => {
+    void Promise.allSettled([usageStore.close(), Promise.resolve().then(() => service.close())]).then((results) => {
+      if (results.every(result => result.status === 'fulfilled')) return;
       logger.error({ event: 'server_cleanup_failed' });
     });
     return;
@@ -44,12 +48,13 @@ function shutdown() {
   const grace = new Promise<void>(resolve => { finishGrace = resolve; });
   const forceClose = setTimeout(() => {
     void service.close();
+    void usageStore.close();
     server.closeAllConnections();
     finishGrace();
   }, 25_000);
   forceClose.unref();
   server.close(async () => {
-    await Promise.race([service.close(), grace]);
+    await Promise.race([Promise.allSettled([service.close(), usageStore.close()]), grace]);
     clearTimeout(forceClose);
     logger.info({ event: 'server_stopped' });
   });

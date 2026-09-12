@@ -38,12 +38,25 @@ docker exec "$name" node --input-type=module -e '
   assert.match(asset.headers.get("content-type"), /javascript/);
   assert.throws(() => fs.writeFileSync("/app/readonly-check", "x"));
   fs.writeFileSync("/app/var/smoke-check", "retained");
+  const usage = await fetch("http://127.0.0.1:5000/api/v1/usage", {
+    method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1:5000" },
+    body: JSON.stringify({ version: 1, eventId: "00000000-0000-4000-8000-000000000001",
+      browserId: "00000000-0000-4000-8000-000000000002", sessionId: "00000000-0000-4000-8000-000000000003",
+      action: "page_view", page: "home", device: "desktop", source: "direct", traffic: "internal" }),
+  });
+  assert.equal(usage.status, 204, "The offline container accepts a marked test usage event");
+  const files = fs.readdirSync("/app/var/usage").filter(name => /^usage-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name));
+  const records = files.flatMap(name => fs.readFileSync(`/app/var/usage/${name}`, "utf8").trim().split("\n").map(JSON.parse));
+  assert.ok(records.some(record => record.eventId === "00000000-0000-4000-8000-000000000001"));
 '
 docker restart --time 45 "$name" >/dev/null
 docker exec "$name" node --input-type=module -e '
   import assert from "node:assert/strict";
   import fs from "node:fs";
   assert.equal(fs.readFileSync("/app/var/smoke-check", "utf8"), "retained");
+  const usageFiles = fs.readdirSync("/app/var/usage").filter(name => /^usage-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name));
+  assert.ok(usageFiles.some(name => fs.readFileSync(`/app/var/usage/${name}`, "utf8").includes("00000000-0000-4000-8000-000000000001")),
+    "Usage records survive container restart on the persistent mount");
   fs.unlinkSync("/app/var/smoke-check");
   fs.writeFileSync("/app/var/provider-state.json", JSON.stringify({version:1,disabled:true,cooldownUntil:123456}));
 '

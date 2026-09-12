@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize retained app logs without contacting the app or its provider."""
+"""Summarize persistent browser usage and retained app logs without provider calls."""
 import argparse
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -21,6 +21,20 @@ MAX_LOG_BYTES = 64 * 1024 * 1024
 MAX_LINE_BYTES = 32 * 1024
 CAPTURE_SECONDS = 60
 REPORT_DIRECTORY = Path("/var/lib/hotel-revealer/reports")
+USAGE_DIRECTORY = Path("/var/lib/hotel-revealer/provider/usage")
+MAX_USAGE_BYTES = 5 * 1024 * 1024
+MAX_USAGE_LINE_BYTES = 2048
+COLLECTOR_GAP_SECONDS = 150
+USAGE_ACTIONS = ("page_view", "search_started", "search_succeeded", "search_failed",
+                 "detail_started", "detail_succeeded", "detail_failed", "provider_handoff", "internal_marked")
+USAGE_PAGES = ("home", "results", "detail", "privacy", "terms", "credits", "other")
+USAGE_DEVICES = ("mobile", "tablet", "desktop")
+USAGE_SOURCES = ("direct", "search", "social", "github", "external", "internal")
+USAGE_TRAFFIC = ("browser", "automated", "internal")
+USAGE_REQUIRED = {"version", "timestamp", "eventId", "browserId", "sessionId", "action", "page", "device", "source", "traffic"}
+USAGE_OUTCOMES = {"coverage", "resultCount", "detailStatus", "quoteStatus"}
+UUID_V4 = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", re.I)
+USAGE_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z")
 
 
 class ReportError(Exception):
@@ -213,6 +227,254 @@ def summarize(lines, start, end):
     return result
 
 
+def unique_fields(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def usage_record(line):
+    """Reject unknown fields and invalid categories without retaining or printing input."""
+    if len(line) > MAX_USAGE_LINE_BYTES:
+        raise ValueError("Usage line too large")
+    event = json.loads(line, object_pairs_hook=unique_fields)
+    if (not isinstance(event, dict) or type(event.get("version")) is not int or event["version"] != 1 or
+            not isinstance(event.get("timestamp"), str) or not USAGE_TIMESTAMP.fullmatch(event["timestamp"])):
+        raise ValueError("Invalid usage record")
+    timestamp = instant(event["timestamp"])
+    if event.get("kind") == "collector_status":
+        if (set(event) != {"version", "kind", "timestamp", "status"} or
+                event.get("status") not in ("started", "heartbeat", "stopped", "limited")):
+            raise ValueError("Invalid collector marker")
+        return event, timestamp
+    if not USAGE_REQUIRED <= set(event) or set(event) - USAGE_REQUIRED - USAGE_OUTCOMES:
+        raise ValueError("Invalid usage fields")
+    for field in ("eventId", "browserId", "sessionId"):
+        if not isinstance(event[field], str) or not UUID_V4.fullmatch(event[field]):
+            raise ValueError("Invalid random identifier")
+        event[field] = event[field].lower()
+    for field, allowed in (("action", USAGE_ACTIONS), ("page", USAGE_PAGES), ("device", USAGE_DEVICES),
+                           ("source", USAGE_SOURCES), ("traffic", USAGE_TRAFFIC)):
+        if event[field] not in allowed:
+            raise ValueError("Invalid usage category")
+    if event["action"] == "internal_marked" and event["traffic"] != "internal":
+        raise ValueError("Invalid internal classification marker")
+    for field in ("coverage", "resultCount"):
+        if field in event and event["action"] != "search_succeeded":
+            raise ValueError("Invalid search outcome")
+    if "coverage" in event and event["coverage"] not in ("complete", "partial"):
+        raise ValueError("Invalid search coverage")
+    if "resultCount" in event and (not count(event["resultCount"]) or event["resultCount"] > 5000):
+        raise ValueError("Invalid result count")
+    for field, allowed in (("detailStatus", ("available", "unavailable", "not_requested")),
+                           ("quoteStatus", ("available", "unavailable"))):
+        if field in event and (event["action"] != "detail_succeeded" or event[field] not in allowed):
+            raise ValueError("Invalid detail outcome")
+    return event, timestamp
+
+
+def summarize_usage(lines, start, end, *, available=True, capped=False):
+    result = {"available": available, "capped": capped, "invalid": 0, "duplicates": 0, "conflicts": 0,
+              "events": [], "markers": [], "classification_markers": 0, "first": None, "last": None}
+    seen = {}
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            event, timestamp = usage_record(line)
+        except (ValueError, TypeError, RecursionError, UnicodeError):
+            result["invalid"] += 1
+            continue
+        if not start <= timestamp < end:
+            continue
+        if event.get("kind") == "collector_status":
+            result["markers"].append((timestamp, event["status"]))
+            continue
+        if event["eventId"] in seen:
+            result["duplicates"] += 1
+            previous = seen[event["eventId"]]
+            if any(event.get(key) != previous.get(key) for key in USAGE_REQUIRED | USAGE_OUTCOMES if key != "timestamp"):
+                result["conflicts"] += 1
+            continue
+        seen[event["eventId"]] = event
+        result["events"].append((timestamp, event))
+        if event["action"] != "internal_marked":
+            result["first"] = min(timestamp, result["first"] or timestamp)
+            result["last"] = max(timestamp, result["last"] or timestamp)
+    # A browser marked as testing/automation anywhere in this day is excluded from
+    # ordinary browser totals, including earlier events before that marker.
+    traffic = {}
+    for _, event in result["events"]:
+        identity = event["browserId"]
+        classification = "internal" if event["action"] == "internal_marked" else event["traffic"]
+        traffic[identity] = max(traffic.get(identity, "browser"), classification, key=USAGE_TRAFFIC.index)
+    # Classification controls update attribution without creating measured activity.
+    interactions = [item for item in result["events"] if item[1]["action"] != "internal_marked"]
+    result["classification_markers"] = len(result["events"]) - len(interactions)
+    result["events"] = interactions
+    groups = {kind: {"browsers": set(), "sessions": {}, "actions": Counter(), "pages": Counter(),
+                     "search": Counter(), "detail": Counter()} for kind in USAGE_TRAFFIC}
+    for timestamp, event in sorted(result["events"], key=lambda item: item[0]):
+        group = groups[traffic[event["browserId"]]]
+        group["browsers"].add(event["browserId"])
+        # A session identifier alone does not merge different browser identities.
+        key = (event["browserId"], event["sessionId"])
+        session = group["sessions"].setdefault(key, {"actions": Counter(), "device": event["device"], "source": event["source"]})
+        action = event["action"]
+        session["actions"][action] += 1
+        group["actions"][action] += 1
+        if action == "page_view":
+            group["pages"][event["page"]] += 1
+        elif action == "search_succeeded":
+            group["search"][event.get("coverage", "coverage_missing")] += 1
+            if "resultCount" in event:
+                group["search"]["result_samples"] += 1
+                group["search"]["result_total"] += event["resultCount"]
+                group["search"]["with_results" if event["resultCount"] else "zero_results"] += 1
+            else:
+                group["search"]["results_missing"] += 1
+        elif action == "detail_succeeded":
+            group["detail"]["detail_" + event.get("detailStatus", "missing")] += 1
+            group["detail"]["quote_" + event.get("quoteStatus", "missing")] += 1
+    result["groups"] = groups
+    return result
+
+
+def read_usage(directory, start, end):
+    """Stream bounded bytes/lines; tiny malformed lines cannot expand into a huge list."""
+    path = Path(directory) / f"usage-{start.date()}.jsonl"
+    state = {"capped": False, "torn": False}
+
+    def lines(stream):
+        size = 0
+        draining = False
+        while True:
+            line = stream.readline(min(MAX_USAGE_LINE_BYTES + 1, MAX_USAGE_BYTES - size + 1))
+            if not line:
+                return
+            size += len(line)
+            if size > MAX_USAGE_BYTES:
+                state["capped"] = True
+                return
+            complete = line.endswith(b"\n")
+            if draining:
+                draining = not complete
+            elif len(line) > MAX_USAGE_LINE_BYTES:
+                # Count an oversized record once, and drain its tail without parsing it.
+                yield line
+                draining = not complete
+            elif not complete:
+                state["torn"] = True
+                return
+            else:
+                yield line
+
+    try:
+        if not path.is_file():
+            return summarize_usage([], start, end, available=False)
+        with path.open("rb") as stream:
+            result = summarize_usage(lines(stream), start, end)
+    except OSError:
+        return summarize_usage([], start, end, available=False)
+    result["capped"] = state["capped"]
+    result["invalid"] += int(state["torn"])
+    return result
+
+
+def usage_coverage(usage, start, end, now):
+    markers = sorted(set(usage["markers"]))
+    reasons = []
+    unavailable = not usage["available"] or not usage["events"] and not usage["classification_markers"] and not markers
+    if unavailable:
+        reasons.append("No readable collection evidence for this UTC day; missing, empty, expired or unavailable collection is not zero traffic.")
+    if end > now:
+        reasons.append("This UTC day is in progress; counts are partial.")
+    if not markers and not unavailable:
+        reasons.append("Collector availability markers are missing; event counts are observations only.")
+    elif markers:
+        endpoint = min(end, now)
+        tolerance = timedelta(seconds=COLLECTOR_GAP_SECONDS)
+        if markers[0][0] - start > tolerance or endpoint - markers[-1][0] > tolerance:
+            reasons.append("Collector markers do not cover the window endpoints within the 150-second tolerance.")
+        if any(after[0] - before[0] > tolerance for before, after in zip(markers, markers[1:])):
+            reasons.append("Collector marker gaps exceed 150 seconds; some activity may be missing.")
+        if any(status == "stopped" or status == "started" and timestamp - start > tolerance for timestamp, status in markers):
+            reasons.append("Collector shutdown or restart was observed during the window; continuity is incomplete.")
+        if any(status == "limited" for _, status in markers):
+            reasons.append("The collector reported a collection limit; some events were dropped.")
+    if usage["capped"]:
+        reasons.append("The persistent file exceeded the 5 MiB report read cap; later records were not read.")
+    if usage["invalid"] or usage["conflicts"]:
+        reasons.append("Malformed, incomplete or conflicting records were ignored; some activity may be missing.")
+    return ("unavailable" if unavailable else "partial" if reasons else "observed continuity"), reasons
+
+
+def render_usage(usage, start, end, now):
+    coverage, reasons = usage_coverage(usage, start, end, now)
+    lines = ["## Browser usage", "",
+             "Persistent first-party usage files survive container replacement. This section has independent coverage from Docker logs.", "",
+             f"- Browser usage coverage: {coverage}."]
+    lines.extend(f"- {reason}" for reason in reasons)
+    lines.append(f"- Accepted unique events: {len(usage['events'])}; duplicate event IDs ignored: {usage['duplicates']}; malformed/incomplete records: {usage['invalid']}; conflicting duplicates: {usage['conflicts']}.")
+    if usage["classification_markers"]:
+        lines.append(f"- Internal classification markers: {usage['classification_markers']} (excluded from activity totals).")
+    if usage["first"]:
+        lines.append(f"- Observed browser event range: {stamp(usage['first'])} to {stamp(usage['last'])}.")
+    lines.extend(["", "Collector continuity is observed availability, not a lossless-delivery guarantee. JavaScript blocked, opt-out, DNT/GPC, blocked storage and ad blockers are unobservable. Bot classification is heuristic; unmarked activity is not proof of a human visitor.",
+                  "Random browser IDs are approximate browsers, not people. IDs expire after 30 days; devices, browsers, cleared storage and separate tabs can overcount people. Sessions are per tab, expire after 30 minutes of inactivity, and are counted once per UTC day with an observed event.",
+                  "Any internal/testing marker for a browser in this day excludes that browser's events from ordinary totals; otherwise any automation marker classifies it as suspected automation.", ""])
+    if coverage == "unavailable":
+        lines.extend(["Browser, session, page-view and action totals: n/a (collection unavailable).", ""])
+        return lines
+    lines.extend(["| Activity class | Approximate browsers | Observed tab sessions | Engaged sessions | Page views | Events |",
+                  "| --- | ---: | ---: | ---: | ---: | ---: |"])
+    for kind, label in (("browser", "Unmarked browser"), ("internal", "Internal/testing"), ("automated", "Suspected automation")):
+        group = usage["groups"][kind]
+        engaged = sum(session["actions"]["page_view"] >= 2 or any(action != "page_view" for action in session["actions"])
+                      for session in group["sessions"].values())
+        lines.append(f"| {label} | {len(group['browsers'])} | {len(group['sessions'])} | {engaged} | {group['actions']['page_view']} | {sum(group['actions'].values())} |")
+    group = usage["groups"]["browser"]
+    sessions = list(group["sessions"].values())
+    total_sessions = len(sessions)
+    lines.extend(["", "Engaged means at least two page views or a search, detail or original-offer action observed in the same tab session during this UTC day. Page views exclude assets, health checks and raw HTTP requests.",
+                  "All breakdowns below use unmarked browser activity only; marked internal/testing and suspected automation are excluded. Zero means no observed events in the available collection, not proof that nobody visited.",
+                  "", "### Pages and action reach", "",
+                  "| Page | Page views |", "| --- | ---: |"])
+    lines.extend(f"| {page} | {group['pages'][page]} |" for page in USAGE_PAGES)
+    lines.extend(["", "| Action | Unique events | Sessions reaching action / observed browser sessions |", "| --- | ---: | --- |"])
+    for action in USAGE_ACTIONS:
+        if action == "internal_marked":
+            continue
+        reached = sum(session["actions"][action] > 0 for session in sessions)
+        lines.append(f"| {action.replace('_', ' ')} | {group['actions'][action]} | {percent(reached, total_sessions)} |")
+    lines.extend(["", "Action reach is an unordered step count, not an ordered conversion funnel. Starts and terminal outcomes can occur on different days; they are not paired attempts. Intentional aborts do not count as failures. Original-offer handoffs are clicks, not bookings.",
+                  "", "### Observed outcomes", ""])
+    actions, searches, details = group["actions"], group["search"], group["detail"]
+    search_completed = actions["search_succeeded"] + actions["search_failed"]
+    detail_completed = actions["detail_succeeded"] + actions["detail_failed"]
+    lines.extend([f"Search terminal outcomes: {actions['search_succeeded']} succeeded, {actions['search_failed']} failed; succeeded / observed terminal outcomes: {percent(actions['search_succeeded'], search_completed)}.",
+                  f"Successful-search coverage: {searches['complete']} complete, {searches['partial']} partial, {searches['coverage_missing']} unspecified (denominator: {actions['search_succeeded']} successful search events).",
+                  f"Successful searches with result counts: {searches['result_samples']}; zero results: {searches['zero_results']}; with results: {searches['with_results']}; result count unspecified: {searches['results_missing']}."])
+    if searches["result_samples"]:
+        lines.append(f"Visible matched results per successful search with a result count: {searches['result_total'] / searches['result_samples']:.1f} mean ({searches['result_total']} results / {searches['result_samples']} events; repeated searches can repeat results).")
+    else:
+        lines.append("Visible matched results per successful search: n/a (no result-count observations).")
+    lines.extend([f"Detail terminal outcomes: {actions['detail_succeeded']} succeeded, {actions['detail_failed']} failed; succeeded / observed terminal outcomes: {percent(actions['detail_succeeded'], detail_completed)}.",
+                  f"Successful-detail content status: {details['detail_available']} available, {details['detail_unavailable']} unavailable, {details['detail_not_requested']} not requested, {details['detail_missing']} unspecified (denominator: {actions['detail_succeeded']} successful detail events).",
+                  f"Successful-detail quote status: {details['quote_available']} available, {details['quote_unavailable']} unavailable, {details['quote_missing']} unspecified (denominator: {actions['detail_succeeded']} successful detail events).",
+                  "", "### Session device and source", "",
+                  "Each breakdown counts a session once using its earliest observed event in this UTC day. Source categories describe the session's reported referrer category; direct can include unavailable referrers.", "",
+                  "| Dimension | Category | Sessions / observed browser sessions |", "| --- | --- | --- |"])
+    for field, categories in (("device", USAGE_DEVICES), ("source", USAGE_SOURCES)):
+        counts = Counter(session[field] for session in sessions)
+        lines.extend(f"| {field} | {category} | {percent(counts[category], total_sessions)} |" for category in categories)
+    lines.append("")
+    return lines
+
+
 def percent(numerator, denominator):
     return f"{100 * numerator / denominator:.1f}% ({numerator}/{denominator})" if denominator else "n/a (no observations)"
 
@@ -221,11 +483,12 @@ def percentile(values, fraction):
     return f"{sorted(values)[math.ceil(len(values) * fraction) - 1]:.0f} ms" if values else "n/a"
 
 
-def render(summary, container, start, end, now=None):
-    in_progress = end > (now or datetime.now(UTC))
+def render(summary, container, start, end, now=None, usage=None):
+    now = now or datetime.now(UTC)
+    in_progress = end > now
     partial = in_progress or container["created"] > start or summary["invalid"] > 0
     lines = [f"# Hotel Revealer — {start.date()} UTC", "",
-             "Only retained logs are reported. Docker rotation or removed containers can omit activity; unavailable metrics show n/a.", "",
+             "Operational statistics use retained logs. Docker rotation or removed containers can omit activity; unavailable metrics show n/a.", "",
              f"- Window: {stamp(start)} inclusive to {stamp(end)} exclusive.",
              f"- Coverage: {'partial' if partial else 'unknown'}.",
              f"- Container: `{container['id'][:12]}`; created {stamp(container['created'])}; capture-time status: {container['status']}.",
@@ -238,6 +501,8 @@ def render(summary, container, start, end, now=None):
         lines.append(f"- Observed event range: {stamp(summary['first'])} to {stamp(summary['last'])}.")
     else:
         lines.append("- No usable timestamped events in this window.")
+    if usage is not None:
+        lines.extend(["", *render_usage(usage, start, end, now)])
     lines.extend(["", "## Hotel API responses", "",
                   "Counts use terminal POST events only. Diagnostics and provider events are not added to HTTP failures. Dates follow completion/abort time.", "",
                   "| Route | Completed | 2xx / completed | 4xx | 5xx | Other status | Aborted | p50 | p95 |",
@@ -309,7 +574,7 @@ def save_report(directory, day, body):
     return target
 
 
-def run(report_date=None, output_dir=REPORT_DIRECTORY):
+def run(report_date=None, output_dir=REPORT_DIRECTORY, usage_dir=USAGE_DIRECTORY):
     start, end = day_window(report_date)
     container = app_container()
     logs = retained_lines(container, start, end)
@@ -317,16 +582,18 @@ def run(report_date=None, output_dir=REPORT_DIRECTORY):
         summary = summarize(logs, start, end)
     finally:
         logs.close()
-    return save_report(output_dir, start.date(), render(summary, container, start, end))
+    usage = read_usage(usage_dir, start, end)
+    return save_report(output_dir, start.date(), render(summary, container, start, end, usage=usage))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", help="UTC day, YYYY-MM-DD; today is partial; default: yesterday")
     parser.add_argument("--output-dir", type=Path, default=REPORT_DIRECTORY)
+    parser.add_argument("--usage-dir", type=Path, default=USAGE_DIRECTORY, help="Persistent usage JSONL directory")
     args = parser.parse_args()
     try:
-        target = run(args.date, args.output_dir)
+        target = run(args.date, args.output_dir, args.usage_dir)
         print(f"Wrote retained-log report: {target}")
     except ReportError as error:
         parser.exit(1, f"Daily report failed: {error}\n")

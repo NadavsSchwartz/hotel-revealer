@@ -296,8 +296,8 @@ current/rollback images and persistent volumes.
 ### Daily report from retained application logs
 
 The optional daily job writes one private Markdown report for the previous UTC
-day at 00:10 UTC. It reads the app container's retained Docker logs and limited
-container metadata; it never calls the application or provider, starts a container,
+day at 00:10 UTC. It reads persistent first-party usage records plus the app
+container's retained Docker logs and limited container metadata; it never calls the application or provider, starts a container,
 resets state, or sends a message. It uses the host's existing Python 3 standard
 library and Docker CLI, with no host Node installation or additional packages.
 Deploy the timestamped JSON application logger before enabling reports; historical
@@ -321,7 +321,7 @@ The report separates terminal hotel-API POST responses from provider events:
   success. Caller-completion counters can miss upstream work continuing after a
   caller times out, so the report does not claim an exact upstream-call total.
 
-Coverage is always **unknown or partial**: Docker retains three 10 MB files, and
+Operational-log coverage is always **unknown or partial**: Docker retains three 10 MB files, and
 container replacement can remove earlier logs. Empty or unreadable input leaves
 metrics unavailable. Reports include the requested window, container creation
 time/status, observed timestamp range and skipped record count.
@@ -356,7 +356,8 @@ Capture has a 60-second deadline, a 64 MiB total limit and a 32 KiB line limit.
 
 The directory is mode 700 and each report mode 600. Successful runs atomically
 replace that date's file and retain the newest 30 report dates; unrelated files
-are preserved. There is no separate raw-log archive or incremental counter store.
+are preserved. Operational Docker logs have no separate archive. First-party
+usage records have independent persistent storage and coverage, described below.
 To regenerate a retained date, run:
 
 ```sh
@@ -382,6 +383,51 @@ existing reports and does not alter the running application. Host installation,
 timer execution and a real daily report require their own verification after
 deployment. Local verification uses `python3 deploy/test-daily-report.py`, which
 supplies synthetic events and a fake Docker executable.
+
+### Browser usage and the path to an original offer
+
+The browser sends allowlisted events to this app's `/api/v1/usage` endpoint:
+page views, search/detail requests and validated outcomes, and original-offer
+clicks. The existing daily report separates ordinary browser, marked internal,
+and suspected automated traffic. It includes distinct browser and tab-session
+counts, page views, device/referral categories, and the steps reached in a session.
+It does not count static assets or health checks as page views.
+
+Browser IDs are random, stored in local storage for at most 30 days, and do not
+identify a person. Tab sessions expire after 30 minutes without a measured action.
+Multiple devices count separately, shared browsers can combine people, and
+storage clearing changes identity. Disabled JavaScript, blockers, unavailable
+storage, DNT, GPC and the privacy-page opt-out prevent measurement. Suspected bot
+classification is a heuristic. Counts are observed usage, not verified humans or
+exhaustive traffic. A click to Priceline does not establish a booking.
+
+Before owner testing, open `/?usage=internal` to mark this browser before its
+first page view, or open `/privacy` and enable **Exclude this browser from
+visitor totals**. Reports exclude that browser's activity for any UTC day
+containing an internal marker. Earlier dates cannot be identified automatically;
+already generated reports change only when regenerated. Automated browsers are classified separately.
+The ordinary browser counts may still include unmarked owner testing.
+
+The collector writes `usage-YYYY-MM-DD.jsonl` under `usage/` beside
+`PROVIDER_STATE_FILE`. In the standard VPS layout this is
+`/var/lib/hotel-revealer/provider/usage` on the host. Files persist on the existing
+volume across app deployments, have a 5 MiB daily cap, and retain at most 30 UTC
+days. Heartbeats and limit markers let the report flag collection gaps. Only
+usage files are pruned. A missing file means unavailable evidence, not zero users.
+The report contains aggregate counts rather than browser or session IDs.
+
+`USAGE_DATA_DIR` overrides the application's path. If changed, point the report's
+`--usage-dir` at the corresponding **host** directory too. The app runs as UID
+1000 and needs that directory writable; the report service only needs to read it.
+No new service, analytics provider, package or public reporting endpoint is needed.
+Raw records contain no trip text, travel dates, guest details, hotel/offer IDs,
+IP addresses, full user agents, full URLs or referrer hostnames.
+
+Deploy both the app image and the updated `daily-report.py` using the existing
+release and report-install steps. Preserve the host-specific Caddyfile. Verify a
+marked internal browser visit produces an internal event and an internal count
+in a partial report; leave normal visitor counts separate. See the implementation
+and evidence record in [USAGE_ANALYTICS.md](../docs/USAGE_ANALYTICS.md).
 
 Run `npm run measure:capacity` with the pinned Node/npm toolchain to measure the
 existing local capacity scenario. It uses a synthetic provider and makes no hotel

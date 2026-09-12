@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { SearchDraft } from './traveler/SearchForm.tsx';
 import {
@@ -13,6 +13,7 @@ import Brand from './traveler/Brand.tsx';
 import CurrencySelector, { useCurrency } from './traveler/CurrencySelector.tsx';
 import ThemeToggle from './traveler/ThemeToggle.tsx';
 import SearchProgress from './traveler/SearchProgress.tsx';
+import { readUsagePreferences, setUsageAllowed, setUsageInternal, trackUsage, usagePage } from './traveler/usage.ts';
 import './traveler/home.css';
 
 const Results = React.lazy(() => import('./traveler/Results.tsx'));
@@ -27,6 +28,43 @@ function RouteLoading({ message, search = false }: { message: string; search?: b
   );
 }
 
+function UsageControls() {
+  const [preferences, setPreferences] = useState(readUsagePreferences);
+  useEffect(() => {
+    const update = () => setPreferences(readUsagePreferences());
+    window.addEventListener('storage', update);
+    window.addEventListener('focus', update);
+    return () => {
+      window.removeEventListener('storage', update);
+      window.removeEventListener('focus', update);
+    };
+  }, []);
+  return (
+    <fieldset className="usage-controls">
+      <legend>Usage measurement on this browser</legend>
+      <label>
+        <input type="checkbox" checked={preferences.allowed} disabled={preferences.blocked !== null}
+          aria-describedby="usage-measurement-help usage-measurement-status"
+          onChange={event => setPreferences(setUsageAllowed(event.target.checked))} />
+        <span>Allow usage measurement</span>
+      </label>
+      <p id="usage-measurement-help">Turning this off stops future usage events and removes this browser’s measurement identifiers. Your search still works.</p>
+      <label>
+        <input type="checkbox" checked={preferences.internal} disabled={preferences.blocked !== null}
+          aria-describedby="usage-internal-help"
+          onChange={event => setPreferences(setUsageInternal(event.target.checked))} />
+        <span>Exclude this browser from visitor totals</span>
+      </label>
+      <p id="usage-internal-help">Use this when testing the app. Marked testing is reported separately from visitor totals when measurement is allowed.</p>
+      <p id="usage-measurement-status" role="status">
+        {preferences.blocked === 'privacy-signal' ? 'Usage measurement is off because your browser sends Do Not Track or Global Privacy Control.'
+          : preferences.blocked === 'storage' ? 'Usage measurement is off because browser storage is unavailable. These settings cannot be saved.'
+          : preferences.allowed ? 'Usage measurement is on for this browser.' : 'Usage measurement is off for this browser.'}
+      </p>
+    </fieldset>
+  );
+}
+
 function Policy({ privacy = false }: { privacy?: boolean }) {
   return (
     <article className="page-shell policy-page">
@@ -37,7 +75,7 @@ function Policy({ privacy = false }: { privacy?: boolean }) {
       <h1 tabIndex={-1}>
         {privacy ? 'Privacy, plainly.' : 'Before you use this.'}
       </h1>
-      <p className="policy-date">Last updated September 8, 2026</p>
+      <p className="policy-date">Last updated September {privacy ? '12' : '8'}, 2026</p>
       {privacy ? (
         <>
           <h2>What your search uses</h2>
@@ -63,9 +101,32 @@ function Policy({ privacy = false }: { privacy?: boolean }) {
           </p>
           <p>
             This application does not require an account and does not include
-            analytics, advertising trackers, or an application tracking cookie.
+            advertising trackers or an application tracking cookie.
             Your browser may retain its normal browsing history.
           </p>
+          <h2>Understanding app usage</h2>
+          <p>
+            This application measures page categories, search and hotel-detail outcomes,
+            and clicks to the original offer. It also records a broad screen-size category,
+            a referral category, and whether activity is marked as testing or suspected automation.
+            A click to Priceline does not tell us whether you book.
+          </p>
+          <p>
+            Random identifiers estimate returning browsers and tab sessions. These identifiers
+            are pseudonymous, not anonymous: they link activity without recording your name.
+            The browser identifier expires 30 days after creation; the tab session expires
+            after 30 minutes without a measured action. They are stored in local and session
+            storage. Different devices, cleared storage, and copied or separate tabs can affect
+            these estimates; they are not a count of people.
+          </p>
+          <p>
+            Usage events go only to this application’s server and are retained for up to 30 days.
+            They contain no full URLs, search text, travel dates, guest details, hotel identities,
+            raw IP addresses, or full browser user-agent strings. There is no fingerprinting,
+            advertising profile, or session recording. The app honors Do Not Track and Global
+            Privacy Control, and skips measurement when browser storage is blocked.
+          </p>
+          <UsageControls />
           <h2>Server and provider requests</h2>
           <p>
             Requests include ordinary network information, such as your IP
@@ -174,6 +235,7 @@ function PageBehavior() {
   useEffect(() => {
     const pathChanged = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
+    if (pathChanged) trackUsage({ action: 'page_view', page: usagePage(location.pathname) });
     const titles: Record<string, string> = {
       '/': 'Your hotel. Out of hiding.',
       '/results': 'Your Express deals',

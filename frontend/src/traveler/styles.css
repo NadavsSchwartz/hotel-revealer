@@ -1160,6 +1160,19 @@ img {
   line-height: 1.8;
   color: var(--muted);
 }
+.usage-controls {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  min-width: 0;
+}
+.usage-controls legend { padding-inline: 8px; font-weight: 600; }
+.usage-controls label { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.usage-controls input { width: 20px; height: 20px; margin: 2px 0 0; flex: 0 0 auto; accent-color: var(--text); }
+.usage-controls input:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.usage-controls p { font-size: 14px; margin: 8px 0 20px; }
+.usage-controls p:last-child { margin-bottom: 0; }
 @media (min-width: 1450px) {
   .home-hero {
     padding-top: 90px;

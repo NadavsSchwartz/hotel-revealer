@@ -11,6 +11,8 @@ import { SAFE_IMAGE_HOSTS } from './domain/index.ts';
 import { searchDestinations, validQuery } from './destinations/index.ts';
 import { requestRoute } from './diagnostics.ts';
 import { createHotelAdmission } from './admission.ts';
+import { createUsageRouter } from './usage.ts';
+import type { UsageSink } from './usage.ts';
 import type { NextFunction, Request, Response } from 'express';
 import type { HotelService } from './http-types.ts';
 import type { ProviderLogger } from './provider/types.ts';
@@ -22,6 +24,8 @@ export interface AppOptions {
   destinationNow?: () => number;
   clientIdentity?: string;
   admissionNow?: () => number;
+  usageStore?: UsageSink;
+  usageNow?: () => number;
 }
 type HtmlDocument = { home: string; other: string; error?: never }
   | { error: ServiceError; home?: never; other?: never };
@@ -34,7 +38,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'", "form-action 'self'",
 ].join('; ');
 
-export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now(), clientIdentity = 'socket', admissionNow }: AppOptions = {}) {
+export function createApp({ logger = console, service = createProviderService({ logger }), frontendDirectory = defaultFrontendDirectory, destinationNow = () => performance.now(), clientIdentity = 'socket', admissionNow, usageStore, usageNow }: AppOptions = {}) {
   const app = express();
   let html: Promise<HtmlDocument> | undefined;
   // One process, ten catalog scans per second, with a burst of ten. Refill on
@@ -72,6 +76,7 @@ export function createApp({ logger = console, service = createProviderService({ 
     });
     next();
   });
+  app.use('/api/v1/usage', createUsageRouter({ store: usageStore, clientIdentity, now: usageNow }));
   app.use(createHotelAdmission({ clientIdentity, now: admissionNow }));
   app.use(express.json({ limit: '16kb', strict: true }));
   app.get('/api/v1/destinations', (req, res) => {

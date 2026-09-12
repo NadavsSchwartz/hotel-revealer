@@ -50,5 +50,5 @@ export function diagnostic(error: unknown, depth = 0): Diagnostic {
 
 export function requestRoute(req: { path?: string }) {
   const path = req.path?.toLowerCase().replace(/\/$/, '');
-  return path && ['/api/v1/hoteldeals', '/api/v1/deal', '/api/v1/destinations', '/health'].includes(path) ? path : 'other';
+  return path && ['/api/v1/hoteldeals', '/api/v1/deal', '/api/v1/destinations', '/api/v1/usage', '/health'].includes(path) ? path : 'other';
 }

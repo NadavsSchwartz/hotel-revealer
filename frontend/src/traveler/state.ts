@@ -1,4 +1,5 @@
 import { contextKey } from './context.ts';
+import { trackUsage } from './usage.ts';
 import { isRecord, validDetailResponse, validSearchResponse, validResolution } from './responseValidation.ts';
 import type { Backoff, TripContext } from '../../../shared/contracts.ts';
 import type { ViewCandidate as Candidate, ViewDetailResponse as DetailResponse, ViewOffer as Offer, ViewSearchResponse as SearchResponse } from './responseValidation.ts';
@@ -278,13 +279,20 @@ function request(kind: 'search' | 'detail', path: string, input: TripContext & {
     const tripKey = contextKey(input);
     if (kind === 'search') dispatch({ type: 'search/start', key, tripKey, requestId });
     else if (input.offerId !== undefined) dispatch({ type: 'detail/start', key, tripKey, requestId, offerId: input.offerId, hotelId: input.hotelId });
+    const usagePage = kind === 'search' ? 'results' : 'detail';
+    trackUsage({ action: kind === 'search' ? 'search_started' : 'detail_started', page: usagePage });
+    const isCurrent = () => controllers[kind] === controller &&
+      (!getState || (getState()[kind].key === key && getState()[kind].requestId === requestId));
     try {
       const data = await post(path, input, controller.signal);
+      if (!isCurrent() || controller.signal.aborted) return;
       if (kind === 'search') {
         if (!validSearchResponse(data) || contextKey(data.context) !== contextKey(input)) {
           throw controlledError('PROVIDER_RESPONSE_INVALID');
         }
         dispatch({ type: 'search/success', key, tripKey, requestId, data });
+        trackUsage({ action: 'search_succeeded', page: usagePage, coverage: data.coverage.status,
+          resultCount: data.offers.filter(offer => offer.resolution.status === 'matched').length });
       } else {
         if (!validDetailResponse(data) || contextKey(data.context) !== contextKey(input) ||
             data.offer.offerId !== input.offerId ||
@@ -300,10 +308,11 @@ function request(kind: 'search' | 'detail', path: string, input: TripContext & {
           throw controlledError('PROVIDER_RESPONSE_INVALID');
         }
         dispatch({ type: 'detail/success', key, tripKey, requestId, data });
+        trackUsage({ action: 'detail_succeeded', page: usagePage, detailStatus: data.detailStatus, quoteStatus: data.quoteStatus });
       }
     } catch (failure) {
       const error = isRecord(failure) ? failure : {};
-      if (controller.signal.aborted && !timedOut) return;
+      if (!isCurrent() || (controller.signal.aborted && !timedOut)) return;
       dispatch({
         type: kind === 'search' ? 'search/error' : 'detail/error',
         key,
@@ -315,6 +324,7 @@ function request(kind: 'search' | 'detail', path: string, input: TripContext & {
           error.retryAt,
         ),
       });
+      trackUsage({ action: kind === 'search' ? 'search_failed' : 'detail_failed', page: usagePage });
     } finally {
       clearTimeout(timeout);
       if (controllers[kind] === controller) controllers[kind] = null;

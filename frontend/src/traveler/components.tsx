@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Offer, Quote as QuoteValue, TripDraft } from '../../../shared/contracts.ts';
 import { displayDate, money, nights, safeHref } from './context.ts';
+import { trackUsage } from './usage.ts';
 import './comparison.css';
 
 export function TripSummary({ context }: { context: TripDraft }) {
@@ -344,7 +345,9 @@ export function ProviderLink({ offer, stale, unavailable = false, refreshing = f
   return (
     <div className="provider-handoff">
       {href ? (
-        <a className="button-link" href={href} target="_blank" rel="noopener noreferrer">
+        <a className="button-link" href={href} target="_blank" rel="noopener noreferrer"
+          onClick={event => { if (event.button === 0) trackUsage({ action: 'provider_handoff' }); }}
+          onAuxClick={event => { if (event.button === 1) trackUsage({ action: 'provider_handoff' }); }}>
           View deal on Priceline
           <svg className="action-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 4h5v5M9 11l7-7" /></svg>
           <span className="sr-only"> (opens a new tab)</span>
