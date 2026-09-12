@@ -57,6 +57,7 @@ test('session identity and referral category survive routes/reloads and expire i
   const first = events[0];
   expect(first.source).toBe('search');
   await page.getByRole('link', { name: 'Privacy', exact: true }).click();
+  await expect(page.getByText('Allow usage measurement', { exact: true })).toHaveCount(0);
   // Let the route render and measure before replacing its document on reload.
   await expect.poll(() => events.map(event => event.page)).toEqual(['home', 'privacy']);
   await page.reload();
@@ -82,59 +83,10 @@ test('session identity and referral category survive routes/reloads and expire i
   expect(events[4].sessionId).not.toBe(events[3].sessionId);
 });
 
-test('privacy controls mark internal activity and opt out immediately across reloads', async ({ page }) => {
-  await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
-  const events = await captureUsage(page);
-  await mockOffers(page);
-  await page.goto('/privacy');
-  await expect.poll(() => events.length).toBe(1);
-  expect(events[0].traffic).toBe('browser');
-  const browserId = events[0].browserId;
-  await page.getByRole('checkbox', { name: 'Exclude this browser from visitor totals' }).check();
-  await expect.poll(() => events.length).toBe(2);
-  expect(events[1]).toMatchObject({ action: 'internal_marked', traffic: 'internal', browserId, page: 'privacy' });
-  expect(events.filter(event => event.action === 'page_view')).toHaveLength(1);
-  await page.getByRole('link', { name: 'Back to search', exact: false }).click();
-  await expect.poll(() => events.length).toBe(3);
-  expect(events[2]).toMatchObject({ traffic: 'internal', browserId });
-  await page.getByRole('link', { name: 'Privacy', exact: true }).click();
-  await expect.poll(() => events.length).toBe(4);
-  await page.getByRole('checkbox', { name: 'Allow usage measurement', exact: true }).uncheck();
-  await expect(page.getByRole('status')).toContainText('Usage measurement is off');
-  await page.goto(searchPath);
-  await expect(page.getByRole('link', { name: 'View hotel details', exact: true })).toBeVisible();
-  await page.waitForLoadState('networkidle');
-  expect(events).toHaveLength(4);
-  expect(await page.evaluate(() => [localStorage.getItem('hotel-revealer-usage-browser'), sessionStorage.getItem('hotel-revealer-usage-session')])).toEqual([null, null]);
-});
-
-test('marking a testing browser takes priority over webdriver classification', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('hotel-revealer-usage-internal', 'true'));
-  const events = await captureUsage(page);
-  await page.goto('/');
-  await expect.poll(() => events.length).toBe(1);
-  expect(events[0].traffic).toBe('internal');
-});
-
-test('the internal testing bookmark marks the first visit and can be disabled in privacy settings', async ({ page }) => {
-  const events = await captureUsage(page);
-  await page.goto('/?usage=internal&private-trip=not-recorded');
-  await expect.poll(() => events.length).toBe(1);
-  expect(events[0]).toMatchObject({ traffic: 'internal', page: 'home' });
-  expect(JSON.stringify(events)).not.toContain('private-trip');
-  await page.getByRole('link', { name: 'Privacy', exact: true }).click();
-  await expect(page.getByRole('checkbox', { name: 'Exclude this browser from visitor totals' })).toBeChecked();
-  await page.getByRole('checkbox', { name: 'Exclude this browser from visitor totals' }).uncheck();
-  await page.getByRole('link', { name: 'Back to search', exact: false }).click();
-  await expect.poll(() => events.length).toBe(3);
-  expect(events[2].traffic).toBe('automated');
-});
-
-for (const mode of ['opt-out', 'DNT', 'GPC', 'blocked-local-storage', 'blocked-session-storage'] as const) {
+for (const mode of ['DNT', 'GPC', 'blocked-local-storage', 'blocked-session-storage'] as const) {
   test(`${mode} disables usage measurement while search remains usable`, async ({ page }) => {
     await page.addInitScript(setting => {
-      if (setting === 'opt-out') localStorage.setItem('hotel-revealer-usage-allowed', 'false');
-      else if (setting === 'DNT') Object.defineProperty(navigator, 'doNotTrack', { get: () => '1' });
+      if (setting === 'DNT') Object.defineProperty(navigator, 'doNotTrack', { get: () => '1' });
       else if (setting === 'GPC') Object.defineProperty(navigator, 'globalPrivacyControl', { get: () => true });
       else Object.defineProperty(window, setting === 'blocked-local-storage' ? 'localStorage' : 'sessionStorage', {
         get: () => { throw new DOMException('Blocked for privacy', 'SecurityError'); },
@@ -144,9 +96,6 @@ for (const mode of ['opt-out', 'DNT', 'GPC', 'blocked-local-storage', 'blocked-s
     await mockOffers(page);
     await page.goto(searchPath);
     await expect(page.getByRole('link', { name: 'View hotel details', exact: true })).toBeVisible();
-    await page.getByRole('link', { name: 'Privacy', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Allow usage measurement', exact: true })).not.toBeChecked();
-    if (mode !== 'opt-out') await expect(page.getByRole('checkbox', { name: 'Allow usage measurement', exact: true })).toBeDisabled();
     await page.waitForLoadState('networkidle');
     expect(events).toEqual([]);
   });

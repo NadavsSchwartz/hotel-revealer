@@ -3,7 +3,7 @@ import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSearch, travelerReducer } from './state.ts';
 import { contextKey } from './context.ts';
-import { setUsageInternal, trackUsage } from './usage.ts';
+import { trackUsage } from './usage.ts';
 import type { UsageEvent } from '../../../shared/usage.ts';
 import type { SearchResponse, TripContext } from '../../../shared/contracts.ts';
 import type { TravelerAction } from './state.ts';
@@ -92,23 +92,4 @@ test('an actual request timeout is measured as a failure', async t => {
   await pending;
   assert.deepEqual(events.map(event => event.action), ['search_started', 'search_failed']);
   assert.equal(state.search.error?.code, 'DEADLINE_EXCEEDED');
-});
-
-test('marking internal activity emits immediately but never overrides opt-out or privacy signals', t => {
-  const events = fakeBrowser(t);
-  setUsageInternal(true);
-  assert.deepEqual(events.map(event => event.action), ['internal_marked']);
-  assert.equal(events[0].traffic, 'internal');
-  setUsageInternal(false);
-  assert.equal(events.length, 1);
-  window.localStorage.setItem('hotel-revealer-usage-allowed', 'false');
-  setUsageInternal(true);
-  assert.equal(events.length, 1);
-  window.localStorage.removeItem('hotel-revealer-usage-allowed');
-  Object.assign(window.navigator, { doNotTrack: '1' });
-  setUsageInternal(true);
-  assert.equal(events.length, 1);
-  Object.assign(window.navigator, { doNotTrack: '0', globalPrivacyControl: true });
-  setUsageInternal(true);
-  assert.equal(events.length, 1);
 });

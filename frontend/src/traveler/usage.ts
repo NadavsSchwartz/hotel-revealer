@@ -3,24 +3,15 @@ import type { UsageEvent } from '../../../shared/usage.ts';
 
 const browserKey = 'hotel-revealer-usage-browser';
 const sessionKey = 'hotel-revealer-usage-session';
-const preferenceKey = 'hotel-revealer-usage-allowed';
-const internalKey = 'hotel-revealer-usage-internal';
 const browserLifetime = 30 * 24 * 60 * 60_000;
 const sessionLifetime = 30 * 60_000;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-let disabledForVisit = false;
 
 type Measurement = { page?: UsageEvent['page'] } & (
   | { action: Exclude<UsageEvent['action'], 'search_succeeded' | 'detail_succeeded'> }
   | { action: 'search_succeeded'; coverage: NonNullable<UsageEvent['coverage']>; resultCount: number }
   | { action: 'detail_succeeded'; detailStatus: NonNullable<UsageEvent['detailStatus']>; quoteStatus: NonNullable<UsageEvent['quoteStatus']> }
 );
-
-export interface UsagePreferences {
-  allowed: boolean;
-  internal: boolean;
-  blocked: 'privacy-signal' | 'storage' | null;
-}
 
 function privacySignal() {
   const browser = window.navigator as Navigator & { globalPrivacyControl?: boolean };
@@ -35,41 +26,16 @@ function checkStorage(storage: Storage) {
   storage.removeItem(key);
 }
 
-export function readUsagePreferences(): UsagePreferences {
-  if (typeof window === 'undefined') return { allowed: false, internal: false, blocked: 'storage' };
+function canTrack() {
+  if (typeof window === 'undefined') return false;
   try {
-    const internal = window.localStorage.getItem(internalKey) === 'true';
-    if (privacySignal()) return { allowed: false, internal, blocked: 'privacy-signal' };
+    if (privacySignal()) return false;
     checkStorage(window.localStorage);
     checkStorage(window.sessionStorage);
-    return { allowed: !disabledForVisit && window.localStorage.getItem(preferenceKey) !== 'false', internal, blocked: null };
+    return true;
   } catch {
-    return { allowed: false, internal: false, blocked: 'storage' };
+    return false;
   }
-}
-
-export function setUsageAllowed(allowed: boolean): UsagePreferences {
-  disabledForVisit = !allowed;
-  try {
-    window.localStorage.setItem(preferenceKey, String(allowed));
-    if (!allowed) {
-      window.localStorage.removeItem(browserKey);
-      window.sessionStorage.removeItem(sessionKey);
-    }
-  } catch {
-    disabledForVisit = true;
-  }
-  return readUsagePreferences();
-}
-
-export function setUsageInternal(internal: boolean): UsagePreferences {
-  try {
-    window.localStorage.setItem(internalKey, String(internal));
-    if (internal) trackUsage({ action: 'internal_marked' });
-  } catch {
-    disabledForVisit = true;
-  }
-  return readUsagePreferences();
 }
 
 export function usagePage(pathname: string): UsageEvent['page'] {
@@ -109,13 +75,7 @@ function storedRecord(value: string | null): Record<string, unknown> {
 // must not change a search, its result, or a provider navigation.
 export function trackUsage(measurement: Measurement): void {
   try {
-    const preferences = readUsagePreferences();
-    if (!preferences.allowed) return;
-    // A bookmark can mark the owner's browser before its first measured visit.
-    if (new URLSearchParams(window.location.search).get('usage') === 'internal') {
-      window.localStorage.setItem(internalKey, 'true');
-      preferences.internal = true;
-    }
+    if (!canTrack()) return;
     const now = Date.now();
     const previousBrowser = storedRecord(window.localStorage.getItem(browserKey));
     const browser = typeof previousBrowser.id === 'string' && uuid.test(previousBrowser.id) &&
@@ -139,7 +99,7 @@ export function trackUsage(measurement: Measurement): void {
       page: measurement.page ?? usagePage(window.location.pathname),
       device: window.innerWidth < 768 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop',
       source: session.source,
-      traffic: preferences.internal ? 'internal' : window.navigator.webdriver ? 'automated' : 'browser',
+      traffic: window.navigator.webdriver ? 'automated' : 'browser',
     };
     if (measurement.action === 'search_succeeded') {
       payload.coverage = measurement.coverage;

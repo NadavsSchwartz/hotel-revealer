@@ -22,7 +22,6 @@ export function parseUsageEvent(value: unknown): UsageEvent | null {
   if (!['eventId', 'browserId', 'sessionId'].every(key => typeof input[key] === 'string' && uuid.test(input[key]))) return null;
   if (!oneOf(input.action, USAGE_ACTIONS) || !oneOf(input.page, USAGE_PAGES) || !oneOf(input.device, USAGE_DEVICES)
     || !oneOf(input.source, USAGE_SOURCES) || !oneOf(input.traffic, USAGE_TRAFFIC)) return null;
-  if (input.action === 'internal_marked' && input.traffic !== 'internal') return null;
   if ('coverage' in input && (input.action !== 'search_succeeded' || !oneOf(input.coverage, ['complete', 'partial']))) return null;
   if ('resultCount' in input && (input.action !== 'search_succeeded' || !Number.isInteger(input.resultCount)
     || Number(input.resultCount) < 0 || Number(input.resultCount) > MAX_USAGE_RESULTS)) return null;

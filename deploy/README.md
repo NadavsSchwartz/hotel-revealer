@@ -388,7 +388,7 @@ supplies synthetic events and a fake Docker executable.
 
 The browser sends allowlisted events to this app's `/api/v1/usage` endpoint:
 page views, search/detail requests and validated outcomes, and original-offer
-clicks. The existing daily report separates ordinary browser, marked internal,
+clicks. The existing daily report separates ordinary browser, internal test,
 and suspected automated traffic. It includes distinct browser and tab-session
 counts, page views, device/referral categories, and the steps reached in a session.
 It does not count static assets or health checks as page views.
@@ -397,16 +397,13 @@ Browser IDs are random, stored in local storage for at most 30 days, and do not
 identify a person. Tab sessions expire after 30 minutes without a measured action.
 Multiple devices count separately, shared browsers can combine people, and
 storage clearing changes identity. Disabled JavaScript, blockers, unavailable
-storage, DNT, GPC and the privacy-page opt-out prevent measurement. Suspected bot
-classification is a heuristic. Counts are observed usage, not verified humans or
+storage, DNT and GPC prevent measurement. Suspected bot classification is a
+heuristic. Counts are observed usage, not verified humans or
 exhaustive traffic. A click to Priceline does not establish a booking.
 
-Before owner testing, open `/?usage=internal` to mark this browser before its
-first page view, or open `/privacy` and enable **Exclude this browser from
-visitor totals**. Reports exclude that browser's activity for any UTC day
-containing an internal marker. Earlier dates cannot be identified automatically;
-already generated reports change only when regenerated. Automated browsers are classified separately.
-The ordinary browser counts may still include unmarked owner testing.
+Automated browsers are classified separately. Local synthetic tests may use the
+internal-test category; ordinary production browser events do not expose a
+testing control or change the app UI.
 
 The collector writes `usage-YYYY-MM-DD.jsonl` under `usage/` beside
 `PROVIDER_STATE_FILE`. In the standard VPS layout this is
@@ -424,9 +421,9 @@ Raw records contain no trip text, travel dates, guest details, hotel/offer IDs,
 IP addresses, full user agents, full URLs or referrer hostnames.
 
 Deploy both the app image and the updated `daily-report.py` using the existing
-release and report-install steps. Preserve the host-specific Caddyfile. Verify a
-marked internal browser visit produces an internal event and an internal count
-in a partial report; leave normal visitor counts separate. See the implementation
+release and report-install steps. Preserve the host-specific Caddyfile. Verify
+synthetic browser events produce the expected daily report while leaving normal
+visitor counts separate. See the implementation
 and evidence record in [USAGE_ANALYTICS.md](../docs/USAGE_ANALYTICS.md).
 
 Run `npm run measure:capacity` with the pinned Node/npm toolchain to measure the

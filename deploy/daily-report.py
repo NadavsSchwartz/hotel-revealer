@@ -26,7 +26,7 @@ MAX_USAGE_BYTES = 5 * 1024 * 1024
 MAX_USAGE_LINE_BYTES = 2048
 COLLECTOR_GAP_SECONDS = 150
 USAGE_ACTIONS = ("page_view", "search_started", "search_succeeded", "search_failed",
-                 "detail_started", "detail_succeeded", "detail_failed", "provider_handoff", "internal_marked")
+                 "detail_started", "detail_succeeded", "detail_failed", "provider_handoff")
 USAGE_PAGES = ("home", "results", "detail", "privacy", "terms", "credits", "other")
 USAGE_DEVICES = ("mobile", "tablet", "desktop")
 USAGE_SOURCES = ("direct", "search", "social", "github", "external", "internal")
@@ -260,8 +260,6 @@ def usage_record(line):
                            ("source", USAGE_SOURCES), ("traffic", USAGE_TRAFFIC)):
         if event[field] not in allowed:
             raise ValueError("Invalid usage category")
-    if event["action"] == "internal_marked" and event["traffic"] != "internal":
-        raise ValueError("Invalid internal classification marker")
     for field in ("coverage", "resultCount"):
         if field in event and event["action"] != "search_succeeded":
             raise ValueError("Invalid search outcome")
@@ -278,7 +276,7 @@ def usage_record(line):
 
 def summarize_usage(lines, start, end, *, available=True, capped=False):
     result = {"available": available, "capped": capped, "invalid": 0, "duplicates": 0, "conflicts": 0,
-              "events": [], "markers": [], "classification_markers": 0, "first": None, "last": None}
+              "events": [], "markers": [], "first": None, "last": None}
     seen = {}
     for line in lines:
         if not line.strip():
@@ -301,20 +299,12 @@ def summarize_usage(lines, start, end, *, available=True, capped=False):
             continue
         seen[event["eventId"]] = event
         result["events"].append((timestamp, event))
-        if event["action"] != "internal_marked":
-            result["first"] = min(timestamp, result["first"] or timestamp)
-            result["last"] = max(timestamp, result["last"] or timestamp)
-    # A browser marked as testing/automation anywhere in this day is excluded from
-    # ordinary browser totals, including earlier events before that marker.
+        result["first"] = min(timestamp, result["first"] or timestamp)
+        result["last"] = max(timestamp, result["last"] or timestamp)
     traffic = {}
     for _, event in result["events"]:
         identity = event["browserId"]
-        classification = "internal" if event["action"] == "internal_marked" else event["traffic"]
-        traffic[identity] = max(traffic.get(identity, "browser"), classification, key=USAGE_TRAFFIC.index)
-    # Classification controls update attribution without creating measured activity.
-    interactions = [item for item in result["events"] if item[1]["action"] != "internal_marked"]
-    result["classification_markers"] = len(result["events"]) - len(interactions)
-    result["events"] = interactions
+        traffic[identity] = max(traffic.get(identity, "browser"), event["traffic"], key=USAGE_TRAFFIC.index)
     groups = {kind: {"browsers": set(), "sessions": {}, "actions": Counter(), "pages": Counter(),
                      "search": Counter(), "detail": Counter()} for kind in USAGE_TRAFFIC}
     for timestamp, event in sorted(result["events"], key=lambda item: item[0]):
@@ -387,7 +377,7 @@ def read_usage(directory, start, end):
 def usage_coverage(usage, start, end, now):
     markers = sorted(set(usage["markers"]))
     reasons = []
-    unavailable = not usage["available"] or not usage["events"] and not usage["classification_markers"] and not markers
+    unavailable = not usage["available"] or not usage["events"] and not markers
     if unavailable:
         reasons.append("No readable collection evidence for this UTC day; missing, empty, expired or unavailable collection is not zero traffic.")
     if end > now:
@@ -419,13 +409,11 @@ def render_usage(usage, start, end, now):
              f"- Browser usage coverage: {coverage}."]
     lines.extend(f"- {reason}" for reason in reasons)
     lines.append(f"- Accepted unique events: {len(usage['events'])}; duplicate event IDs ignored: {usage['duplicates']}; malformed/incomplete records: {usage['invalid']}; conflicting duplicates: {usage['conflicts']}.")
-    if usage["classification_markers"]:
-        lines.append(f"- Internal classification markers: {usage['classification_markers']} (excluded from activity totals).")
     if usage["first"]:
         lines.append(f"- Observed browser event range: {stamp(usage['first'])} to {stamp(usage['last'])}.")
-    lines.extend(["", "Collector continuity is observed availability, not a lossless-delivery guarantee. JavaScript blocked, opt-out, DNT/GPC, blocked storage and ad blockers are unobservable. Bot classification is heuristic; unmarked activity is not proof of a human visitor.",
+    lines.extend(["", "Collector continuity is observed availability, not a lossless-delivery guarantee. JavaScript blocked, DNT/GPC, blocked storage and ad blockers are unobservable. Bot classification is heuristic; unmarked activity is not proof of a human visitor.",
                   "Random browser IDs are approximate browsers, not people. IDs expire after 30 days; devices, browsers, cleared storage and separate tabs can overcount people. Sessions are per tab, expire after 30 minutes of inactivity, and are counted once per UTC day with an observed event.",
-                  "Any internal/testing marker for a browser in this day excludes that browser's events from ordinary totals; otherwise any automation marker classifies it as suspected automation.", ""])
+                  "Internal/testing and suspected automation are reported separately from ordinary browser activity.", ""])
     if coverage == "unavailable":
         lines.extend(["Browser, session, page-view and action totals: n/a (collection unavailable).", ""])
         return lines
@@ -440,14 +428,12 @@ def render_usage(usage, start, end, now):
     sessions = list(group["sessions"].values())
     total_sessions = len(sessions)
     lines.extend(["", "Engaged means at least two page views or a search, detail or original-offer action observed in the same tab session during this UTC day. Page views exclude assets, health checks and raw HTTP requests.",
-                  "All breakdowns below use unmarked browser activity only; marked internal/testing and suspected automation are excluded. Zero means no observed events in the available collection, not proof that nobody visited.",
+                  "The ordinary browser breakdown excludes internal/testing and suspected automation. Zero means no observed events in the available collection, not proof that nobody visited.",
                   "", "### Pages and action reach", "",
                   "| Page | Page views |", "| --- | ---: |"])
     lines.extend(f"| {page} | {group['pages'][page]} |" for page in USAGE_PAGES)
     lines.extend(["", "| Action | Unique events | Sessions reaching action / observed browser sessions |", "| --- | ---: | --- |"])
     for action in USAGE_ACTIONS:
-        if action == "internal_marked":
-            continue
         reached = sum(session["actions"][action] > 0 for session in sessions)
         lines.append(f"| {action.replace('_', ' ')} | {group['actions'][action]} | {percent(reached, total_sessions)} |")
     lines.extend(["", "Action reach is an unordered step count, not an ordered conversion funnel. Starts and terminal outcomes can occur on different days; they are not paired attempts. Intentional aborts do not count as failures. Original-offer handoffs are clicks, not bookings.",

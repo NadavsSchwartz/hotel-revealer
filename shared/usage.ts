@@ -1,7 +1,7 @@
 // First-party usage payloads contain categories and random identifiers only.
 // Never add URLs, trip parameters, hotel/offer IDs, free text, IPs or full user agents.
 export const USAGE_ACTIONS = ['page_view', 'search_started', 'search_succeeded', 'search_failed',
-  'detail_started', 'detail_succeeded', 'detail_failed', 'provider_handoff', 'internal_marked'] as const;
+  'detail_started', 'detail_succeeded', 'detail_failed', 'provider_handoff'] as const;
 export const USAGE_PAGES = ['home', 'results', 'detail', 'privacy', 'terms', 'credits', 'other'] as const;
 export const USAGE_DEVICES = ['mobile', 'tablet', 'desktop'] as const;
 export const USAGE_SOURCES = ['direct', 'search', 'social', 'github', 'external', 'internal'] as const;

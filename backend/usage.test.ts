@@ -48,7 +48,6 @@ test('usage schema permits only categorical fields, v4 UUID identifiers and acti
   assert.ok(parseUsageEvent(event({ action: 'search_succeeded', resultCount: 5000 })));
   assert.ok(parseUsageEvent(event({ action: 'detail_succeeded', detailStatus: 'available', quoteStatus: 'unavailable' })));
   assert.ok(parseUsageEvent(event({ action: 'detail_succeeded', detailStatus: 'not_requested' })));
-  assert.ok(parseUsageEvent(event({ action: 'internal_marked', traffic: 'internal' })));
   for (const body of [null, [], 'page_view', {}, { ...valid, version: 2 }, { ...valid, timestamp: '2026-09-12' },
     { ...valid, url: 'https://private.example' }, { ...valid, ip: '192.0.2.1' }, { ...valid, userAgent: 'Browser' },
     { ...valid, searchText: 'private trip' }, { ...valid, eventId: 'arbitrary text' },
@@ -57,11 +56,6 @@ test('usage schema permits only categorical fields, v4 UUID identifiers and acti
     { ...valid, resultCount: '1' }, { ...valid, coverage: 'unknown' }, { ...valid, quoteStatus: 'available' },
     event({ coverage: 'complete' }), event({ resultCount: 1 }), event({ detailStatus: 'available' }),
     { ...event({ action: 'detail_succeeded' }), quoteStatus: 'not_requested' },
-    event({ action: 'internal_marked', traffic: 'browser' }), event({ action: 'internal_marked', traffic: 'automated' }),
-    event({ action: 'internal_marked', traffic: 'internal', coverage: 'complete' }),
-    event({ action: 'internal_marked', traffic: 'internal', resultCount: 0 }),
-    event({ action: 'internal_marked', traffic: 'internal', detailStatus: 'available' }),
-    event({ action: 'internal_marked', traffic: 'internal', quoteStatus: 'available' }),
   ]) assert.equal(parseUsageEvent(body), null, JSON.stringify(body));
 });
 
@@ -87,7 +81,7 @@ test('ingestion checks origin, privacy headers, media type and body bounds befor
   assert.ok(app.logs.some(value => typeof value === 'object' && value && 'route' in value && value.route === '/api/v1/usage'));
 });
 
-test('traffic classification preserves internal testing and treats automated/browser reports as heuristics', async t => {
+test('traffic classification preserves explicit categories and treats automation as a heuristic', async t => {
   const records: UsageEvent[] = [];
   const app = await serve(t, { usageStore: { append: async value => { records.push(value); return true; } } });
   await app.request(event(), { 'User-Agent': 'Mozilla HeadlessChrome private-UA', 'X-Forwarded-For': '192.0.2.55' });

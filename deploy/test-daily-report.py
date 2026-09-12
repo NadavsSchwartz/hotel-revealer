@@ -92,34 +92,6 @@ class UsageTests(unittest.TestCase):
         self.assertNotIn("99", body)
         self.assertEqual(result["groups"]["browser"]["search"], {})
 
-    def test_internal_marker_reclassifies_prior_activity_without_creating_activity(self):
-        control = usage(2, action="internal_marked", traffic="internal", page="privacy",
-                        sessionId="20000000-0000-4000-8000-000000000002",
-                        timestamp="2020-01-02T13:00:00Z")
-        marker_only_browser = usage(3, action="internal_marked", traffic="internal",
-                                    browserId="10000000-0000-4000-8000-000000000002")
-        result = summarize_usage([usage(), control, marker_only_browser], full_markers())
-        self.assertEqual(result["invalid"], 0)
-        self.assertEqual(result["classification_markers"], 2)
-        self.assertEqual(len(result["events"]), 1)
-        self.assertEqual(result["last"], report.instant(usage()["timestamp"]))
-        internal = result["groups"]["internal"]
-        self.assertEqual(len(internal["browsers"]), 1)
-        self.assertEqual(len(internal["sessions"]), 1)
-        self.assertEqual(internal["actions"], {"page_view": 1})
-        self.assertEqual(internal["pages"], {"home": 1})
-        body = render_usage(result)
-        self.assertIn("| Unmarked browser | 0 | 0 | 0 | 0 | 0 |", body)
-        self.assertIn("| Internal/testing | 1 | 1 | 0 | 1 | 1 |", body)
-        self.assertIn("Internal classification markers: 2 (excluded from activity totals)", body)
-        self.assertNotIn("| internal marked |", body)
-        only_control = summarize_usage([control])
-        self.assertIn("Browser usage coverage: partial", render_usage(only_control))
-        self.assertEqual(only_control["groups"]["internal"]["sessions"], {})
-        self.assertIsNone(only_control["first"])
-        for fields in ({"traffic": "browser"}, {"traffic": "automated"}, {"coverage": "complete"}):
-            self.assertEqual(summarize_usage([{**control, **fields}])["invalid"], 1)
-
     def test_search_detail_outcomes_have_explicit_non_overlapping_denominators(self):
         events = [usage(1, action="search_started"),
                   usage(2, action="search_succeeded", coverage="complete", resultCount=4),
